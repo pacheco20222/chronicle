@@ -104,6 +104,27 @@ def get_latest(
     return {"id": record.id, **record.payload}
 
 
+def get_recent(
+    client: QdrantClient,
+    project: str,
+    type_: str,
+    k: int = 5,
+    collection: str = config.COLLECTION_NAME,
+) -> list[dict]:
+    must = [
+        models.FieldCondition(key="project", match=models.MatchValue(value=project)),
+        models.FieldCondition(key="type", match=models.MatchValue(value=type_)),
+    ]
+    records, _ = client.scroll(
+        collection_name=collection,
+        scroll_filter=models.Filter(must=must),
+        order_by=models.OrderBy(key="created_at", direction="desc"),
+        limit=k,
+        with_payload=True,
+    )
+    return [{"id": r.id, **r.payload} for r in records]
+
+
 def get_document(
     client: QdrantClient,
     project: str,

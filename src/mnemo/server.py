@@ -27,7 +27,9 @@ mcp = FastMCP(
         "timestamp. Never use memory_search for this: it ranks by semantic "
         "similarity to the query text, not recency, and can surface an "
         "older but more textually-relevant memory instead of the newest "
-        "one. The project overview document is NOT a checkpoint — never "
+        "one. memory_search with type=\"checkpoint\" also returns checkpoints "
+        "newest-first (query ignored), so it can never surface a stale one "
+        "ahead of the latest. The project overview document is NOT a checkpoint — never "
         "present it as one. There is also memory_search_global(query, "
         "type, k), which searches across every project, not just this "
         "one. Only call it when the user explicitly asks for something "
@@ -70,6 +72,9 @@ def memory_add(content: str, type: str) -> dict:
 @mcp.tool
 def memory_search(query: str, type: str | None = None, k: int = 5) -> list[dict]:
     project = config.get_project()
+    if type == "checkpoint":
+        # Checkpoints are a timeline, not a topic: newest first, query ignored.
+        return store.get_recent(_get_client(), project, "checkpoint", k=k)
     vector = embeddings.embed_text(query)
     return store.search_memory(_get_client(), vector, project, type_=type, k=k)
 

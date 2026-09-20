@@ -160,3 +160,12 @@ def test_memory_register_project_rejects_empty_name(tmp_path, monkeypatch):
     monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(ValueError):
         server.memory_register_project("   ")
+
+
+def test_memory_search_checkpoint_type_is_newest_first_ignoring_query():
+    server.memory_add("alpha deployment kubernetes rollout notes", "checkpoint")
+    newest = server.memory_add("zzz unrelated newest checkpoint", "checkpoint")
+    results = server.memory_search("alpha deployment kubernetes rollout", type="checkpoint", k=5)
+    assert results[0]["id"] == newest["id"]
+    stamps = [r["created_at"] for r in results]
+    assert stamps == sorted(stamps, reverse=True)

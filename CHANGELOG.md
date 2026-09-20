@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.2 — 2026-09-20
+
+### Fixed
+- `memory_search(type="checkpoint")` now returns checkpoints newest-first
+  (query ignored). Semantic ranking could put an old checkpoint ahead of
+  the latest for any agent that searched instead of calling
+  `memory_get_latest` — the wrong-checkpoint bug is now impossible via
+  either tool.
+
 ## 2.3.1 — 2026-09-20
 
 ### Fixed
