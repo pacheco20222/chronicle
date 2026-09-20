@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.3.0 — 2026-09-20
+
+### Added
+- `mnemo graph` renders a glowing 3D network you can orbit (drag) and
+  zoom (scroll), with depth fading and light pulses along edges.
+  Node dragging removed in favor of orbit.
+
+### Fixed
+- Session-start recall now prints the latest checkpoint FIRST, labeled
+  "LATEST CHECKPOINT", and labels the project overview "NOT a
+  checkpoint". Previously overview came first and an agent asked for
+  "the latest checkpoint" answered from the (older) overview instead.
+  Server instructions also state the overview is not a checkpoint.
+- Graph HTML declares UTF-8 (fixed `Â·` mojibake over HTTP).
+
 ## 2.2.0 — 2026-09-15
 
 ### Added

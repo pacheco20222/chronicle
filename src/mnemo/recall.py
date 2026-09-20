@@ -15,7 +15,11 @@ def latest_checkpoint(project: str) -> str | None:
         return None
     if record is None:
         return None
-    return f"[Mnemo] Resuming from last checkpoint ({record['created_at']}):\n{record['content']}"
+    return (
+        f"[Mnemo] LATEST CHECKPOINT (saved {record['created_at']}) — the most recent "
+        f"saved state for this project. Treat this as the answer to \"what is the "
+        f"latest checkpoint\" and resume from it:\n{record['content']}"
+    )
 
 
 def overview_document(project: str) -> str | None:
@@ -27,7 +31,10 @@ def overview_document(project: str) -> str | None:
         return None
     if record is None:
         return None
-    return f"[Mnemo] Project overview (updated {record['updated_at']}):\n{record['content']}"
+    return (
+        f"[Mnemo] Project overview — background reference only, NOT a checkpoint "
+        f"(updated {record['updated_at']}):\n{record['content']}"
+    )
 
 
 def main() -> None:
@@ -39,12 +46,12 @@ def main() -> None:
             project = ""
     if not project:
         return
-    overview = overview_document(project)
-    if overview:
-        print(overview)
     checkpoint = latest_checkpoint(project)
     if checkpoint:
         print(checkpoint)
+    overview = overview_document(project)
+    if overview:
+        print(overview)
 
 
 if __name__ == "__main__":

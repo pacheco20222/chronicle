@@ -15,7 +15,7 @@ another repo's memory by accident.
 - **Named documents** — a project overview or running dev log that updates in place instead of piling up, also auto-loaded every session.
 - **`memory_search_global`** — the one explicit, deliberate escape hatch for a genuinely cross-project question.
 - **`mnemo import`** — bulk-load an existing file into a project's memory. Run yourself, from a terminal — see [docs/INSTALL.md §6](docs/INSTALL.md#6-running-mnemos-other-commands-import-graph).
-- **`mnemo graph`** — a real, embedding-similarity graph of your memories, rendered locally and opened in your browser. Scoped to the current project by default, same as everything else; `--all` graphs every project together, deliberately. Same terminal invocation as `import` above.
+- **`mnemo graph`** — a real, embedding-similarity graph of your memories, rendered as a glowing 3D network you can orbit and zoom, locally and opened in your browser. Scoped to the current project by default, same as everything else; `--all` graphs every project together, deliberately. Same terminal invocation as `import` above.
 
 ## Requirements
 

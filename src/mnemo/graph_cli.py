@@ -82,7 +82,8 @@ def main(argv: list[str]) -> None:
     webbrowser.open(out_path.as_uri())
 
 
-_TEMPLATE = r"""<title>Mnemo Graph</title>
+_TEMPLATE = r"""<meta charset="utf-8">
+<title>Mnemo Graph</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -104,7 +105,7 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
   html, body {
     margin: 0;
     height: 100%;
-    background: var(--bg);
+    background: radial-gradient(ellipse at 50% 45%, #1d1812 0%, var(--bg) 70%);
     color: var(--ink);
     font-family: "Source Serif 4", Georgia, serif;
     overflow: hidden;
@@ -288,7 +289,7 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
 </header>
 
 <div class="legend" id="legend"></div>
-<div class="hint">drag to rearrange · hover to trace · click to read</div>
+<div class="hint">drag to orbit · scroll to zoom · hover to trace · click to read</div>
 <div class="node-label" id="node-label"></div>
 
 <div class="overlay" id="overlay" hidden>
@@ -345,8 +346,17 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
 
   const nodeById = {};
   const nodes = GRAPH.nodes.map((n, i) => {
-    const angle = (i / GRAPH.nodes.length) * Math.PI * 2;
-    const obj = { ...n, x: Math.cos(angle) * 160, y: Math.sin(angle) * 160, vx: 0, vy: 0, r: 9, degree: 0 };
+    const total = GRAPH.nodes.length;
+    const phi = Math.acos(1 - 2 * (i + 0.5) / total);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+    const R = 170;
+    const obj = {
+      ...n,
+      x: R * Math.sin(phi) * Math.cos(theta),
+      y: R * Math.sin(phi) * Math.sin(theta),
+      z: R * Math.cos(phi),
+      vx: 0, vy: 0, vz: 0, r: 9, degree: 0,
+    };
     nodeById[n.id] = obj;
     return obj;
   });
@@ -364,33 +374,33 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i], b = nodes[j];
-        let dx = a.x - b.x, dy = a.y - b.y;
-        let distSq = dx * dx + dy * dy;
+        let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+        let distSq = dx * dx + dy * dy + dz * dz;
         if (distSq < 1) distSq = 1;
         const dist = Math.sqrt(distSq);
         const force = REPEL / distSq;
-        const fx = (dx / dist) * force, fy = (dy / dist) * force;
-        a.vx += fx; a.vy += fy;
-        b.vx -= fx; b.vy -= fy;
+        const fx = (dx / dist) * force, fy = (dy / dist) * force, fz = (dz / dist) * force;
+        a.vx += fx; a.vy += fy; a.vz += fz;
+        b.vx -= fx; b.vy -= fy; b.vz -= fz;
       }
     }
 
     for (const e of edges) {
-      const dx = e.t.x - e.s.x, dy = e.t.y - e.s.y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const dx = e.t.x - e.s.x, dy = e.t.y - e.s.y, dz = e.t.z - e.s.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
       const rest = 260 - e.sim * 190;
       const force = (dist - rest) * SPRING;
-      const fx = (dx / dist) * force, fy = (dy / dist) * force;
-      e.s.vx += fx; e.s.vy += fy;
-      e.t.vx -= fx; e.t.vy -= fy;
+      const fx = (dx / dist) * force, fy = (dy / dist) * force, fz = (dz / dist) * force;
+      e.s.vx += fx; e.s.vy += fy; e.s.vz += fz;
+      e.t.vx -= fx; e.t.vy -= fy; e.t.vz -= fz;
     }
 
     for (const n of nodes) {
-      if (n.pinned) continue;
       n.vx -= n.x * CENTER;
       n.vy -= n.y * CENTER;
-      n.vx *= DAMP; n.vy *= DAMP;
-      n.x += n.vx; n.y += n.vy;
+      n.vz -= n.z * CENTER;
+      n.vx *= DAMP; n.vy *= DAMP; n.vz *= DAMP;
+      n.x += n.vx; n.y += n.vy; n.z += n.vz;
     }
   }
 
@@ -412,11 +422,25 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
   resize();
 
   let hoverNode = null;
-  let dragNode = null;
-  let dragOffset = { x: 0, y: 0 };
+  let yaw = 0.6, pitch = 0.25, zoom = 1;
+  let autoRotate = !REDUCE_MOTION;
+  let orbiting = false, orbitMoved = false, lastX = 0, lastY = 0, idleSince = 0;
+  const FOCAL = 720;
 
-  function toScreen(n) { return { x: W / 2 + n.x, y: H / 2 + n.y }; }
-  function fromScreen(x, y) { return { x: x - W / 2, y: y - H / 2 }; }
+  function project(n) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const x1 = n.x * cy + n.z * sy;
+    const z1 = -n.x * sy + n.z * cy;
+    const y2 = n.y * cp - z1 * sp;
+    const z2 = n.y * sp + z1 * cp;
+    const scale = (FOCAL / (FOCAL + z2 + 260)) * zoom;
+    return { x: W / 2 + x1 * scale, y: H / 2 + y2 * scale, z: z2, s: scale };
+  }
+
+  function depthAlpha(z) {
+    return Math.max(0.18, Math.min(1, 1 - (z + 260) / 700));
+  }
 
   function connectedIds(n) {
     const set = new Set([n.id]);
@@ -424,52 +448,97 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
     return set;
   }
 
-  function draw() {
+  function hexToRgb(h) {
+    const v = parseInt(h.slice(1), 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+
+  function draw(t) {
     ctx.clearRect(0, 0, W, H);
     const highlight = hoverNode ? connectedIds(hoverNode) : null;
+    nodes.forEach(n => { n.p = project(n); });
 
-    for (const e of edges) {
-      const p1 = toScreen(e.s), p2 = toScreen(e.t);
+    const sortedEdges = edges.slice().sort((a, b) => (b.s.p.z + b.t.p.z) - (a.s.p.z + a.t.p.z));
+    for (const e of sortedEdges) {
+      const p1 = e.s.p, p2 = e.t.p;
       const dim = highlight && !(highlight.has(e.s.id) && highlight.has(e.t.id));
-      ctx.strokeStyle = dim ? "rgba(232,223,200,0.05)" : (highlight ? "rgba(232,223,200,0.55)" : `rgba(232,223,200,${0.08 + e.sim * 0.22})`);
-      ctx.lineWidth = highlight && !dim ? 1.4 : 1;
+      const da = depthAlpha((p1.z + p2.z) / 2);
+      const base = dim ? 0.03 : (highlight ? 0.6 : 0.1 + e.sim * 0.3);
+      const c1 = hexToRgb(PROJECT_COLOR[e.s.project]), c2 = hexToRgb(PROJECT_COLOR[e.t.project]);
+      const grad = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+      grad.addColorStop(0, `rgba(${c1[0]},${c1[1]},${c1[2]},${base * da})`);
+      grad.addColorStop(1, `rgba(${c2[0]},${c2[1]},${c2[2]},${base * da})`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = (highlight && !dim ? 1.6 : 1) * Math.max(0.5, (p1.s + p2.s) / 2);
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
+
+      if (!REDUCE_MOTION && !dim) {
+        const f = ((t * 0.00025 * (0.6 + e.sim) + e.phase) % 1);
+        const px = p1.x + (p2.x - p1.x) * f, py = p1.y + (p2.y - p1.y) * f;
+        const ps = Math.max(0.6, (p1.s + p2.s) / 2);
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, da * 1.2);
+        ctx.shadowColor = "#fff";
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = "rgba(255,244,220,0.95)";
+        ctx.beginPath();
+        ctx.arc(px, py, 1.5 * ps, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
 
-    for (const n of nodes) {
-      const p = toScreen(n);
+    const sorted = nodes.slice().sort((a, b) => b.p.z - a.p.z);
+    for (const n of sorted) {
+      const p = n.p;
       const dim = highlight && !highlight.has(n.id);
       const color = PROJECT_COLOR[n.project];
-      ctx.save();
-      ctx.globalAlpha = dim ? 0.28 : 1;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = n === hoverNode ? 22 : 10;
+      const rgb = hexToRgb(color);
+      const rad = n.r * p.s * (n === hoverNode ? 1.25 : 1);
+      const a = (dim ? 0.25 : 1) * depthAlpha(p.z);
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad * 3.2);
+      glow.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.55 * a})`);
+      glow.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
+      ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, n.r, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, rad * 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
       ctx.fillStyle = color;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(p.x - rad * 0.3, p.y - rad * 0.3, rad * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.fill();
       ctx.restore();
     }
   }
 
-  function loop() {
+  edges.forEach(e => { e.phase = Math.random(); });
+
+  function loop(t) {
     if (!REDUCE_MOTION) simTick();
-    draw();
+    if (autoRotate && !orbiting && t - idleSince > 1500) yaw += 0.0026;
+    draw(t || 0);
     requestAnimationFrame(loop);
   }
-  loop();
+  requestAnimationFrame(loop);
 
   function nodeAt(x, y) {
-    const p = fromScreen(x, y);
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const n = nodes[i];
-      const dx = n.x - p.x, dy = n.y - p.y;
-      if (dx * dx + dy * dy <= (n.r + 4) * (n.r + 4)) return n;
+    let best = null, bestZ = Infinity;
+    for (const n of nodes) {
+      if (!n.p) continue;
+      const dx = n.p.x - x, dy = n.p.y - y;
+      const rr = n.r * n.p.s + 5;
+      if (dx * dx + dy * dy <= rr * rr && n.p.z < bestZ) { best = n; bestZ = n.p.z; }
     }
-    return null;
+    return best;
   }
 
   const labelEl = document.getElementById("node-label");
@@ -477,20 +546,21 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
   canvas.addEventListener("mousemove", (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    if (dragNode) {
-      const p = fromScreen(x, y);
-      dragNode.x = p.x + dragOffset.x;
-      dragNode.y = p.y + dragOffset.y;
-      dragNode.vx = 0; dragNode.vy = 0;
+    if (orbiting) {
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) orbitMoved = true;
+      yaw += dx * 0.006;
+      pitch = Math.max(-1.3, Math.min(1.3, pitch + dy * 0.006));
+      lastX = e.clientX; lastY = e.clientY;
+      labelEl.classList.remove("show");
       return;
     }
     const hit = nodeAt(x, y);
     hoverNode = hit;
     if (hit) {
-      const p = toScreen(hit);
       labelEl.textContent = `${hit.project} · ${hit.type} · ${preview(hit.content, 46)}`;
-      labelEl.style.left = p.x + "px";
-      labelEl.style.top = p.y + "px";
+      labelEl.style.left = hit.p.x + "px";
+      labelEl.style.top = hit.p.y + "px";
       labelEl.classList.add("show");
       canvas.style.cursor = "pointer";
     } else {
@@ -500,29 +570,28 @@ _TEMPLATE = r"""<title>Mnemo Graph</title>
   });
 
   canvas.addEventListener("mousedown", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const hit = nodeAt(x, y);
-    if (hit) {
-      dragNode = hit;
-      dragNode.pinned = true;
-      const p = fromScreen(x, y);
-      dragOffset = { x: hit.x - p.x, y: hit.y - p.y };
-      canvas.classList.add("dragging");
+    orbiting = true; orbitMoved = false;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.classList.add("dragging");
+  });
+
+  window.addEventListener("mouseup", (e) => {
+    if (!orbiting) return;
+    orbiting = false;
+    idleSince = performance.now();
+    canvas.classList.remove("dragging");
+    if (!orbitMoved) {
+      const rect = canvas.getBoundingClientRect();
+      const hit = nodeAt(e.clientX - rect.left, e.clientY - rect.top);
+      if (hit) openCase(hit.id);
     }
   });
 
-  let dragStartMoved = false;
-  window.addEventListener("mouseup", () => {
-    if (dragNode) {
-      canvas.classList.remove("dragging");
-      if (!dragStartMoved) openCase(dragNode.id);
-      dragNode.pinned = false;
-      dragNode = null;
-    }
-    dragStartMoved = false;
-  });
-  canvas.addEventListener("mousemove", () => { if (dragNode) dragStartMoved = true; });
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoom = Math.max(0.35, Math.min(3, zoom * (e.deltaY < 0 ? 1.08 : 0.93)));
+    idleSince = performance.now();
+  }, { passive: false });
 
   canvas.addEventListener("touchstart", (e) => {
     const t = e.touches[0];
