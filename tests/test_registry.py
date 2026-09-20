@@ -56,3 +56,47 @@ def test_load_raises_registry_error_on_corrupt_json(isolated_registry):
     isolated_registry.write_text("{not valid json")
     with pytest.raises(registry.RegistryError):
         registry.lookup(Path("/some/folder"))
+
+
+def _git(cwd, *args):
+    import subprocess
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def test_lookup_resolves_git_worktree_to_main_repo_project(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    main = tmp_path / "main"
+    main.mkdir()
+    _git(main, "init", "-q")
+    _git(main, "-c", "user.email=a@b", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x")
+    wt = tmp_path / "wt"
+    _git(main, "worktree", "add", "-q", str(wt), "-b", "feat")
+    registry.register(main, "main-project")
+    assert registry.lookup(wt) == "main-project"
+
+
+def test_lookup_worktree_own_registration_wins(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    main = tmp_path / "main"
+    main.mkdir()
+    _git(main, "init", "-q")
+    _git(main, "-c", "user.email=a@b", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x")
+    wt = tmp_path / "wt"
+    _git(main, "worktree", "add", "-q", str(wt), "-b", "feat")
+    registry.register(main, "main-project")
+    registry.register(wt, "wt-project")
+    assert registry.lookup(wt) == "wt-project"
+
+
+def test_lookup_non_git_dir_unregistered_returns_none(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    d = tmp_path / "plain"
+    d.mkdir()
+    assert registry.lookup(d) is None
+
+
+def test_register_refuses_home_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    with pytest.raises(ValueError):
+        registry.register(Path.home(), "oops")
+    assert not (tmp_path / "projects.json").exists()

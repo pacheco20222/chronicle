@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.3.1 — 2026-09-20
+
+### Fixed
+- Git worktrees resolve to their main repo's registered project. Registry
+  lookup matched exact folder only, so a session inside
+  `<repo>/.worktrees/x` failed with "not registered". A worktree's own
+  registration still wins if present.
+- `register` refuses the home directory and filesystem root (a stray
+  `~` registration silently bound any session run from home to a project).
+
 ## 2.3.0 — 2026-09-20
 
 ### Added

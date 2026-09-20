@@ -260,7 +260,9 @@ instead? Same registry, so this step is already done — skip it.)
 After that, any Codex session started in that folder resolves to
 `your-project-name` automatically, with no further Codex-specific
 step. Register a different folder for a different project the same
-way, and Codex follows along.
+way, and Codex follows along. Git worktrees of a registered repo
+resolve to that repo's project automatically — no separate
+registration per worktree.
 
 If you genuinely need two Codex sessions open in two different
 projects to resolve differently *at the exact same time*, that still

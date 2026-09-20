@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from pathlib import Path
 
 
@@ -24,6 +25,12 @@ def _load(path: Path) -> dict[str, str]:
 
 
 def register(cwd: Path, project: str) -> None:
+    resolved = cwd.resolve()
+    if resolved == Path.home().resolve() or resolved == Path(resolved.anchor):
+        raise ValueError(
+            f"refusing to register {resolved}: home/root is not a project "
+            f"folder. cd into the project first."
+        )
     path = registry_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     data = _load(path)
@@ -31,6 +38,26 @@ def register(cwd: Path, project: str) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True))
 
 
+def _main_worktree(cwd: Path) -> Path | None:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=cwd, capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    common = Path(out.stdout.strip())
+    return common.parent if common.name == ".git" else None
+
+
 def lookup(cwd: Path) -> str | None:
     data = _load(registry_path())
-    return data.get(str(cwd.resolve()))
+    hit = data.get(str(cwd.resolve()))
+    if hit:
+        return hit
+    main = _main_worktree(cwd)
+    if main is not None:
+        return data.get(str(main.resolve()))
+    return None
