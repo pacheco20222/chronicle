@@ -30,6 +30,18 @@ def _build_graph_data(records: list[dict], k: int = K_NEIGHBORS) -> dict:
         for j in neighbors:
             edge_set.add(tuple(sorted((i, j))))
 
+    latest_checkpoint = {}
+    for r in records:
+        if r["type"] == "checkpoint" and r.get("created_at", "") > latest_checkpoint.get(r["project"], ("", ""))[0]:
+            latest_checkpoint[r["project"]] = (r.get("created_at", ""), r["id"])
+
+    def _role(r: dict) -> str:
+        if r["type"] == "overview" or (r.get("slug") and r.get("slug") == r["project"]):
+            return "core"
+        if latest_checkpoint.get(r["project"], ("", None))[1] == r["id"]:
+            return "latest"
+        return ""
+
     nodes = [
         {
             "id": r["id"],
@@ -37,6 +49,8 @@ def _build_graph_data(records: list[dict], k: int = K_NEIGHBORS) -> dict:
             "type": r["type"],
             "content": r["content"],
             "slug": r.get("slug"),
+            "created_at": r.get("created_at"),
+            "role": _role(r),
         }
         for r in records
     ]
@@ -274,6 +288,37 @@ _TEMPLATE = r"""<meta charset="utf-8">
     display: flex; flex-wrap: wrap; gap: 4px 16px;
   }
 
+  .controls {
+    position: fixed;
+    top: clamp(16px, 3vw, 30px);
+    right: clamp(16px, 3vw, 34px);
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+    z-index: 6;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+  }
+  .controls input[type=search] {
+    background: rgba(27, 23, 18, 0.85);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 6px 10px;
+    width: 220px;
+    font: inherit;
+  }
+  .chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 360px; }
+  .chip {
+    background: rgba(27, 23, 18, 0.85);
+    border: 1px solid var(--border);
+    color: var(--ink-dim);
+    padding: 4px 9px;
+    cursor: pointer;
+    font: inherit;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .chip.active { color: var(--ink); border-color: var(--ink-dim); }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .keytoggle { color: var(--ink-dim); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
   @media (max-width: 640px) {
     .legend { display: none; }
     .hint { max-width: 46%; }
@@ -289,6 +334,11 @@ _TEMPLATE = r"""<meta charset="utf-8">
 </header>
 
 <div class="legend" id="legend"></div>
+<div class="controls">
+  <input type="search" id="q" placeholder="search memories…" aria-label="Search memories">
+  <div class="chips" id="chips"></div>
+  <label class="keytoggle"><input type="checkbox" id="keyOnly"> core + latest checkpoint only</label>
+</div>
 <div class="hint">drag to orbit · scroll to zoom · hover to trace · click to read</div>
 <div class="node-label" id="node-label"></div>
 
@@ -363,7 +413,17 @@ _TEMPLATE = r"""<meta charset="utf-8">
 
   const edges = GRAPH.edges.map(e => ({ ...e, s: nodeById[e.source], t: nodeById[e.target] }));
   edges.forEach(e => { e.s.degree++; e.t.degree++; });
-  nodes.forEach(n => { n.r = 7 + Math.min(n.degree, 6) * 1.1; });
+  nodes.forEach(n => { n.r = 7 + Math.min(n.degree, 6) * 1.1; if (n.role === "core") n.r *= 1.7; else if (n.role === "latest") n.r *= 1.35; });
+
+  const ANCHOR = {};
+  projects.forEach((p, i) => {
+    const a = (i / projects.length) * Math.PI * 2;
+    ANCHOR[p] = { x: Math.cos(a) * 330, y: Math.sin(a) * 190, z: Math.sin(a * 1.7) * 230 };
+  });
+
+  const state = { only: null, keyOnly: false, q: "" };
+  const isVisible = (n) => (!state.only || n.project === state.only) && (!state.keyOnly || n.role);
+  const matches = (n) => !state.q || (n.content + " " + (n.slug || "") + " " + n.type + " " + n.project).toLowerCase().includes(state.q);
 
   function simTick() {
     const REPEL = 2600;
@@ -396,6 +456,10 @@ _TEMPLATE = r"""<meta charset="utf-8">
     }
 
     for (const n of nodes) {
+      if (projects.length > 1) {
+        const anc = ANCHOR[n.project];
+        n.vx += (anc.x - n.x) * 0.009; n.vy += (anc.y - n.y) * 0.009; n.vz += (anc.z - n.z) * 0.009;
+      }
       n.vx -= n.x * CENTER;
       n.vy -= n.y * CENTER;
       n.vz -= n.z * CENTER;
@@ -460,6 +524,7 @@ _TEMPLATE = r"""<meta charset="utf-8">
 
     const sortedEdges = edges.slice().sort((a, b) => (b.s.p.z + b.t.p.z) - (a.s.p.z + a.t.p.z));
     for (const e of sortedEdges) {
+      if (!isVisible(e.s) || !isVisible(e.t)) continue;
       const p1 = e.s.p, p2 = e.t.p;
       const dim = highlight && !(highlight.has(e.s.id) && highlight.has(e.t.id));
       const da = depthAlpha((p1.z + p2.z) / 2);
@@ -493,8 +558,9 @@ _TEMPLATE = r"""<meta charset="utf-8">
 
     const sorted = nodes.slice().sort((a, b) => b.p.z - a.p.z);
     for (const n of sorted) {
+      if (!isVisible(n)) continue;
       const p = n.p;
-      const dim = highlight && !highlight.has(n.id);
+      const dim = (highlight && !highlight.has(n.id)) || !matches(n);
       const color = PROJECT_COLOR[n.project];
       const rgb = hexToRgb(color);
       const rad = n.r * p.s * (n === hoverNode ? 1.25 : 1);
@@ -516,7 +582,32 @@ _TEMPLATE = r"""<meta charset="utf-8">
       ctx.arc(p.x - rad * 0.3, p.y - rad * 0.3, rad * 0.35, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.fill();
+      if (n.role === "core") {
+        ctx.strokeStyle = "#F2C14E";
+        ctx.lineWidth = 2.4 * Math.max(0.7, p.s);
+        ctx.beginPath(); ctx.arc(p.x, p.y, rad * 1.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = a * 0.4; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, rad * 1.95, 0, Math.PI * 2); ctx.stroke();
+      } else if (n.role === "latest") {
+        const pulse = 1 + 0.14 * Math.sin((t || 0) / 320);
+        const d = rad * 1.6 * pulse;
+        ctx.strokeStyle = "#FFF4DC";
+        ctx.lineWidth = 2 * Math.max(0.7, p.s);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - d); ctx.lineTo(p.x + d, p.y); ctx.lineTo(p.x, p.y + d); ctx.lineTo(p.x - d, p.y);
+        ctx.closePath(); ctx.stroke();
+      }
       ctx.restore();
+      if (n.role && !dim) {
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.font = `${Math.round(11 * Math.max(0.85, p.s))}px "JetBrains Mono", monospace`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = n.role === "core" ? "#F2C14E" : "#FFF4DC";
+        const txt = n.role === "core" ? `${n.project} · CORE` : `${n.project} · latest checkpoint${n.created_at ? " " + n.created_at.slice(0, 10) : ""}`;
+        ctx.fillText(txt, p.x, p.y - rad * 2.3);
+        ctx.restore();
+      }
     }
   }
 
@@ -533,7 +624,7 @@ _TEMPLATE = r"""<meta charset="utf-8">
   function nodeAt(x, y) {
     let best = null, bestZ = Infinity;
     for (const n of nodes) {
-      if (!n.p) continue;
+      if (!n.p || !isVisible(n)) continue;
       const dx = n.p.x - x, dy = n.p.y - y;
       const rr = n.r * n.p.s + 5;
       if (dx * dx + dy * dy <= rr * rr && n.p.z < bestZ) { best = n; bestZ = n.p.z; }
@@ -621,6 +712,30 @@ _TEMPLATE = r"""<meta charset="utf-8">
 
   document.getElementById("legend").innerHTML = projects.map(p =>
     `<div class="legend-row"><span class="legend-dot" style="background:${PROJECT_COLOR[p]}"></span>${escapeHtml(p)}</div>`
-  ).join("");
+  ).join("") +
+    `<div class="legend-row"><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="none" stroke="#F2C14E" stroke-width="2"/></svg>core memory (project overview)</div>` +
+    `<div class="legend-row"><svg width="14" height="14"><path d="M7 1 L13 7 L7 13 L1 7 Z" fill="none" stroke="#FFF4DC" stroke-width="1.6"/></svg>latest checkpoint</div>`;
+
+  function fitZoom() {
+    const vis = nodes.filter(isVisible);
+    if (!vis.length) return;
+    const R = Math.max(...vis.map(n => Math.hypot(n.x, n.y, n.z)), 60);
+    zoom = Math.max(0.5, Math.min(2.6, (Math.min(W, H) * 0.36) / R));
+  }
+  const chipsEl = document.getElementById("chips");
+  function renderChips() {
+    chipsEl.innerHTML = "";
+    const mk = (label, key, color) => {
+      const b = document.createElement("button");
+      b.className = "chip" + ((state.only === key) ? " active" : "");
+      b.innerHTML = (color ? `<i style="background:${color}"></i>` : "") + escapeHtml(label);
+      b.addEventListener("click", () => { state.only = (state.only === key ? null : key); renderChips(); fitZoom(); });
+      chipsEl.appendChild(b);
+    };
+    if (projects.length > 1) projects.forEach(p => mk(p, p, PROJECT_COLOR[p]));
+  }
+  renderChips();
+  document.getElementById("q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); });
+  document.getElementById("keyOnly").addEventListener("change", (e) => { state.keyOnly = e.target.checked; fitZoom(); });
 </script>
 """

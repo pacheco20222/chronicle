@@ -103,3 +103,18 @@ def test_main_rejects_project_and_all_together(monkeypatch):
     monkeypatch.setenv("MNEMO_PROJECT", "env-project")
     with pytest.raises(SystemExit):
         graph_cli.main(["--project", "x", "--all"])
+
+
+def test_build_graph_data_marks_core_and_latest_checkpoint_per_project():
+    def rec(i, project, type_, created, slug=None):
+        return {"id": i, "vector": [1.0, float(len(i))], "project": project, "type": type_,
+                "content": i, "slug": slug, "created_at": created}
+    records = [
+        rec("c1", "p", "checkpoint", "2026-09-01T00:00:00+00:00"),
+        rec("c2", "p", "checkpoint", "2026-09-20T00:00:00+00:00"),
+        rec("doc", "p", "overview", "2026-08-01T00:00:00+00:00", slug="p"),
+        rec("old-doc", "q", "architecture", "2026-08-01T00:00:00+00:00", slug="q"),
+        rec("q1", "q", "checkpoint", "2026-09-05T00:00:00+00:00"),
+    ]
+    roles = {n["id"]: n["role"] for n in graph_cli._build_graph_data(records, k=1)["nodes"]}
+    assert roles == {"c1": "", "c2": "latest", "doc": "core", "old-doc": "core", "q1": "latest"}

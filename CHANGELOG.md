@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.0 — 2026-09-20
+
+### Added
+- `mnemo graph`: core memory (project overview) drawn as a gold ring, the
+  latest checkpoint per project as a pulsing diamond, both labeled. Project
+  chips isolate one project; "core + latest checkpoint only" hides
+  everything else; search box dims non-matching memories. Projects cluster
+  in their own region of the 3D space in `--all` view; view auto-fits on
+  filter change.
+
 ## 2.3.2 — 2026-09-20
 
 ### Fixed

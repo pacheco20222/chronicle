@@ -1,6 +1,6 @@
 {
   "name": "mnemo",
-  "version": "2.3.2",
+  "version": "2.4.0",
   "description": "Self-hosted, project-scoped memory MCP server for Claude Code and Codex. No cloud services, no paid APIs.",
   "author": {
     "name": "Jose Pacheco",
