@@ -87,6 +87,26 @@ not using Claude Code, want to see exactly what the plugin command
 does under the hood, or ran into something `/mnemo:mnemo-register` didn't
 handle.
 
+### Updating
+
+The plugin isn't per-project — every project that has it enabled reads
+from one shared cache (`~/.claude/plugins/cache/mnemo`), so you only
+update once, not once per project:
+
+```
+./scripts/update.sh
+```
+
+or by hand:
+
+```
+/plugin marketplace update mnemo
+/plugin update mnemo
+```
+
+Restart any open Claude Code or Codex session afterward to pick up the
+new version.
+
 ## Option B: Manual install
 
 ### 1. Clone and start the services
