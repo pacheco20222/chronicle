@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.0 — 2026-09-22
+
+### Changed
+- `mnemo graph`: KNN edges now default to same-project only, even in
+  `--all` view. New `--cross-project` opts back into edges across
+  projects. New `--min-similarity` (default 0.3) drops an edge entirely
+  when the best match is too weak, instead of always wiring up k
+  neighbors regardless of similarity.
+
 ## 2.4.0 — 2026-09-20
 
 ### Added
