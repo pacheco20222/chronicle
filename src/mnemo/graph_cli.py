@@ -22,6 +22,7 @@ def _build_graph_data(
     k: int = K_NEIGHBORS,
     cross_project: bool = False,
     min_similarity: float = MIN_SIMILARITY,
+    current_project: str | None = None,
 ) -> dict:
     n = len(records)
     sim = [[0.0] * n for _ in range(n)]
@@ -63,6 +64,7 @@ def _build_graph_data(
             "content": r["content"],
             "slug": r.get("slug"),
             "created_at": r.get("created_at"),
+            "status": r.get("status") or "active",
             "role": _role(r),
         }
         for r in records
@@ -88,7 +90,7 @@ def _build_graph_data(
                 }
             )
 
-    return {"nodes": nodes, "edges": edges, "k": k}
+    return {"nodes": nodes, "edges": edges, "k": k, "current_project": current_project}
 
 
 def _explicit_relations(record: dict) -> list[dict]:
@@ -129,6 +131,14 @@ def main(argv: list[str]) -> None:
 
     project = None if args.all else (args.project or config.get_project())
 
+    if project is not None:
+        default_focus = project
+    else:
+        try:
+            default_focus = config.get_project()
+        except RuntimeError:
+            default_focus = None
+
     client = store.get_client()
     records = store.get_all_with_vectors(client, project=project)
 
@@ -136,7 +146,12 @@ def main(argv: list[str]) -> None:
         print("Need at least 2 memories to build a graph.")
         return
 
-    graph = _build_graph_data(records, cross_project=args.cross_project, min_similarity=args.min_similarity)
+    graph = _build_graph_data(
+        records,
+        cross_project=args.cross_project,
+        min_similarity=args.min_similarity,
+        current_project=default_focus,
+    )
     html = _render_html(graph)
 
     out_path = Path(args.out) if args.out else Path.cwd() / f"mnemo-graph-{int(time.time())}.html"
@@ -355,6 +370,15 @@ _TEMPLATE = r"""<meta charset="utf-8">
     font: inherit;
   }
   .chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 360px; }
+  .filter-row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+  .controls select, .controls input[type=date] {
+    background: rgba(27, 23, 18, 0.85);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 5px 8px;
+    font: inherit;
+  }
+  .controls input[type=range] { accent-color: var(--stamp); vertical-align: middle; }
   .chip {
     background: rgba(27, 23, 18, 0.85);
     border: 1px solid var(--border);
@@ -386,6 +410,21 @@ _TEMPLATE = r"""<meta charset="utf-8">
 <div class="controls">
   <input type="search" id="q" placeholder="search memories…" aria-label="Search memories">
   <div class="chips" id="chips"></div>
+  <div class="filter-row">
+    <select id="typeFilter" aria-label="Filter by memory type"><option value="">all types</option></select>
+    <select id="statusFilter" aria-label="Filter by status"><option value="">all statuses</option></select>
+  </div>
+  <div class="filter-row">
+    <input type="date" id="dateFrom" aria-label="From date">
+    <input type="date" id="dateTo" aria-label="To date">
+  </div>
+  <div class="filter-row">
+    <label class="keytoggle">min sim <input type="range" id="simRange" min="0" max="1" step="0.05" value="0"> <span id="simValue" class="mono">0.00</span></label>
+  </div>
+  <div class="filter-row">
+    <label class="keytoggle"><input type="checkbox" id="showSemantic" checked> semantic</label>
+    <label class="keytoggle"><input type="checkbox" id="showExplicit" checked> explicit</label>
+  </div>
   <label class="keytoggle"><input type="checkbox" id="keyOnly"> core + latest checkpoint only</label>
 </div>
 <div class="hint">drag to orbit · scroll to zoom · hover to trace · click to read</div>
@@ -470,8 +509,30 @@ _TEMPLATE = r"""<meta charset="utf-8">
     ANCHOR[p] = { x: Math.cos(a) * 330, y: Math.sin(a) * 190, z: Math.sin(a * 1.7) * 230 };
   });
 
-  const state = { only: null, keyOnly: false, q: "" };
-  const isVisible = (n) => (!state.only || n.project === state.only) && (!state.keyOnly || n.role);
+  const state = {
+    only: (projects.length > 1 && GRAPH.current_project && projects.includes(GRAPH.current_project)) ? GRAPH.current_project : null,
+    keyOnly: false,
+    q: "",
+    type: null,
+    status: null,
+    dateFrom: "",
+    dateTo: "",
+    minSim: 0,
+    showSemantic: true,
+    showExplicit: true,
+  };
+  const inDateRange = (n) => {
+    if (!n.created_at) return true;
+    const d = n.created_at.slice(0, 10);
+    if (state.dateFrom && d < state.dateFrom) return false;
+    if (state.dateTo && d > state.dateTo) return false;
+    return true;
+  };
+  const isVisible = (n) => (!state.only || n.project === state.only)
+    && (!state.keyOnly || n.role)
+    && (!state.type || n.type === state.type)
+    && (!state.status || n.status === state.status)
+    && inDateRange(n);
   const matches = (n) => !state.q || (n.content + " " + (n.slug || "") + " " + n.type + " " + n.project).toLowerCase().includes(state.q);
 
   function simTick() {
@@ -574,6 +635,8 @@ _TEMPLATE = r"""<meta charset="utf-8">
     const sortedEdges = edges.slice().sort((a, b) => (b.s.p.z + b.t.p.z) - (a.s.p.z + a.t.p.z));
     for (const e of sortedEdges) {
       if (!isVisible(e.s) || !isVisible(e.t)) continue;
+      if (e.kind === "explicit" && !state.showExplicit) continue;
+      if (e.kind === "semantic" && (!state.showSemantic || e.sim < state.minSim)) continue;
       const p1 = e.s.p, p2 = e.t.p;
       const dim = highlight && !(highlight.has(e.s.id) && highlight.has(e.t.id));
       const da = depthAlpha((p1.z + p2.z) / 2);
@@ -818,5 +881,36 @@ _TEMPLATE = r"""<meta charset="utf-8">
   renderChips();
   document.getElementById("q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); });
   document.getElementById("keyOnly").addEventListener("change", (e) => { state.keyOnly = e.target.checked; fitZoom(); });
+
+  const typeFilterEl = document.getElementById("typeFilter");
+  [...new Set(GRAPH.nodes.map(n => n.type))].sort().forEach(t => {
+    const o = document.createElement("option");
+    o.value = t; o.textContent = t;
+    typeFilterEl.appendChild(o);
+  });
+  typeFilterEl.addEventListener("change", (e) => { state.type = e.target.value || null; fitZoom(); });
+
+  const statusFilterEl = document.getElementById("statusFilter");
+  [...new Set(GRAPH.nodes.map(n => n.status))].sort().forEach(s => {
+    const o = document.createElement("option");
+    o.value = s; o.textContent = s;
+    statusFilterEl.appendChild(o);
+  });
+  statusFilterEl.addEventListener("change", (e) => { state.status = e.target.value || null; fitZoom(); });
+
+  document.getElementById("dateFrom").addEventListener("change", (e) => { state.dateFrom = e.target.value; fitZoom(); });
+  document.getElementById("dateTo").addEventListener("change", (e) => { state.dateTo = e.target.value; fitZoom(); });
+
+  const simRangeEl = document.getElementById("simRange");
+  const simValueEl = document.getElementById("simValue");
+  simRangeEl.addEventListener("input", (e) => {
+    state.minSim = parseFloat(e.target.value);
+    simValueEl.textContent = state.minSim.toFixed(2);
+  });
+
+  document.getElementById("showSemantic").addEventListener("change", (e) => { state.showSemantic = e.target.checked; });
+  document.getElementById("showExplicit").addEventListener("change", (e) => { state.showExplicit = e.target.checked; });
+
+  if (state.only) fitZoom();
 </script>
 """

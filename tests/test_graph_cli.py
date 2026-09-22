@@ -29,6 +29,25 @@ def test_build_graph_data_creates_knn_edges():
     assert frozenset(("a", "b")) in edge_pairs
 
 
+def test_build_graph_data_nodes_carry_status_defaulting_to_active():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0, 0.0], "project": "p", "type": "note", "content": "a", "status": "resolved"},
+        {"id": "b", "vector": [0.99, 0.01, 0.0], "project": "p", "type": "note", "content": "b"},
+    ]
+    nodes = {n["id"]: n for n in graph_cli._build_graph_data(records, k=1)["nodes"]}
+    assert nodes["a"]["status"] == "resolved"
+    assert nodes["b"]["status"] == "active"
+
+
+def test_build_graph_data_carries_current_project():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0, 0.0], "project": "p", "type": "note", "content": "a"},
+        {"id": "b", "vector": [0.99, 0.01, 0.0], "project": "p", "type": "note", "content": "b"},
+    ]
+    graph = graph_cli._build_graph_data(records, k=1, current_project="p")
+    assert graph["current_project"] == "p"
+
+
 def test_build_graph_data_handles_k_larger_than_available_neighbors():
     records = [
         {"id": "a", "vector": [1.0, 0.0], "project": "p", "type": "note", "content": "a"},
