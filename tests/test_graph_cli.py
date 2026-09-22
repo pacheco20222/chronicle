@@ -34,8 +34,36 @@ def test_build_graph_data_handles_k_larger_than_available_neighbors():
         {"id": "a", "vector": [1.0, 0.0], "project": "p", "type": "note", "content": "a"},
         {"id": "b", "vector": [0.0, 1.0], "project": "p", "type": "note", "content": "b"},
     ]
-    graph = graph_cli._build_graph_data(records, k=5)
+    graph = graph_cli._build_graph_data(records, k=5, min_similarity=0.0)
     assert len(graph["edges"]) == 1
+
+
+def test_build_graph_data_defaults_to_project_isolated_edges():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0, 0.0], "project": "p", "type": "note", "content": "a"},
+        {"id": "b", "vector": [1.0, 0.0, 0.0], "project": "q", "type": "note", "content": "b"},
+    ]
+    graph = graph_cli._build_graph_data(records, k=5, min_similarity=0.0)
+    assert graph["edges"] == []
+
+
+def test_build_graph_data_cross_project_allows_edges_across_projects():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0, 0.0], "project": "p", "type": "note", "content": "a"},
+        {"id": "b", "vector": [1.0, 0.0, 0.0], "project": "q", "type": "note", "content": "b"},
+    ]
+    graph = graph_cli._build_graph_data(records, k=5, cross_project=True, min_similarity=0.0)
+    edge_pairs = {frozenset((e["source"], e["target"])) for e in graph["edges"]}
+    assert frozenset(("a", "b")) in edge_pairs
+
+
+def test_build_graph_data_min_similarity_drops_weak_edges():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0], "project": "p", "type": "note", "content": "a"},
+        {"id": "b", "vector": [0.0, 1.0], "project": "p", "type": "note", "content": "b"},
+    ]
+    graph = graph_cli._build_graph_data(records, k=5, min_similarity=0.5)
+    assert graph["edges"] == []
 
 
 def test_render_html_embeds_graph_json():

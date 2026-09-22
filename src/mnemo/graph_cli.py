@@ -7,6 +7,7 @@ from pathlib import Path
 from mnemo import config, store
 
 K_NEIGHBORS = 3
+MIN_SIMILARITY = 0.3
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -16,7 +17,12 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-def _build_graph_data(records: list[dict], k: int = K_NEIGHBORS) -> dict:
+def _build_graph_data(
+    records: list[dict],
+    k: int = K_NEIGHBORS,
+    cross_project: bool = False,
+    min_similarity: float = MIN_SIMILARITY,
+) -> dict:
     n = len(records)
     sim = [[0.0] * n for _ in range(n)]
     for i in range(n):
@@ -26,7 +32,14 @@ def _build_graph_data(records: list[dict], k: int = K_NEIGHBORS) -> dict:
 
     edge_set = set()
     for i in range(n):
-        neighbors = sorted((j for j in range(n) if j != i), key=lambda j: -sim[i][j])[:k]
+        candidates = [
+            j
+            for j in range(n)
+            if j != i
+            and (cross_project or records[j]["project"] == records[i]["project"])
+            and sim[i][j] >= min_similarity
+        ]
+        neighbors = sorted(candidates, key=lambda j: -sim[i][j])[:k]
         for j in neighbors:
             edge_set.add(tuple(sorted((i, j))))
 
@@ -72,6 +85,17 @@ def main(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(prog="mnemo graph")
     parser.add_argument("--project", default=None)
     parser.add_argument("--all", action="store_true", help="graph every project together, not just one")
+    parser.add_argument(
+        "--cross-project",
+        action="store_true",
+        help="allow edges between memories in different projects (only meaningful with --all)",
+    )
+    parser.add_argument(
+        "--min-similarity",
+        type=float,
+        default=MIN_SIMILARITY,
+        help=f"minimum cosine similarity required to draw an edge (default {MIN_SIMILARITY})",
+    )
     parser.add_argument("--out", default=None)
     args = parser.parse_args(argv)
 
@@ -87,7 +111,7 @@ def main(argv: list[str]) -> None:
         print("Need at least 2 memories to build a graph.")
         return
 
-    graph = _build_graph_data(records)
+    graph = _build_graph_data(records, cross_project=args.cross_project, min_similarity=args.min_similarity)
     html = _render_html(graph)
 
     out_path = Path(args.out) if args.out else Path.cwd() / f"mnemo-graph-{int(time.time())}.html"
