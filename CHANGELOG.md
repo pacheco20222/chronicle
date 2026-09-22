@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.6.0 — 2026-09-22
+
+### Added
+- Memory lifecycle: every memory has a `status` (`active`, `resolved`,
+  `superseded`; default `active`). `memory_add` accepts `supersedes=<old
+  memory id>`, which marks the old memory superseded automatically. New
+  `memory_set_status(memory_id, status)` tool marks a memory resolved or
+  superseded directly. Default retrieval (`memory_search`,
+  `memory_search_global`, `memory_get_latest`) hides superseded
+  memories.
+
 ## 2.5.0 — 2026-09-22
 
 ### Changed
