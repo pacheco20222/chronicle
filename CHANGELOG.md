@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.8.0 — 2026-09-22
+
+### Added
+- Hybrid search: `memory_search`/`memory_search_global` now fuse vector
+  similarity with an exact full-text match on content (RRF), so exact
+  code symbols, ticket IDs, paths, API routes, and error strings surface
+  reliably even when semantically distant from the query wording.
+
 ## 2.7.0 — 2026-09-22
 
 ### Added
