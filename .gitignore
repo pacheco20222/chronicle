@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 backups/
 mnemo-graph-*.html
+graphify-out/
