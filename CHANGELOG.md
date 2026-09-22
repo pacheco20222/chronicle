@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.9.0 — 2026-09-22
+
+### Added
+- `mnemo graph`: type, status, and created_at date-range filters; a live
+  similarity slider for semantic edges; semantic/explicit edge-kind
+  toggles. View now defaults to the current project instead of showing
+  every project at once when graphing with `--all`.
+
 ## 2.8.0 — 2026-09-22
 
 ### Added
