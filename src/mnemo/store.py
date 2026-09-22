@@ -38,6 +38,8 @@ def add_memory(
     project: str,
     type_: str,
     source: str | None = None,
+    status: str = "active",
+    supersedes: str | None = None,
     collection: str = config.COLLECTION_NAME,
 ) -> str:
     memory_id = str(uuid.uuid4())
@@ -53,11 +55,35 @@ def add_memory(
                     "content": content,
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "source": source,
+                    "status": status,
+                    "supersedes": supersedes,
                 },
             )
         ],
     )
+    if supersedes is not None:
+        set_status(client, supersedes, "superseded", collection=collection)
     return memory_id
+
+
+def set_status(
+    client: QdrantClient,
+    memory_id: str,
+    status: str,
+    collection: str = config.COLLECTION_NAME,
+) -> None:
+    client.set_payload(
+        collection_name=collection,
+        payload={"status": status},
+        points=[memory_id],
+    )
+
+
+def _exclude_superseded_filter(must: list) -> models.Filter:
+    return models.Filter(
+        must=must,
+        must_not=[models.FieldCondition(key="status", match=models.MatchValue(value="superseded"))],
+    )
 
 
 def search_memory(
@@ -66,17 +92,19 @@ def search_memory(
     project: str,
     type_: str | None = None,
     k: int = 5,
+    include_superseded: bool = False,
     collection: str = config.COLLECTION_NAME,
 ) -> list[dict]:
     must = [models.FieldCondition(key="project", match=models.MatchValue(value=project))]
     if type_ is not None:
         must.append(models.FieldCondition(key="type", match=models.MatchValue(value=type_)))
+    query_filter = models.Filter(must=must) if include_superseded else _exclude_superseded_filter(must)
 
     response = client.query_points(
         collection_name=collection,
         query=vector,
         limit=k,
-        query_filter=models.Filter(must=must),
+        query_filter=query_filter,
     )
     return [{"id": point.id, "score": point.score, **point.payload} for point in response.points]
 
@@ -85,15 +113,17 @@ def get_latest(
     client: QdrantClient,
     project: str,
     type_: str,
+    include_superseded: bool = False,
     collection: str = config.COLLECTION_NAME,
 ) -> dict | None:
     must = [
         models.FieldCondition(key="project", match=models.MatchValue(value=project)),
         models.FieldCondition(key="type", match=models.MatchValue(value=type_)),
     ]
+    scroll_filter = models.Filter(must=must) if include_superseded else _exclude_superseded_filter(must)
     records, _ = client.scroll(
         collection_name=collection,
-        scroll_filter=models.Filter(must=must),
+        scroll_filter=scroll_filter,
         order_by=models.OrderBy(key="created_at", direction="desc"),
         limit=1,
         with_payload=True,
@@ -109,15 +139,17 @@ def get_recent(
     project: str,
     type_: str,
     k: int = 5,
+    include_superseded: bool = False,
     collection: str = config.COLLECTION_NAME,
 ) -> list[dict]:
     must = [
         models.FieldCondition(key="project", match=models.MatchValue(value=project)),
         models.FieldCondition(key="type", match=models.MatchValue(value=type_)),
     ]
+    scroll_filter = models.Filter(must=must) if include_superseded else _exclude_superseded_filter(must)
     records, _ = client.scroll(
         collection_name=collection,
-        scroll_filter=models.Filter(must=must),
+        scroll_filter=scroll_filter,
         order_by=models.OrderBy(key="created_at", direction="desc"),
         limit=k,
         with_payload=True,
@@ -180,17 +212,23 @@ def search_memory_global(
     vector: list[float],
     type_: str | None = None,
     k: int = 5,
+    include_superseded: bool = False,
     collection: str = config.COLLECTION_NAME,
 ) -> list[dict]:
     must = []
     if type_ is not None:
         must.append(models.FieldCondition(key="type", match=models.MatchValue(value=type_)))
+    query_filter = (
+        (models.Filter(must=must) if must else None)
+        if include_superseded
+        else _exclude_superseded_filter(must)
+    )
 
     response = client.query_points(
         collection_name=collection,
         query=vector,
         limit=k,
-        query_filter=models.Filter(must=must) if must else None,
+        query_filter=query_filter,
     )
     return [{"id": point.id, "score": point.score, **point.payload} for point in response.points]
 

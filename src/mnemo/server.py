@@ -45,7 +45,16 @@ mcp = FastMCP(
         "the project overview document, ask before updating it — don't "
         "update it silently. Separately, if a while has passed without "
         "saving anything and something notable has come up, ask whether "
-        "to save it as a note — never save either one automatically."
+        "to save it as a note — never save either one automatically. "
+        "Every memory has a status: active, resolved, or superseded. "
+        "Retrieval (memory_search, memory_search_global, memory_get_latest) "
+        "hides superseded memories by default — treat them as gone unless "
+        "someone explicitly asks for history. When a new memory replaces "
+        "an old one outright, pass supersedes=<old memory id> to "
+        "memory_add — this marks the old one superseded automatically. "
+        "Use memory_set_status(memory_id, status) to mark something "
+        "resolved (e.g. a bug that got fixed) without replacing it with a "
+        "new memory."
     ),
 )
 
@@ -61,12 +70,19 @@ def _get_client():
 
 
 @mcp.tool
-def memory_add(content: str, type: str) -> dict:
+def memory_add(content: str, type: str, supersedes: str | None = None) -> dict:
     project = config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
-    memory_id = store.add_memory(_get_client(), vector, content, project, type)
-    return {"id": memory_id, "project": project, "type": type, "content": content}
+    memory_id = store.add_memory(_get_client(), vector, content, project, type, supersedes=supersedes)
+    return {"id": memory_id, "project": project, "type": type, "content": content, "supersedes": supersedes}
+
+
+@mcp.tool
+def memory_set_status(memory_id: str, status: str) -> dict:
+    config.validate_status(status)
+    store.set_status(_get_client(), memory_id, status)
+    return {"id": memory_id, "status": status}
 
 
 @mcp.tool

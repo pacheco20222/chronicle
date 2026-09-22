@@ -50,6 +50,29 @@ def test_server_instructions_cover_checkpoint_workflow():
     assert "memory_add" in server.mcp.instructions
 
 
+def test_memory_add_with_supersedes_hides_old_memory_from_search():
+    old = server.memory_add("old fact about the deploy process", "note")
+    new = server.memory_add("corrected fact about the deploy process", "note", supersedes=old["id"])
+    assert new["supersedes"] == old["id"]
+
+    results = server.memory_search("fact about the deploy process")
+    result_ids = {r["id"] for r in results}
+    assert new["id"] in result_ids
+    assert old["id"] not in result_ids
+
+
+def test_memory_set_status_marks_memory_resolved():
+    added = server.memory_add("a bug that will get fixed", "bug")
+    result = server.memory_set_status(added["id"], "resolved")
+    assert result == {"id": added["id"], "status": "resolved"}
+
+
+def test_memory_set_status_rejects_invalid_status():
+    added = server.memory_add("a memory", "note")
+    with pytest.raises(ValueError):
+        server.memory_set_status(added["id"], "nonsense")
+
+
 def test_memory_set_document_creates_and_replaces():
     first = server.memory_set_document("plan-test-doc", "version one", "note")
     assert first["slug"] == "plan-test-doc"

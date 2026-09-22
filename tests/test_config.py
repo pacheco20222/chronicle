@@ -34,6 +34,16 @@ def test_validate_type_rejects_unknown():
         config.validate_type("nonsense")
 
 
+def test_validate_status_accepts_known_statuses():
+    for known in ("active", "resolved", "superseded"):
+        config.validate_status(known)  # must not raise
+
+
+def test_validate_status_rejects_unknown():
+    with pytest.raises(ValueError):
+        config.validate_status("nonsense")
+
+
 def test_get_project_falls_back_to_registry(monkeypatch, tmp_path):
     monkeypatch.delenv("MNEMO_PROJECT", raising=False)
     monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))

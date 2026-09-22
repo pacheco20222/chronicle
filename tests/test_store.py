@@ -114,6 +114,78 @@ def test_get_latest_filters_by_type(client, collection):
         client.delete_collection(collection)
 
 
+def test_add_memory_defaults_to_active_status(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        mem_id = store.add_memory(client, _vector(40), "a note", "mcp-llm-brain", "note", collection=collection)
+        results = store.search_memory(client, _vector(40), "mcp-llm-brain", k=5, collection=collection)
+        assert results[0]["id"] == mem_id
+        assert results[0]["status"] == "active"
+        assert results[0]["supersedes"] is None
+    finally:
+        client.delete_collection(collection)
+
+
+def test_search_memory_excludes_superseded_by_default(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        old_id = store.add_memory(client, _vector(41), "old fact", "mcp-llm-brain", "note", collection=collection)
+        store.set_status(client, old_id, "superseded", collection=collection)
+
+        results = store.search_memory(client, _vector(41), "mcp-llm-brain", k=5, collection=collection)
+        assert results == []
+
+        results_with_history = store.search_memory(
+            client, _vector(41), "mcp-llm-brain", k=5, include_superseded=True, collection=collection
+        )
+        assert len(results_with_history) == 1
+        assert results_with_history[0]["id"] == old_id
+    finally:
+        client.delete_collection(collection)
+
+
+def test_add_memory_with_supersedes_marks_old_memory_superseded(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        old_id = store.add_memory(client, _vector(42), "old fact", "mcp-llm-brain", "note", collection=collection)
+        new_id = store.add_memory(
+            client, _vector(42), "corrected fact", "mcp-llm-brain", "note",
+            supersedes=old_id, collection=collection,
+        )
+
+        results = store.search_memory(client, _vector(42), "mcp-llm-brain", k=5, collection=collection)
+        ids = {r["id"] for r in results}
+        assert new_id in ids
+        assert old_id not in ids
+
+        new_record = next(r for r in results if r["id"] == new_id)
+        assert new_record["supersedes"] == old_id
+    finally:
+        client.delete_collection(collection)
+
+
+def test_get_latest_and_get_recent_exclude_superseded_by_default(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        old_id = store.add_memory(client, _vector(43), "old checkpoint", "mcp-llm-brain", "checkpoint", collection=collection)
+        time.sleep(0.01)
+        new_id = store.add_memory(client, _vector(44), "new checkpoint", "mcp-llm-brain", "checkpoint", collection=collection)
+        store.set_status(client, old_id, "superseded", collection=collection)
+
+        latest = store.get_latest(client, "mcp-llm-brain", "checkpoint", collection=collection)
+        assert latest["id"] == new_id
+
+        recent = store.get_recent(client, "mcp-llm-brain", "checkpoint", collection=collection)
+        assert [r["id"] for r in recent] == [new_id]
+
+        recent_with_history = store.get_recent(
+            client, "mcp-llm-brain", "checkpoint", include_superseded=True, collection=collection
+        )
+        assert {r["id"] for r in recent_with_history} == {old_id, new_id}
+    finally:
+        client.delete_collection(collection)
+
+
 def test_get_document_returns_none_for_unknown_slug(client, collection):
     store.ensure_collection(client, collection)
     try:
@@ -160,6 +232,22 @@ def test_search_memory_global_returns_results_across_projects(client, collection
         result_ids = {r["id"] for r in results}
         assert villenca_id in result_ids
         assert brain_id in result_ids
+    finally:
+        client.delete_collection(collection)
+
+
+def test_search_memory_global_excludes_superseded_by_default(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        v = _vector(45)
+        old_id = store.add_memory(client, v, "old villenca note", "villenca", "note", collection=collection)
+        store.set_status(client, old_id, "superseded", collection=collection)
+
+        results = store.search_memory_global(client, v, k=10, collection=collection)
+        assert old_id not in {r["id"] for r in results}
+
+        results_with_history = store.search_memory_global(client, v, k=10, include_superseded=True, collection=collection)
+        assert old_id in {r["id"] for r in results_with_history}
     finally:
         client.delete_collection(collection)
 

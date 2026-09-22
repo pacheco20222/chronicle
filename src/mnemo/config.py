@@ -8,6 +8,7 @@ EMBED_MODEL = "nomic-ai/nomic-embed-text-v1.5"
 VECTOR_SIZE = 768
 COLLECTION_NAME = os.environ.get("MNEMO_COLLECTION", "memories")
 VALID_TYPES = frozenset({"decision", "architecture", "bug", "todo", "note", "checkpoint", "overview"})
+VALID_STATUSES = frozenset({"active", "resolved", "superseded"})
 
 
 def get_project() -> str:
@@ -35,3 +36,8 @@ def get_project() -> str:
 def validate_type(type_: str) -> None:
     if type_ not in VALID_TYPES:
         raise ValueError(f"invalid type {type_!r}, must be one of {sorted(VALID_TYPES)}")
+
+
+def validate_status(status: str) -> None:
+    if status not in VALID_STATUSES:
+        raise ValueError(f"invalid status {status!r}, must be one of {sorted(VALID_STATUSES)}")
