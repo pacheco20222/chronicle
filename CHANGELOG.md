@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.0 — 2026-09-22
+
+### Added
+- Typed relationships: `memory_link(source_id, relation_type, target_id)`
+  records an explicit link between two memories (`related_to`,
+  `supersedes`, `caused_by`, `blocked_by`, `implements`). `mnemo graph`
+  draws these as dashed red arrows, distinct from the solid semantic
+  (nearest-neighbor) edges.
+
 ## 2.6.0 — 2026-09-22
 
 ### Added
