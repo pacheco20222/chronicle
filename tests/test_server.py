@@ -23,6 +23,12 @@ def test_memory_add_rejects_invalid_type():
         server.memory_add("bad type memory", "nonsense")
 
 
+def test_memory_search_finds_exact_technical_token():
+    added = server.memory_add("grep for ERR_CODE_55219 before touching the log parser", "bug")
+    results = server.memory_search("ERR_CODE_55219")
+    assert any(r["id"] == added["id"] for r in results)
+
+
 def test_memory_search_filters_by_type():
     added = server.memory_add("a specific bug about vector size mismatch", "bug")
     bugs = server.memory_search("vector size mismatch", type="bug")

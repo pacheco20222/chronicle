@@ -104,13 +104,13 @@ def memory_search(query: str, type: str | None = None, k: int = 5) -> list[dict]
         # Checkpoints are a timeline, not a topic: newest first, query ignored.
         return store.get_recent(_get_client(), project, "checkpoint", k=k)
     vector = embeddings.embed_text(query)
-    return store.search_memory(_get_client(), vector, project, type_=type, k=k)
+    return store.search_memory(_get_client(), vector, project, query_text=query, type_=type, k=k)
 
 
 @mcp.tool
 def memory_search_global(query: str, type: str | None = None, k: int = 5) -> list[dict]:
     vector = embeddings.embed_text(query)
-    return store.search_memory_global(_get_client(), vector, type_=type, k=k)
+    return store.search_memory_global(_get_client(), vector, query_text=query, type_=type, k=k)
 
 
 @mcp.tool

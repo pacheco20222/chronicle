@@ -227,6 +227,50 @@ def test_link_memories_raises_for_unknown_source(client, collection):
         client.delete_collection(collection)
 
 
+class _FakePoint:
+    def __init__(self, id_, payload):
+        self.id = id_
+        self.payload = payload
+
+
+def test_rrf_merge_boosts_ids_present_in_multiple_lists():
+    vector_ranked = [_FakePoint("a", {"content": "a"}), _FakePoint("b", {"content": "b"})]
+    lexical_ranked = [_FakePoint("b", {"content": "b"}), _FakePoint("c", {"content": "c"})]
+
+    merged = store._rrf_merge([vector_ranked, lexical_ranked], k=5)
+    ids = [m["id"] for m in merged]
+
+    assert ids[0] == "b"  # present in both lists, ranks first
+    assert set(ids) == {"a", "b", "c"}
+
+
+def test_rrf_merge_truncates_to_k():
+    ranked = [_FakePoint(str(i), {"content": str(i)}) for i in range(10)]
+    merged = store._rrf_merge([ranked], k=3)
+    assert len(merged) == 3
+
+
+def test_search_memory_lexical_match_surfaces_despite_poor_vector_rank(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        distractor_id = store.add_memory(client, _vector(70), "distractor content", "mcp-llm-brain", "note", collection=collection)
+        target_id = store.add_memory(
+            client, _vector(9999), "grep for ERR_CODE_88421 in the log parser", "mcp-llm-brain", "bug",
+            collection=collection,
+        )
+        query_vector = _vector(70)  # identical to the distractor's vector -> distractor wins on pure similarity
+
+        vector_only = store.search_memory(client, query_vector, "mcp-llm-brain", k=1, collection=collection)
+        assert vector_only[0]["id"] == distractor_id
+
+        hybrid = store.search_memory(
+            client, query_vector, "mcp-llm-brain", query_text="ERR_CODE_88421", k=1, collection=collection
+        )
+        assert hybrid[0]["id"] == target_id
+    finally:
+        client.delete_collection(collection)
+
+
 def test_get_document_returns_none_for_unknown_slug(client, collection):
     store.ensure_collection(client, collection)
     try:
@@ -289,6 +333,24 @@ def test_search_memory_global_excludes_superseded_by_default(client, collection)
 
         results_with_history = store.search_memory_global(client, v, k=10, include_superseded=True, collection=collection)
         assert old_id in {r["id"] for r in results_with_history}
+    finally:
+        client.delete_collection(collection)
+
+
+def test_search_memory_global_lexical_match_surfaces_despite_poor_vector_rank(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        distractor_id = store.add_memory(client, _vector(71), "distractor content", "villenca", "note", collection=collection)
+        target_id = store.add_memory(
+            client, _vector(9998), "see ERR_CODE_77331 in the parser", "villenca", "bug", collection=collection
+        )
+        query_vector = _vector(71)
+
+        hybrid = store.search_memory_global(
+            client, query_vector, query_text="ERR_CODE_77331", k=1, collection=collection
+        )
+        assert hybrid[0]["id"] == target_id
+        assert distractor_id  # sanity: distractor was created
     finally:
         client.delete_collection(collection)
 

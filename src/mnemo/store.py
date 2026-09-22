@@ -29,6 +29,11 @@ def ensure_collection(client: QdrantClient, collection: str = config.COLLECTION_
         field_name="created_at",
         field_schema=models.PayloadSchemaType.DATETIME,
     )
+    client.create_payload_index(
+        collection_name=collection,
+        field_name="content",
+        field_schema=models.PayloadSchemaType.TEXT,
+    )
 
 
 def add_memory(
@@ -108,10 +113,26 @@ def _exclude_superseded_filter(must: list) -> models.Filter:
     )
 
 
+RRF_K = 60
+HYBRID_POOL = 20
+
+
+def _rrf_merge(ranked_lists: list[list], k: int) -> list[dict]:
+    scores: dict = {}
+    payloads: dict = {}
+    for ranked in ranked_lists:
+        for rank, point in enumerate(ranked, start=1):
+            scores[point.id] = scores.get(point.id, 0.0) + 1.0 / (RRF_K + rank)
+            payloads.setdefault(point.id, point.payload)
+    ordered = sorted(scores.items(), key=lambda kv: -kv[1])[:k]
+    return [{"id": point_id, "score": round(score, 6), **payloads[point_id]} for point_id, score in ordered]
+
+
 def search_memory(
     client: QdrantClient,
     vector: list[float],
     project: str,
+    query_text: str | None = None,
     type_: str | None = None,
     k: int = 5,
     include_superseded: bool = False,
@@ -122,13 +143,27 @@ def search_memory(
         must.append(models.FieldCondition(key="type", match=models.MatchValue(value=type_)))
     query_filter = models.Filter(must=must) if include_superseded else _exclude_superseded_filter(must)
 
+    pool = max(k * 4, HYBRID_POOL)
     response = client.query_points(
         collection_name=collection,
         query=vector,
-        limit=k,
+        limit=pool,
         query_filter=query_filter,
     )
-    return [{"id": point.id, "score": point.score, **point.payload} for point in response.points]
+    ranked_lists = [response.points]
+
+    if query_text and query_text.strip():
+        lexical_must = must + [models.FieldCondition(key="content", match=models.MatchText(text=query_text))]
+        lexical_filter = models.Filter(must=lexical_must) if include_superseded else _exclude_superseded_filter(lexical_must)
+        records, _ = client.scroll(
+            collection_name=collection,
+            scroll_filter=lexical_filter,
+            limit=pool,
+            with_payload=True,
+        )
+        ranked_lists.append(records)
+
+    return _rrf_merge(ranked_lists, k)
 
 
 def get_latest(
@@ -232,6 +267,7 @@ def set_document(
 def search_memory_global(
     client: QdrantClient,
     vector: list[float],
+    query_text: str | None = None,
     type_: str | None = None,
     k: int = 5,
     include_superseded: bool = False,
@@ -246,13 +282,27 @@ def search_memory_global(
         else _exclude_superseded_filter(must)
     )
 
+    pool = max(k * 4, HYBRID_POOL)
     response = client.query_points(
         collection_name=collection,
         query=vector,
-        limit=k,
+        limit=pool,
         query_filter=query_filter,
     )
-    return [{"id": point.id, "score": point.score, **point.payload} for point in response.points]
+    ranked_lists = [response.points]
+
+    if query_text and query_text.strip():
+        lexical_must = must + [models.FieldCondition(key="content", match=models.MatchText(text=query_text))]
+        lexical_filter = models.Filter(must=lexical_must) if include_superseded else _exclude_superseded_filter(lexical_must)
+        records, _ = client.scroll(
+            collection_name=collection,
+            scroll_filter=lexical_filter,
+            limit=pool,
+            with_payload=True,
+        )
+        ranked_lists.append(records)
+
+    return _rrf_merge(ranked_lists, k)
 
 
 def get_all_with_vectors(
