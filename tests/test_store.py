@@ -186,6 +186,47 @@ def test_get_latest_and_get_recent_exclude_superseded_by_default(client, collect
         client.delete_collection(collection)
 
 
+def test_link_memories_appends_typed_relation(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        a_id = store.add_memory(client, _vector(50), "memory a", "mcp-llm-brain", "note", collection=collection)
+        b_id = store.add_memory(client, _vector(51), "memory b", "mcp-llm-brain", "note", collection=collection)
+
+        store.link_memories(client, a_id, "related_to", b_id, collection=collection)
+
+        results = store.search_memory(client, _vector(50), "mcp-llm-brain", k=5, collection=collection)
+        a_record = next(r for r in results if r["id"] == a_id)
+        assert a_record["relations"] == [{"type": "related_to", "target": b_id}]
+    finally:
+        client.delete_collection(collection)
+
+
+def test_link_memories_supersedes_marks_target_superseded(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        old_id = store.add_memory(client, _vector(52), "old memory", "mcp-llm-brain", "note", collection=collection)
+        new_id = store.add_memory(client, _vector(53), "new memory", "mcp-llm-brain", "note", collection=collection)
+
+        store.link_memories(client, new_id, "supersedes", old_id, collection=collection)
+
+        results = store.search_memory(client, _vector(53), "mcp-llm-brain", k=5, collection=collection)
+        result_ids = {r["id"] for r in results}
+        assert new_id in result_ids
+        assert old_id not in result_ids
+    finally:
+        client.delete_collection(collection)
+
+
+def test_link_memories_raises_for_unknown_source(client, collection):
+    store.ensure_collection(client, collection)
+    try:
+        missing_id = str(uuid.uuid4())
+        with pytest.raises(ValueError):
+            store.link_memories(client, missing_id, "related_to", str(uuid.uuid4()), collection=collection)
+    finally:
+        client.delete_collection(collection)
+
+
 def test_get_document_returns_none_for_unknown_slug(client, collection):
     store.ensure_collection(client, collection)
     try:

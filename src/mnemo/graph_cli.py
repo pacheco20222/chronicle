@@ -68,10 +68,35 @@ def _build_graph_data(
         for r in records
     ]
     edges = [
-        {"source": records[i]["id"], "target": records[j]["id"], "sim": round(sim[i][j], 3)}
+        {"source": records[i]["id"], "target": records[j]["id"], "sim": round(sim[i][j], 3), "kind": "semantic"}
         for i, j in edge_set
     ]
+
+    id_to_index = {r["id"]: idx for idx, r in enumerate(records)}
+    for r in records:
+        for rel in _explicit_relations(r):
+            target = rel.get("target")
+            if target not in id_to_index or target == r["id"]:
+                continue
+            edges.append(
+                {
+                    "source": r["id"],
+                    "target": target,
+                    "sim": 0.8,
+                    "kind": "explicit",
+                    "relation": rel.get("type"),
+                }
+            )
+
     return {"nodes": nodes, "edges": edges, "k": k}
+
+
+def _explicit_relations(record: dict) -> list[dict]:
+    relations = list(record.get("relations") or [])
+    supersedes = record.get("supersedes")
+    if supersedes and not any(r.get("type") == "supersedes" and r.get("target") == supersedes for r in relations):
+        relations.append({"type": "supersedes", "target": supersedes})
+    return relations
 
 
 def _render_html(graph: dict) -> str:
@@ -552,6 +577,37 @@ _TEMPLATE = r"""<meta charset="utf-8">
       const p1 = e.s.p, p2 = e.t.p;
       const dim = highlight && !(highlight.has(e.s.id) && highlight.has(e.t.id));
       const da = depthAlpha((p1.z + p2.z) / 2);
+
+      if (e.kind === "explicit") {
+        const base = dim ? 0.05 : (highlight ? 0.95 : 0.55);
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = `rgba(232,93,93,${base * da})`;
+        ctx.lineWidth = (highlight && !dim ? 1.8 : 1.3) * Math.max(0.5, (p1.s + p2.s) / 2);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.restore();
+        if (!dim) {
+          const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+          const ah = 6 * Math.max(0.6, p2.s);
+          ctx.save();
+          ctx.globalAlpha = base * da;
+          ctx.fillStyle = "rgba(232,93,93,1)";
+          ctx.translate(p2.x - Math.cos(angle) * 8, p2.y - Math.sin(angle) * 8);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-ah, ah * 0.55);
+          ctx.lineTo(-ah, -ah * 0.55);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+        continue;
+      }
+
       const base = dim ? 0.03 : (highlight ? 0.6 : 0.1 + e.sim * 0.3);
       const c1 = hexToRgb(PROJECT_COLOR[e.s.project]), c2 = hexToRgb(PROJECT_COLOR[e.t.project]);
       const grad = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
@@ -738,7 +794,8 @@ _TEMPLATE = r"""<meta charset="utf-8">
     `<div class="legend-row"><span class="legend-dot" style="background:${PROJECT_COLOR[p]}"></span>${escapeHtml(p)}</div>`
   ).join("") +
     `<div class="legend-row"><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="none" stroke="#F2C14E" stroke-width="2"/></svg>core memory (project overview)</div>` +
-    `<div class="legend-row"><svg width="14" height="14"><path d="M7 1 L13 7 L7 13 L1 7 Z" fill="none" stroke="#FFF4DC" stroke-width="1.6"/></svg>latest checkpoint</div>`;
+    `<div class="legend-row"><svg width="14" height="14"><path d="M7 1 L13 7 L7 13 L1 7 Z" fill="none" stroke="#FFF4DC" stroke-width="1.6"/></svg>latest checkpoint</div>` +
+    `<div class="legend-row"><svg width="14" height="14"><line x1="1" y1="7" x2="13" y2="7" stroke="#E85D5D" stroke-width="1.6" stroke-dasharray="3,2"/></svg>explicit relationship (related_to / supersedes / caused_by / blocked_by / implements)</div>`;
 
   function fitZoom() {
     const vis = nodes.filter(isVisible);

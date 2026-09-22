@@ -73,6 +73,21 @@ def test_memory_set_status_rejects_invalid_status():
         server.memory_set_status(added["id"], "nonsense")
 
 
+def test_memory_link_records_typed_relation():
+    a = server.memory_add("memory a", "note")
+    b = server.memory_add("memory b", "note")
+
+    result = server.memory_link(a["id"], "blocked_by", b["id"])
+    assert result == {"source_id": a["id"], "relation_type": "blocked_by", "target_id": b["id"]}
+
+
+def test_memory_link_rejects_invalid_relation_type():
+    a = server.memory_add("memory a", "note")
+    b = server.memory_add("memory b", "note")
+    with pytest.raises(ValueError):
+        server.memory_link(a["id"], "nonsense", b["id"])
+
+
 def test_memory_set_document_creates_and_replaces():
     first = server.memory_set_document("plan-test-doc", "version one", "note")
     assert first["slug"] == "plan-test-doc"

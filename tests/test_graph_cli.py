@@ -57,6 +57,41 @@ def test_build_graph_data_cross_project_allows_edges_across_projects():
     assert frozenset(("a", "b")) in edge_pairs
 
 
+def test_build_graph_data_includes_explicit_relation_edges():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0], "project": "p", "type": "note", "content": "a",
+         "relations": [{"type": "blocked_by", "target": "b"}]},
+        {"id": "b", "vector": [0.0, 1.0], "project": "p", "type": "note", "content": "b"},
+    ]
+    graph = graph_cli._build_graph_data(records, k=5, min_similarity=1.0)
+    explicit = [e for e in graph["edges"] if e["kind"] == "explicit"]
+    assert len(explicit) == 1
+    assert explicit[0]["source"] == "a"
+    assert explicit[0]["target"] == "b"
+    assert explicit[0]["relation"] == "blocked_by"
+
+
+def test_build_graph_data_falls_back_to_bare_supersedes_field():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0], "project": "p", "type": "note", "content": "a", "supersedes": "b"},
+        {"id": "b", "vector": [0.0, 1.0], "project": "p", "type": "note", "content": "b"},
+    ]
+    graph = graph_cli._build_graph_data(records, k=5, min_similarity=1.0)
+    explicit = [e for e in graph["edges"] if e["kind"] == "explicit"]
+    assert len(explicit) == 1
+    assert explicit[0]["relation"] == "supersedes"
+
+
+def test_build_graph_data_ignores_relation_target_outside_record_set():
+    records = [
+        {"id": "a", "vector": [1.0, 0.0], "project": "p", "type": "note", "content": "a",
+         "relations": [{"type": "related_to", "target": "missing"}]},
+        {"id": "b", "vector": [0.0, 1.0], "project": "p", "type": "note", "content": "b"},
+    ]
+    graph = graph_cli._build_graph_data(records, k=5, min_similarity=1.0)
+    assert [e for e in graph["edges"] if e["kind"] == "explicit"] == []
+
+
 def test_build_graph_data_min_similarity_drops_weak_edges():
     records = [
         {"id": "a", "vector": [1.0, 0.0], "project": "p", "type": "note", "content": "a"},

@@ -57,6 +57,7 @@ def add_memory(
                     "source": source,
                     "status": status,
                     "supersedes": supersedes,
+                    "relations": [{"type": "supersedes", "target": supersedes}] if supersedes else [],
                 },
             )
         ],
@@ -77,6 +78,27 @@ def set_status(
         payload={"status": status},
         points=[memory_id],
     )
+
+
+def link_memories(
+    client: QdrantClient,
+    source_id: str,
+    relation_type: str,
+    target_id: str,
+    collection: str = config.COLLECTION_NAME,
+) -> None:
+    points = client.retrieve(collection_name=collection, ids=[source_id], with_payload=True)
+    if not points:
+        raise ValueError(f"no memory found with id {source_id!r}")
+    relations = list(points[0].payload.get("relations") or [])
+    relations.append({"type": relation_type, "target": target_id})
+    client.set_payload(
+        collection_name=collection,
+        payload={"relations": relations},
+        points=[source_id],
+    )
+    if relation_type == "supersedes":
+        set_status(client, target_id, "superseded", collection=collection)
 
 
 def _exclude_superseded_filter(must: list) -> models.Filter:

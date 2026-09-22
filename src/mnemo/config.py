@@ -9,6 +9,7 @@ VECTOR_SIZE = 768
 COLLECTION_NAME = os.environ.get("MNEMO_COLLECTION", "memories")
 VALID_TYPES = frozenset({"decision", "architecture", "bug", "todo", "note", "checkpoint", "overview"})
 VALID_STATUSES = frozenset({"active", "resolved", "superseded"})
+VALID_RELATION_TYPES = frozenset({"related_to", "supersedes", "caused_by", "blocked_by", "implements"})
 
 
 def get_project() -> str:
@@ -41,3 +42,10 @@ def validate_type(type_: str) -> None:
 def validate_status(status: str) -> None:
     if status not in VALID_STATUSES:
         raise ValueError(f"invalid status {status!r}, must be one of {sorted(VALID_STATUSES)}")
+
+
+def validate_relation_type(relation_type: str) -> None:
+    if relation_type not in VALID_RELATION_TYPES:
+        raise ValueError(
+            f"invalid relation type {relation_type!r}, must be one of {sorted(VALID_RELATION_TYPES)}"
+        )

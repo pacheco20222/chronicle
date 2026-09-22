@@ -54,7 +54,12 @@ mcp = FastMCP(
         "memory_add — this marks the old one superseded automatically. "
         "Use memory_set_status(memory_id, status) to mark something "
         "resolved (e.g. a bug that got fixed) without replacing it with a "
-        "new memory."
+        "new memory. To record an explicit relationship between two "
+        "existing memories (not just semantic similarity), call "
+        "memory_link(source_id, relation_type, target_id) with "
+        "relation_type one of: related_to, supersedes, caused_by, "
+        "blocked_by, implements. Only call it when the relationship is "
+        "worth remembering on its own, not for every passing mention."
     ),
 )
 
@@ -83,6 +88,13 @@ def memory_set_status(memory_id: str, status: str) -> dict:
     config.validate_status(status)
     store.set_status(_get_client(), memory_id, status)
     return {"id": memory_id, "status": status}
+
+
+@mcp.tool
+def memory_link(source_id: str, relation_type: str, target_id: str) -> dict:
+    config.validate_relation_type(relation_type)
+    store.link_memories(_get_client(), source_id, relation_type, target_id)
+    return {"source_id": source_id, "relation_type": relation_type, "target_id": target_id}
 
 
 @mcp.tool
