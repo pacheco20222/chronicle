@@ -14,33 +14,57 @@ const EXPLICIT = BRASS;
 const STATUS_OPACITY = { active: 1, resolved: 0.62, superseded: 0.34 } as const;
 type LayoutNode = GraphNode & { position: THREE.Vector3; degree: number };
 
-function fieldRadiusForCount(total: number) {
-  return Math.max(5.2, 4.2 + Math.sqrt(total) * 0.72);
+function localClusterRadius(count: number) {
+  return Math.max(0.75, 0.5 + Math.sqrt(count) * 0.42);
+}
+
+function fibonacciPoint(index: number, total: number, radius: number) {
+  const phi = Math.acos(1 - (2 * (index + 0.5)) / total);
+  const theta = Math.PI * (1 + Math.sqrt(5)) * index;
+  return new THREE.Vector3(
+    radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.sin(phi) * Math.sin(theta),
+    radius * Math.cos(phi),
+  );
 }
 
 function useLayout(nodes: GraphNode[], edges: GraphEdge[]) {
-  return useMemo<LayoutNode[]>(() => {
+  return useMemo(() => {
     const degree = new Map(nodes.map((node) => [node.id, 0]));
     edges.forEach((edge) => {
       degree.set(edge.source, (degree.get(edge.source) || 0) + 1);
       degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
     });
-    const total = Math.max(nodes.length, 1);
-    const radius = fieldRadiusForCount(total);
-    return nodes.map((node, index) => {
-      const phi = Math.acos(1 - (2 * (index + 0.5)) / total);
-      const theta = Math.PI * (1 + Math.sqrt(5)) * index;
-      const layer = radius + Math.sin(index * 1.9) * 0.35;
-      return {
-        ...node,
-        degree: degree.get(node.id) || 0,
-        position: new THREE.Vector3(
-          layer * Math.sin(phi) * Math.cos(theta),
-          layer * Math.sin(phi) * Math.sin(theta),
-          layer * Math.cos(phi),
-        ),
-      };
+
+    const byProject = new Map<string, GraphNode[]>();
+    nodes.forEach((node) => {
+      const list = byProject.get(node.project);
+      if (list) list.push(node);
+      else byProject.set(node.project, [node]);
     });
+    const projects = [...byProject.keys()].sort();
+    const projectCount = Math.max(projects.length, 1);
+    const localRadii = projects.map((project) => localClusterRadius(byProject.get(project)!.length));
+    const maxLocalRadius = Math.max(0.75, ...localRadii);
+    const clusterRadius = projectCount <= 1 ? 0 : Math.max(4.5, maxLocalRadius * 2.4 + Math.sqrt(projectCount) * 1.1);
+
+    const layout: LayoutNode[] = [];
+    projects.forEach((project, clusterIndex) => {
+      const center = projectCount <= 1 ? new THREE.Vector3() : fibonacciPoint(clusterIndex, projectCount, clusterRadius);
+      const projectNodes = byProject.get(project)!;
+      const total = Math.max(projectNodes.length, 1);
+      const radius = localClusterRadius(total);
+      projectNodes.forEach((node, index) => {
+        const local = total === 1 ? new THREE.Vector3() : fibonacciPoint(index, total, radius);
+        layout.push({
+          ...node,
+          degree: degree.get(node.id) || 0,
+          position: center.clone().add(local),
+        });
+      });
+    });
+
+    return { layout, extent: clusterRadius + maxLocalRadius };
   }, [edges, nodes]);
 }
 
@@ -211,9 +235,9 @@ function ChartMotion({ chartRef, controlsRef, layout, selectedId, interactionRef
 }
 
 export function GraphScene({ nodes, edges, selectedId, onSelect, showSemanticEdges }: { nodes: GraphNode[]; edges: GraphEdge[]; selectedId: string | null; onSelect: (node: GraphNode) => void; showSemanticEdges: boolean }) {
-  const layout = useLayout(nodes, edges);
+  const { layout, extent } = useLayout(nodes, edges);
   const renderedEdges = useMemo(() => edgesForRender(edgesForVisibility(edges, showSemanticEdges)), [edges, showSemanticEdges]);
-  const cameraDistance = Math.max(22, fieldRadiusForCount(Math.max(nodes.length, 1)) * 3.1);
+  const cameraDistance = Math.max(22, extent * 3.1);
   const chartRef = useRef<THREE.Group>(null);
   const controlsRef = useRef<any>(null);
   const interactionRef = useRef({ active: false, lastInteraction: 0 });
