@@ -17,6 +17,8 @@ another repo's memory by accident.
 - **`mnemo import`** — bulk-load an existing file into a project's memory. Run yourself, from a terminal — see [docs/INSTALL.md §6](docs/INSTALL.md#6-running-mnemos-other-commands-import-graph).
 - **`mnemo graph`** — a real, embedding-similarity graph of your memories, rendered as a glowing 3D network you can orbit and zoom (core memory = gold ring, latest checkpoint = diamond; filter by project, search, or show only key memories), locally and opened in your browser. Scoped to the current project by default, same as everything else; `--all` graphs every project together, deliberately. Same terminal invocation as `import` above.
 
+- **`mnemo dashboard`** — a local React/Three.js memory dashboard served through FastMCP streamable HTTP. Run `uv run mnemo dashboard start` for foreground mode, `uv run mnemo dashboard start --background` for a persistent local process, and `uv run mnemo dashboard stop` to stop it. It binds only to `127.0.0.1:8765` by default; set `MNEMO_DASHBOARD_PORT` or pass `--port` to change the port.
+
 ## Requirements
 
 - macOS, Linux, or Windows (PowerShell 5.1+/pwsh, or WSL2 — anything

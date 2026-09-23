@@ -61,3 +61,10 @@ def lookup(cwd: Path) -> str | None:
     if main is not None:
         return data.get(str(main.resolve()))
     return None
+
+
+def list_projects() -> dict[str, list[str]]:
+    projects: dict[str, list[str]] = {}
+    for path, project in _load(registry_path()).items():
+        projects.setdefault(project, []).append(path)
+    return {project: sorted(paths) for project, paths in sorted(projects.items())}

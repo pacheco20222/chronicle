@@ -321,3 +321,19 @@ def get_all_with_vectors(
         with_vectors=True,
     )
     return [{"id": r.id, "vector": r.vector, **r.payload} for r in records]
+
+
+def count_points(
+    client: QdrantClient,
+    project: str | None = None,
+    collection: str = config.COLLECTION_NAME,
+) -> int:
+    must = []
+    if project is not None:
+        must.append(models.FieldCondition(key="project", match=models.MatchValue(value=project)))
+    result = client.count(
+        collection_name=collection,
+        count_filter=models.Filter(must=must) if must else None,
+        exact=True,
+    )
+    return result.count

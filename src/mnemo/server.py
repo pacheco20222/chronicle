@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from mnemo import config, embeddings, registry, store
+from mnemo import config, dashboard, embeddings, graph_cli, registry, store
 
 mcp = FastMCP(
     "mnemo",
@@ -143,6 +143,28 @@ def memory_register_project(name: str) -> dict:
     cwd = Path.cwd()
     registry.register(cwd, name)
     return {"registered": str(cwd.resolve()), "project": name}
+
+
+@mcp.tool
+def memory_dashboard_graph(
+    project: str | None = None,
+    cross_project: bool = False,
+    k: int = graph_cli.K_NEIGHBORS,
+    min_similarity: float = graph_cli.MIN_SIMILARITY,
+) -> dict:
+    records = store.get_all_with_vectors(_get_client(), project=project)
+    return graph_cli._build_graph_data(
+        records,
+        k=k,
+        cross_project=cross_project,
+        min_similarity=min_similarity,
+        current_project=project,
+    )
+
+
+@mcp.tool
+def memory_dashboard_snapshot() -> dict:
+    return dashboard.build_snapshot(_get_client())
 
 
 def main() -> None:

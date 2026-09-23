@@ -12,6 +12,8 @@ dependencies = [
     "fastmcp>=3.4.7",
     "fastembed>=0.8.0",
     "qdrant-client>=1.19.0",
+    "starlette>=1.6.0",
+    "uvicorn>=0.52.4",
 ]
 
 [project.scripts]
