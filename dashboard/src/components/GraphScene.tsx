@@ -13,6 +13,17 @@ const SEMANTIC = "#c5cee0";
 const EXPLICIT = BRASS;
 const STATUS_OPACITY = { active: 1, resolved: 0.62, superseded: 0.34 } as const;
 type LayoutNode = GraphNode & { position: THREE.Vector3; degree: number };
+type Cluster = { project: string; center: THREE.Vector3; radius: number; color: string };
+
+/* Deterministic hue per project name so each constellation reads as a
+ * distinct "galaxy" color at a glance, without a lookup table to maintain
+ * as projects come and go. */
+function projectColor(project: string) {
+  let hash = 0;
+  for (let i = 0; i < project.length; i++) hash = (hash * 31 + project.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return `hsl(${hue}, 62%, 68%)`;
+}
 
 function localClusterRadius(count: number) {
   return Math.max(0.75, 0.5 + Math.sqrt(count) * 0.42);
@@ -64,7 +75,14 @@ function useLayout(nodes: GraphNode[], edges: GraphEdge[]) {
       });
     });
 
-    return { layout, extent: clusterRadius + maxLocalRadius };
+    const clusters: Cluster[] = projects.map((project, clusterIndex) => ({
+      project,
+      center: projectCount <= 1 ? new THREE.Vector3() : fibonacciPoint(clusterIndex, projectCount, clusterRadius),
+      radius: localRadii[clusterIndex],
+      color: projectColor(project),
+    }));
+
+    return { layout, clusters, extent: clusterRadius + maxLocalRadius };
   }, [edges, nodes]);
 }
 
@@ -90,6 +108,24 @@ function roleLabel(node: GraphNode) {
   if (node.role === "core") return `${node.project} · CORE`;
   if (node.role === "latest") return `${node.project} · latest checkpoint${node.created_at ? ` ${node.created_at.slice(0, 10)}` : ""}`;
   return null;
+}
+
+function ProjectNebula({ cluster }: { cluster: Cluster }) {
+  const nebulaScale = (cluster.radius + 0.9) * 2.6;
+  return (
+    <sprite position={cluster.center} scale={[nebulaScale, nebulaScale, 1]} renderOrder={-1}>
+      <spriteMaterial map={getGlowTexture()} color={cluster.color} transparent opacity={0.16} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+    </sprite>
+  );
+}
+
+function ProjectLabel({ cluster }: { cluster: Cluster }) {
+  const position = useMemo(() => cluster.center.clone().add(new THREE.Vector3(0, cluster.radius + 0.55, 0)), [cluster]);
+  return (
+    <Html position={position} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "13px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: cluster.color, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
+      {cluster.project}
+    </Html>
+  );
 }
 
 let nodeSphereGeometry: THREE.SphereGeometry | null = null;
@@ -211,7 +247,7 @@ function RelationArrow({ source, target, highlighted, focusActive }: { source: T
   </mesh>;
 }
 
-function GraphObjects({ layout, edges, selectedId, onSelect }: { layout: LayoutNode[]; edges: GraphEdge[]; selectedId: string | null; onSelect: (node: GraphNode) => void }) {
+function GraphObjects({ layout, clusters, edges, selectedId, onSelect }: { layout: LayoutNode[]; clusters: Cluster[]; edges: GraphEdge[]; selectedId: string | null; onSelect: (node: GraphNode) => void }) {
   const positionById = useMemo(() => new Map(layout.map((node) => [node.id, node.position])), [layout]);
   const connectedIds = useMemo(() => {
     if (!selectedId) return new Set<string>();
@@ -224,6 +260,8 @@ function GraphObjects({ layout, edges, selectedId, onSelect }: { layout: LayoutN
   const explicitEdges = useMemo(() => edges.filter((edge) => edge.kind === "explicit"), [edges]);
 
   return <group>
+    {clusters.map((cluster) => <ProjectNebula key={`nebula-${cluster.project}`} cluster={cluster} />)}
+    {clusters.map((cluster) => <ProjectLabel key={`label-${cluster.project}`} cluster={cluster} />)}
     <SemanticEdgeField edges={semanticEdges} positionById={positionById} connectedIds={connectedIds} focusActive={focusActive} />
     {explicitEdges.map((edge, index) => {
       const source = positionById.get(edge.source);
@@ -293,7 +331,7 @@ function ChartMotion({ chartRef, controlsRef, layout, selectedId, interactionRef
 }
 
 export function GraphScene({ nodes, edges, selectedId, onSelect, showSemanticEdges }: { nodes: GraphNode[]; edges: GraphEdge[]; selectedId: string | null; onSelect: (node: GraphNode) => void; showSemanticEdges: boolean }) {
-  const { layout, extent } = useLayout(nodes, edges);
+  const { layout, clusters, extent } = useLayout(nodes, edges);
   const renderedEdges = useMemo(() => edgesForRender(edgesForVisibility(edges, showSemanticEdges)), [edges, showSemanticEdges]);
   const cameraDistance = Math.max(22, extent * 3.1);
   const chartRef = useRef<THREE.Group>(null);
@@ -302,10 +340,11 @@ export function GraphScene({ nodes, edges, selectedId, onSelect, showSemanticEdg
   return (
     <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: "low-power" }} frameloop="always">
       <PerspectiveCamera makeDefault position={[0, 0, cameraDistance]} fov={42} />
-      <color attach="background" args={["#090d1d"]} />
+      <color attach="background" args={["#040509"]} />
+      <Stars radius={90} depth={60} count={2600} factor={2.1} saturation={0} fade speed={0.15} />
+      <Stars radius={40} depth={30} count={900} factor={1.3} saturation={0} fade speed={0.35} />
       <group ref={chartRef}>
-        <Stars radius={34} depth={22} count={620} factor={1.15} saturation={0} fade speed={0} />
-        <GraphObjects layout={layout} edges={renderedEdges} selectedId={selectedId} onSelect={onSelect} />
+        <GraphObjects layout={layout} clusters={clusters} edges={renderedEdges} selectedId={selectedId} onSelect={onSelect} />
       </group>
       <ChartMotion chartRef={chartRef} controlsRef={controlsRef} layout={layout} selectedId={selectedId} interactionRef={interactionRef} homeDistance={cameraDistance} />
       <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.07} enablePan={false} minDistance={4} maxDistance={Math.max(42, cameraDistance * 1.4)} onStart={() => { interactionRef.current.active = true; }} onEnd={() => { interactionRef.current.active = false; interactionRef.current.lastInteraction = performance.now(); }} />

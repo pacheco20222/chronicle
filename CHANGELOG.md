@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.9.1 — 2026-09-23
+
+### Changed
+- Dashboard graph: per-project name labels, near-black background, denser
+  parallax starfield, and a colored nebula halo per project cluster so each
+  project reads as its own constellation at a glance.
+
 ## 2.9.0 — 2026-09-22
 
 ### Added
