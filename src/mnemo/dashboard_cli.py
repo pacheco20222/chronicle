@@ -35,6 +35,7 @@ def build_app():
         transport="streamable-http",
         json_response=True,
         stateless_http=True,
+        host_origin_protection=True,
     )
     dist = _dashboard_dist()
     if dist.is_dir():
