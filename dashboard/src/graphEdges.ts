@@ -1,6 +1,6 @@
 import type { GraphEdge } from "./types";
 
-const SEMANTIC_RENDER_NEIGHBORS = 2;
+const SEMANTIC_RENDER_NEIGHBORS = 3;
 
 export function edgesForVisibility(edges: GraphEdge[], showSemanticEdges: boolean) {
   return showSemanticEdges ? edges : edges.filter((edge) => edge.kind === "explicit");

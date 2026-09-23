@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera, Stars } from "@react-three/drei";
+import { Html, OrbitControls, PerspectiveCamera, Stars } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 
@@ -86,6 +86,12 @@ function getGlowTexture() {
   return glowTexture;
 }
 
+function roleLabel(node: GraphNode) {
+  if (node.role === "core") return `${node.project} · CORE`;
+  if (node.role === "latest") return `${node.project} · latest checkpoint${node.created_at ? ` ${node.created_at.slice(0, 10)}` : ""}`;
+  return null;
+}
+
 function geometryForType(type: string) {
   switch (type) {
     case "decision": return new THREE.ConeGeometry(0.09, 0.18, 4);
@@ -108,6 +114,7 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
   const roleScale = node.role === "core" ? 1.3 : node.role === "latest" ? 1.12 : 1;
   const scale = significance * roleScale * (node.status === "superseded" ? 0.82 : node.status === "resolved" ? 0.92 : 1);
   const color = colorForType(node.type);
+  const label = useMemo(() => roleLabel(node), [node]);
 
   useFrame((_, delta) => {
     const target = focusActive ? (highlighted ? 1 : 0.28) : statusOpacity;
@@ -132,27 +139,65 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
         <octahedronGeometry args={[0.12, 0]} />
         <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} wireframe toneMapped={false} />
       </mesh>}
+      {label && <Html position={[0, 0.3 * scale + 0.08, 0]} center distanceFactor={9} zIndexRange={[10, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.03em", color: BRASS, textShadow: "0 0 5px rgba(5,7,18,0.95), 0 0 2px rgba(5,7,18,0.95)" }}>{label}</Html>}
     </group>
   );
 }
 
-function EdgeLine({ source, target, kind, highlighted, focusActive }: { source: THREE.Vector3; target: THREE.Vector3; kind: GraphEdge["kind"]; highlighted: boolean; focusActive: boolean }) {
-  const materialRef = useRef<THREE.LineBasicMaterial | THREE.LineDashedMaterial>(null);
+function ExplicitEdgeLine({ source, target, highlighted, focusActive }: { source: THREE.Vector3; target: THREE.Vector3; highlighted: boolean; focusActive: boolean }) {
+  const materialRef = useRef<THREE.LineDashedMaterial>(null);
   const geometry = useMemo(() => {
     const result = new THREE.BufferGeometry().setFromPoints([source, target]);
-    if (kind === "explicit") new THREE.Line(result).computeLineDistances();
+    new THREE.Line(result).computeLineDistances();
     return result;
-  }, [kind, source, target]);
+  }, [source, target]);
 
   useFrame((_, delta) => {
     if (!materialRef.current) return;
-    const base = kind === "explicit" ? 0.7 : 0.055;
-    const targetOpacity = focusActive ? (highlighted ? (kind === "explicit" ? 1 : 0.3) : 0.02) : base;
+    const targetOpacity = focusActive ? (highlighted ? 1 : 0.05) : 0.7;
     materialRef.current.opacity = THREE.MathUtils.damp(materialRef.current.opacity, targetOpacity, 5, delta);
   });
 
   return <lineSegments geometry={geometry}>
-    {kind === "explicit" ? <lineDashedMaterial ref={materialRef as React.RefObject<THREE.LineDashedMaterial>} color={EXPLICIT} transparent opacity={0.7} dashSize={0.22} gapSize={0.14} toneMapped={false} /> : <lineBasicMaterial ref={materialRef as React.RefObject<THREE.LineBasicMaterial>} color={SEMANTIC} transparent opacity={0.055} toneMapped={false} />}
+    <lineDashedMaterial ref={materialRef} color={EXPLICIT} transparent opacity={0.7} dashSize={0.22} gapSize={0.14} toneMapped={false} />
+  </lineSegments>;
+}
+
+/* Batches every semantic edge into one additively-blended lineSegments draw
+ * call, per-vertex-colored by cosine similarity. Overlapping lines add their
+ * glow, which is what produces the "spiderweb nebula" look instead of a flat
+ * wash of uniform-opacity segments (one draw call per edge otherwise, and no
+ * glow buildup where lines cross). Static per render — no per-frame damping —
+ * matching how sparse this graph actually is (tens, not tens of thousands). */
+function SemanticEdgeField({ edges, positionById, connectedIds, focusActive }: { edges: GraphEdge[]; positionById: Map<string, THREE.Vector3>; connectedIds: Set<string>; focusActive: boolean }) {
+  const geometry = useMemo(() => {
+    const color = new THREE.Color(SEMANTIC);
+    const positions = new Float32Array(edges.length * 6);
+    const colors = new Float32Array(edges.length * 6);
+    let count = 0;
+    for (const edge of edges) {
+      const source = positionById.get(edge.source);
+      const target = positionById.get(edge.target);
+      if (!source || !target) continue;
+      const highlighted = connectedIds.has(edge.source) && connectedIds.has(edge.target);
+      let intensity = 0.05 + edge.sim * 0.22;
+      if (focusActive) intensity = highlighted ? 0.55 : intensity * 0.15;
+
+      const off = count * 6;
+      positions[off] = source.x; positions[off + 1] = source.y; positions[off + 2] = source.z;
+      positions[off + 3] = target.x; positions[off + 4] = target.y; positions[off + 5] = target.z;
+      colors[off] = color.r * intensity; colors[off + 1] = color.g * intensity; colors[off + 2] = color.b * intensity;
+      colors[off + 3] = colors[off]; colors[off + 4] = colors[off + 1]; colors[off + 5] = colors[off + 2];
+      count++;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions.slice(0, count * 6), 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(colors.slice(0, count * 6), 3));
+    return geo;
+  }, [edges, positionById, connectedIds, focusActive]);
+
+  return <lineSegments geometry={geometry}>
+    <lineBasicMaterial vertexColors transparent opacity={1} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
   </lineSegments>;
 }
 
@@ -181,16 +226,19 @@ function GraphObjects({ layout, edges, selectedId, onSelect }: { layout: LayoutN
     return ids;
   }, [edges, selectedId]);
   const focusActive = Boolean(selectedId);
+  const semanticEdges = useMemo(() => edges.filter((edge) => edge.kind === "semantic"), [edges]);
+  const explicitEdges = useMemo(() => edges.filter((edge) => edge.kind === "explicit"), [edges]);
 
   return <group>
-    {edges.map((edge, index) => {
+    <SemanticEdgeField edges={semanticEdges} positionById={positionById} connectedIds={connectedIds} focusActive={focusActive} />
+    {explicitEdges.map((edge, index) => {
       const source = positionById.get(edge.source);
       const target = positionById.get(edge.target);
       if (!source || !target) return null;
       const highlighted = connectedIds.has(edge.source) && connectedIds.has(edge.target);
-      return <group key={`${edge.source}-${edge.target}-${edge.kind}-${index}`}>
-        <EdgeLine source={source} target={target} kind={edge.kind} highlighted={highlighted} focusActive={focusActive} />
-        {edge.kind === "explicit" && <RelationArrow source={source} target={target} highlighted={highlighted} focusActive={focusActive} />}
+      return <group key={`${edge.source}-${edge.target}-${index}`}>
+        <ExplicitEdgeLine source={source} target={target} highlighted={highlighted} focusActive={focusActive} />
+        <RelationArrow source={source} target={target} highlighted={highlighted} focusActive={focusActive} />
       </group>;
     })}
     {layout.map((node) => <NodeGlyph key={node.id} node={node} position={node.position} degree={node.degree} highlighted={connectedIds.has(node.id)} focusActive={focusActive} onSelect={onSelect} />)}

@@ -52,7 +52,7 @@ function GraphTab({ snapshot, project, selectedId, onSelect }: { snapshot: Dashb
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GraphNode[]>([]);
   const [searching, setSearching] = useState(false);
-  const [showSemanticEdges, setShowSemanticEdges] = useState(false);
+  const [showSemanticEdges, setShowSemanticEdges] = useState(true);
 
   async function search() {
     if (!query.trim()) return;
