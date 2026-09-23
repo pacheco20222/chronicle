@@ -92,23 +92,17 @@ function roleLabel(node: GraphNode) {
   return null;
 }
 
-function geometryForType(type: string) {
-  switch (type) {
-    case "decision": return new THREE.ConeGeometry(0.09, 0.18, 4);
-    case "architecture": return new THREE.OctahedronGeometry(0.11, 0);
-    case "bug": return new THREE.TetrahedronGeometry(0.11, 0);
-    case "todo": return new THREE.BoxGeometry(0.14, 0.14, 0.14);
-    case "checkpoint": return new THREE.OctahedronGeometry(0.11, 0);
-    case "overview": return new THREE.DodecahedronGeometry(0.11, 0);
-    default: return new THREE.SphereGeometry(0.1, 8, 6);
-  }
+let nodeSphereGeometry: THREE.SphereGeometry | null = null;
+function getNodeSphere() {
+  if (!nodeSphereGeometry) nodeSphereGeometry = new THREE.SphereGeometry(0.1, 20, 14);
+  return nodeSphereGeometry;
 }
 
 function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect }: { node: GraphNode; position: THREE.Vector3; degree: number; highlighted: boolean; focusActive: boolean; onSelect: (node: GraphNode) => void }) {
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const glowRef = useRef<THREE.SpriteMaterial>(null);
   const ringRef = useRef<THREE.MeshBasicMaterial>(null);
-  const shape = useMemo(() => geometryForType(node.type), [node.type]);
+  const shape = getNodeSphere();
   const statusOpacity = STATUS_OPACITY[node.status] || STATUS_OPACITY.active;
   const significance = 0.68 + Math.min(degree, 8) * 0.04;
   const roleScale = node.role === "core" ? 1.3 : node.role === "latest" ? 1.12 : 1;
@@ -135,9 +129,9 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
         <torusGeometry args={[0.13, 0.014, 8, 24]} />
         <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} toneMapped={false} />
       </mesh>}
-      {node.role === "latest" && <mesh scale={1.35 * scale} rotation={[0, 0, Math.PI / 4]}>
-        <octahedronGeometry args={[0.12, 0]} />
-        <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} wireframe toneMapped={false} />
+      {node.role === "latest" && <mesh rotation={[Math.PI / 2.3, 0, Math.PI / 4]} scale={1.35 * scale}>
+        <torusGeometry args={[0.13, 0.01, 8, 24]} />
+        <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.85} toneMapped={false} />
       </mesh>}
       {label && <Html position={[0, 0.3 * scale + 0.08, 0]} center distanceFactor={9} zIndexRange={[10, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.03em", color: BRASS, textShadow: "0 0 5px rgba(5,7,18,0.95), 0 0 2px rgba(5,7,18,0.95)" }}>{label}</Html>}
     </group>
@@ -253,6 +247,8 @@ function ChartMotion({ chartRef, controlsRef, layout, selectedId, interactionRef
   const homeTarget = useMemo(() => new THREE.Vector3(), []);
   const direction = useMemo(() => new THREE.Vector3(), []);
   const nodeById = useMemo(() => new Map(layout.map((node) => [node.id, node])), [layout]);
+  const wasSelectedRef = useRef(false);
+  const homingRef = useRef(false);
 
   useFrame((state, delta) => {
     const chart = chartRef.current;
@@ -263,6 +259,15 @@ function ChartMotion({ chartRef, controlsRef, layout, selectedId, interactionRef
       chart.rotation.x = Math.sin(state.clock.elapsedTime * 0.04) * 0.045;
     }
     if (!controls) return;
+
+    if (selectedId) {
+      wasSelectedRef.current = true;
+      homingRef.current = false;
+    } else if (wasSelectedRef.current) {
+      wasSelectedRef.current = false;
+      homingRef.current = true;
+    }
+
     if (selectedId && chart) {
       const node = nodeById.get(selectedId);
       if (node) {
@@ -273,9 +278,14 @@ function ChartMotion({ chartRef, controlsRef, layout, selectedId, interactionRef
         desiredCamera.copy(selectedPoint).add(direction.multiplyScalar(6.4));
         camera.position.lerp(desiredCamera, 1 - Math.exp(-delta * 2.1));
       }
-    } else {
+    } else if (homingRef.current && !interactionRef.current.active) {
+      // One-shot return to the overview framing right after a selection is
+      // cleared. Cancelled the instant the user touches the controls, and
+      // otherwise self-terminates on arrival — never fights free orbit/zoom
+      // when nothing was ever selected.
       controls.target.lerp(homeTarget, 1 - Math.exp(-delta * 1.6));
       camera.position.lerp(homeCamera, 1 - Math.exp(-delta * 1.6));
+      if (camera.position.distanceTo(homeCamera) < 0.05) homingRef.current = false;
     }
     controls.update();
   });
