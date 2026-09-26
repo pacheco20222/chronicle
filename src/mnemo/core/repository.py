@@ -8,7 +8,7 @@ from mnemo.storage.database import Database
 from mnemo.storage.models import Memory, Source, utc_now
 
 
-HIDDEN_STATUSES = {"superseded", "deleted"}
+HIDDEN_STATUSES = {"superseded", "deleted", "wrong"}
 memory_fts = table("memory_fts", column("memory_id", String), column("content", Text))
 
 
@@ -114,6 +114,24 @@ class MemoryRepository:
         with self.session_factory() as session:
             return session.scalar(select(Memory).where(Memory.id == memory_id))
 
+    def set_confidence(self, memory_id: str, confidence: float) -> None:
+        with self.session_factory() as session:
+            session.execute(
+                update(Memory)
+                .where(Memory.id == memory_id)
+                .values(confidence=confidence, updated_at=utc_now())
+            )
+            session.commit()
+
+    def edit_content(self, memory_id: str, content: str) -> None:
+        with self.session_factory() as session:
+            session.execute(
+                update(Memory)
+                .where(Memory.id == memory_id)
+                .values(content=content, updated_at=utc_now())
+            )
+            session.commit()
+
     def get_by_ids(self, memory_ids: Iterable[str]) -> dict[str, Memory]:
         ids = list(memory_ids)
         if not ids:
@@ -131,7 +149,7 @@ class MemoryRepository:
         with self.session_factory() as session:
             updated_at = utc_now()
             values = {"status": status, "updated_at": updated_at}
-            if status in {"superseded", "expired"}:
+            if status in {"superseded", "expired", "wrong"}:
                 values["invalid_at"] = updated_at
             session.execute(
                 update(Memory)

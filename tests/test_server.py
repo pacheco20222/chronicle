@@ -239,6 +239,48 @@ def test_server_instructions_cover_registration_workflow():
     assert "memory_register_project" in server.mcp.instructions
 
 
+def test_memory_correction_tools_round_trip():
+    added = server.memory_add("correction workflow source", "note", confidence=0.2)
+
+    confirmed = server.memory_confirm(added["id"], confidence=0.9)
+    assert confirmed == {"id": added["id"], "confidence": 0.9}
+
+    edited = server.memory_edit(added["id"], "correction workflow edited")
+    assert edited == {"id": added["id"], "content": "correction workflow edited"}
+    assert any(row["id"] == added["id"] for row in server.memory_search("correction workflow edited"))
+
+    retracted = server.memory_retract(added["id"])
+    assert retracted == {"id": added["id"], "status": "deleted"}
+
+    wrong = server.memory_add("incorrect extracted fact", "note")
+    marked_wrong = server.memory_mark_wrong(wrong["id"])
+    assert marked_wrong == {"id": wrong["id"], "status": "wrong"}
+
+    source_a = server.memory_add("merge source a", "note")
+    source_b = server.memory_add("merge source b", "note")
+    merged = server.memory_merge("merged correction", "note", [source_a["id"], source_b["id"]])
+    assert merged["id"]
+
+    split_source = server.memory_add("combined correction", "note")
+    split = server.memory_split(
+        split_source["id"],
+        [{"content": "split correction one", "type": "note"}, {"content": "split correction two", "type": "note"}],
+    )
+    assert len(split["ids"]) == 2
+
+
+def test_server_instructions_cover_correction_workflow():
+    for tool in (
+        "memory_confirm",
+        "memory_edit",
+        "memory_retract",
+        "memory_mark_wrong",
+        "memory_merge",
+        "memory_split",
+    ):
+        assert tool in server.mcp.instructions
+
+
 def test_memory_register_project_rejects_empty_name(tmp_path, monkeypatch):
     monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(ValueError):

@@ -62,7 +62,14 @@ mcp = FastMCP(
         "memory_link(source_id, relation_type, target_id) with "
         "relation_type one of: related_to, supersedes, caused_by, "
         "blocked_by, implements. Only call it when the relationship is "
-        "worth remembering on its own, not for every passing mention."
+        "worth remembering on its own, not for every passing mention. "
+        "For human correction, use memory_confirm to adjust confidence, "
+        "memory_edit for typo or extraction fixes in place, memory_retract "
+        "to mark unwanted memory deleted, memory_mark_wrong for facts that "
+        "were never true, memory_merge to combine sources, and memory_split "
+        "to replace one source with fragments; use memory_add with "
+        "supersedes for a genuinely new replacement fact and memory_link "
+        "for relationships without replacement."
     ),
 )
 
@@ -115,10 +122,61 @@ def memory_set_status(memory_id: str, status: str) -> dict:
 
 
 @mcp.tool
+def memory_confirm(memory_id: str, confidence: float = 1.0) -> dict:
+    _get_service().confirm_memory(memory_id, confidence=confidence)
+    return {"id": memory_id, "confidence": confidence}
+
+
+@mcp.tool
+def memory_edit(memory_id: str, content: str) -> dict:
+    _get_service().edit_memory(memory_id, content)
+    return {"id": memory_id, "content": content}
+
+
+@mcp.tool
+def memory_retract(memory_id: str) -> dict:
+    _get_service().retract_memory(memory_id)
+    return {"id": memory_id, "status": "deleted"}
+
+
+@mcp.tool
+def memory_mark_wrong(memory_id: str) -> dict:
+    _get_service().mark_wrong(memory_id)
+    return {"id": memory_id, "status": "wrong"}
+
+
+@mcp.tool
 def memory_link(source_id: str, relation_type: str, target_id: str) -> dict:
     config.validate_relation_type(relation_type)
     _get_service().link_memories(source_id, relation_type, target_id)
     return {"source_id": source_id, "relation_type": relation_type, "target_id": target_id}
+
+
+@mcp.tool
+def memory_merge(content: str, type: str, source_ids: list[str]) -> dict:
+    project = config.get_project()
+    config.validate_type(type)
+    vector = embeddings.embed_text(content)
+    memory_id = _get_service().merge_memories(vector, content, project, type, source_ids)
+    return {
+        "id": memory_id,
+        "project": project,
+        "type": type,
+        "content": content,
+        "source_ids": source_ids,
+    }
+
+
+@mcp.tool
+def memory_split(source_id: str, new_memories: list[dict]) -> dict:
+    contents = []
+    for memory in new_memories:
+        content = memory["content"]
+        type_ = memory["type"]
+        config.validate_type(type_)
+        contents.append((embeddings.embed_text(content), content, type_))
+    memory_ids = _get_service().split_memory(source_id, contents)
+    return {"source_id": source_id, "ids": memory_ids}
 
 
 @mcp.tool

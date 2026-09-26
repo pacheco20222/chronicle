@@ -82,8 +82,46 @@ class MemoryService:
     def set_status(self, memory_id: str, status: str) -> None:
         self.repository.set_status(memory_id, status)
 
+    def confirm_memory(self, memory_id: str, confidence: float = 1.0) -> None:
+        self.repository.set_confidence(memory_id, confidence)
+
+    def edit_memory(self, memory_id: str, content: str) -> None:
+        self.repository.edit_content(memory_id, content)
+
+    def retract_memory(self, memory_id: str) -> None:
+        self.set_status(memory_id, "deleted")
+
+    def mark_wrong(self, memory_id: str) -> None:
+        self.set_status(memory_id, "wrong")
+
     def link_memories(self, source_id: str, relation_type: str, target_id: str) -> None:
         self.repository.link(source_id, relation_type, target_id)
+
+    def merge_memories(
+        self,
+        vector: Sequence[float],
+        content: str,
+        project: str,
+        type_: str,
+        source_ids: list[str],
+    ) -> str:
+        merged_id = self.add_memory(vector, content, project, type_)
+        for source_id in source_ids:
+            self.link_memories(merged_id, "supersedes", source_id)
+        return merged_id
+
+    def split_memory(
+        self,
+        source_id: str,
+        new_contents: list[tuple[Sequence[float], str, str]],
+    ) -> list[str]:
+        source = self.repository.get(source_id)
+        if source is None:
+            raise ValueError(f"no memory found with id {source_id!r}")
+        return [
+            self.add_memory(vector, content, source.project, type_, supersedes=source_id)
+            for vector, content, type_ in new_contents
+        ]
 
     def _merge(self, ranked_lists: list[list[str]], rows: dict[str, Memory], k: int) -> list[dict]:
         scores: dict[str, float] = {}

@@ -35,7 +35,7 @@ def test_validate_type_rejects_unknown():
 
 
 def test_validate_status_accepts_known_statuses():
-    for known in ("active", "resolved", "superseded"):
+    for known in ("active", "resolved", "superseded", "wrong"):
         config.validate_status(known)  # must not raise
 
 

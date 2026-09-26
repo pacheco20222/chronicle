@@ -254,3 +254,77 @@ def test_search_keeps_best_item_when_it_exceeds_budget(service):
 
     assert len(results) == 1
     assert results[0]["content"] == best_content
+
+
+def test_confirm_updates_confidence_without_changing_status(service):
+    memory_id = service.add_memory([1.0], "confidence probe", "p", "note", confidence=0.2)
+
+    service.confirm_memory(memory_id, confidence=0.9)
+
+    row = service.repository.get(memory_id)
+    assert row.confidence == 0.9
+    assert row.status == "active"
+
+
+def test_edit_updates_existing_memory_and_fts_content(service):
+    memory_id = service.add_memory([1.0], "old exact correction phrase", "p", "note")
+
+    service.edit_memory(memory_id, "new exact correction phrase")
+
+    row = service.repository.get(memory_id)
+    assert row.id == memory_id
+    assert row.content == "new exact correction phrase"
+    assert service.repository.lexical("p", "new exact correction phrase", None, 5, False)[0].id == memory_id
+    assert service.repository.lexical("p", "old exact correction phrase", None, 5, False) == []
+
+
+def test_retract_hides_memory_but_keeps_direct_record(service):
+    memory_id = service.add_memory([1.0], "retractable memory", "p", "note")
+
+    service.retract_memory(memory_id)
+
+    assert service.repository.get(memory_id).status == "deleted"
+    assert service.search([1.0], "p", query_text="retractable memory", k=5) == []
+    assert service.get_latest("p", "note") is None
+
+
+def test_mark_wrong_sets_hidden_status_and_invalid_at(service):
+    memory_id = service.add_memory([1.0], "incorrect extraction", "p", "note")
+
+    service.mark_wrong(memory_id)
+
+    row = service.repository.get(memory_id)
+    assert row.status == "wrong"
+    assert row.invalid_at is not None
+    assert service.search([1.0], "p", query_text="incorrect extraction", k=5) == []
+    assert service.search([1.0], "p", query_text="incorrect extraction", k=5, include_superseded=True)[0]["id"] == memory_id
+
+
+def test_merge_creates_memory_and_supersedes_all_sources(service):
+    source_ids = [
+        service.add_memory([1.0], "first source", "p", "note"),
+        service.add_memory([1.0], "second source", "p", "note"),
+    ]
+
+    merged_id = service.merge_memories([1.0], "merged content", "p", "note", source_ids)
+
+    assert service.repository.get(merged_id).content == "merged content"
+    for source_id in source_ids:
+        source = service.repository.get(source_id)
+        assert source.status == "superseded"
+        assert source.invalid_at is not None
+
+
+def test_split_creates_fragments_that_supersede_source(service):
+    source_id = service.add_memory([1.0], "combined source", "p", "note")
+
+    fragment_ids = service.split_memory(
+        source_id,
+        [([1.0], "first fragment", "note"), ([1.0], "second fragment", "note")],
+    )
+
+    assert len(fragment_ids) == 2
+    assert [service.repository.get(fragment_id).supersedes for fragment_id in fragment_ids] == [source_id, source_id]
+    source = service.repository.get(source_id)
+    assert source.status == "superseded"
+    assert source.invalid_at is not None

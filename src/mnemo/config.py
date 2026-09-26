@@ -9,7 +9,7 @@ EMBED_MODEL = "nomic-ai/nomic-embed-text-v1.5"
 VECTOR_SIZE = 768
 COLLECTION_NAME = os.environ.get("MNEMO_COLLECTION", "memories")
 VALID_TYPES = frozenset({"decision", "architecture", "bug", "todo", "note", "checkpoint", "overview"})
-VALID_STATUSES = frozenset({"active", "proposed", "resolved", "superseded", "expired", "deleted"})
+VALID_STATUSES = frozenset({"active", "proposed", "resolved", "superseded", "expired", "deleted", "wrong"})
 VALID_RELATION_TYPES = frozenset({"related_to", "supersedes", "caused_by", "blocked_by", "implements"})
 
 
