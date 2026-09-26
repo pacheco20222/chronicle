@@ -341,8 +341,8 @@ export function GraphScene({ nodes, edges, selectedId, onSelect, showSemanticEdg
     <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: "low-power" }} frameloop="always">
       <PerspectiveCamera makeDefault position={[0, 0, cameraDistance]} fov={42} />
       <color attach="background" args={["#040509"]} />
-      <Stars radius={90} depth={60} count={2600} factor={2.1} saturation={0} fade speed={0.15} />
-      <Stars radius={40} depth={30} count={900} factor={1.3} saturation={0} fade speed={0.35} />
+      <Stars radius={90} depth={60} count={9000} factor={2.1} saturation={0} fade speed={0.15} />
+      <Stars radius={40} depth={30} count={3200} factor={1.3} saturation={0} fade speed={0.35} />
       <group ref={chartRef}>
         <GraphObjects layout={layout} clusters={clusters} edges={renderedEdges} selectedId={selectedId} onSelect={onSelect} />
       </group>

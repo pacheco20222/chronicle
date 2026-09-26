@@ -1,6 +1,6 @@
 [project]
 name = "mnemo"
-version = "2.9.1"
+version = "2.9.2"
 description = "Self-hosted, project-scoped memory MCP server for Claude Code and Codex"
 readme = "README.md"
 license = "MIT"

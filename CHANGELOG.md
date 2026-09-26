@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.9.2 — 2026-09-25
+
+### Changed
+- Dashboard graph: denser starfield (far/near star counts 2600/900 →
+  9000/3200) for a more visible Milky Way effect.
+
 ## 2.9.1 — 2026-09-23
 
 ### Changed
