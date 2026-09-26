@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.0.0 — 2026-09-26
+
+### Changed
+- **Storage rearchitecture**: SQLite (SQLAlchemy 2 + Alembic) is now the
+  canonical source of truth for all memory data. Qdrant is reduced to a
+  `VectorIndex` adapter used only for semantic similarity search — no
+  other module imports `qdrant_client`. Lexical retrieval is now real
+  SQLite FTS5 (was a Qdrant text-match filter).
+- `memory_add`/`memory_set_document` accept optional `confidence` and
+  `extraction_method`; results now include `episode_title` alongside
+  existing provenance fields.
+- Memory lifecycle now populates `valid_at`/`invalid_at` automatically
+  on every transition to superseded/expired/wrong.
+- Project-scoped operations (`memory_search`, `memory_get_latest`, etc.)
+  now reject an empty/missing project instead of silently searching
+  everything; `memory_search_global` remains the explicit global path.
+- `memory_search`/`memory_search_global` accept an optional `max_tokens`
+  budget, packing whole results by rank rather than returning a raw
+  top-k dump.
+- `mnemo import` accepts a directory: recursively ingests `.md`/`.txt`
+  files, one memory per file, idempotent via content-hash change
+  detection; unchanged files are skipped on rescan, changed files
+  supersede the prior memory for that path.
+- Dashboard graph is now a context explorer: clicking a memory node
+  reaches its provenance, temporal history, supersede chain, and
+  explicit relations without leaving the page; project "core" memories
+  are editable inline.
+
+### Added
+- Human correction workflow: `memory_confirm`, `memory_edit`,
+  `memory_retract`, `memory_mark_wrong`, `memory_merge`, `memory_split`
+  (alongside the existing supersede-via-add/link).
+- `mnemo eval --project X`: an evaluation harness reporting
+  self-retrieval recall, stale-memory rate, near-duplicate/contradiction
+  proxy, duplicate rate, token cost, latency, and provenance coverage
+  against real stored data.
+
 ## 2.9.2 — 2026-09-25
 
 ### Changed
