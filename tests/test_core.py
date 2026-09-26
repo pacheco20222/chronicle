@@ -1,9 +1,9 @@
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 
 from mnemo.core.repository import MemoryRepository
 from mnemo.core.service import MemoryService
 from mnemo.storage.database import Database
-from mnemo.storage.models import Memory
+from mnemo.storage.models import Episode, Memory
 
 from fake_vector import FakeVectorIndex
 
@@ -30,6 +30,66 @@ def test_add_memory_writes_authoritative_row_and_vector(tmp_path):
     assert row is not None
     assert row.content == "SQLite is canonical"
     assert service.vector_index.points[memory_id]["metadata"] == {"project": "p", "type": "architecture"}
+
+
+def test_provenance_fields_round_trip_through_latest_and_search(tmp_path):
+    service = make_service(tmp_path)
+
+    memory_id = service.add_memory(
+        [1.0],
+        "manual provenance memory",
+        "p",
+        "note",
+        confidence=0.8,
+        extraction_method="manual",
+    )
+
+    latest = service.get_latest("p", "note")
+    search_result = service.search([1.0], "p", query_text="manual provenance memory", k=1)[0]
+
+    assert latest["id"] == memory_id
+    assert latest["confidence"] == 0.8
+    assert latest["extraction_method"] == "manual"
+    assert search_result["confidence"] == 0.8
+    assert search_result["extraction_method"] == "manual"
+
+
+def test_document_provenance_fields_round_trip_through_get_document(tmp_path):
+    service = make_service(tmp_path)
+
+    service.set_document(
+        [1.0],
+        "document provenance",
+        "p",
+        "provenance-doc",
+        "note",
+        confidence=0.8,
+        extraction_method="manual",
+    )
+
+    document = service.get_document("p", "provenance-doc")
+
+    assert document["confidence"] == 0.8
+    assert document["extraction_method"] == "manual"
+
+
+def test_serialization_includes_episode_id_and_title(tmp_path):
+    service = make_service(tmp_path)
+    episode_id = "episode-1"
+
+    with service.repository.session_factory() as session:
+        session.add(Episode(id=episode_id, project="p", title="Manual import"))
+        session.commit()
+
+    memory_id = service.add_memory([1.0], "episode memory", "p", "note")
+    with service.repository.session_factory() as session:
+        session.execute(update(Memory).where(Memory.id == memory_id).values(episode_id=episode_id))
+        session.commit()
+
+    serialized = service.get_latest("p", "note")
+
+    assert serialized["episode_id"] == episode_id
+    assert serialized["episode_title"] == "Manual import"
 
 
 def test_search_loads_content_from_sqlite_and_hides_superseded_rows(tmp_path):

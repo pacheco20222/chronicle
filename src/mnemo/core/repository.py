@@ -33,6 +33,8 @@ class MemoryRepository:
         status: str = "active",
         supersedes: str | None = None,
         slug: str | None = None,
+        confidence: float | None = None,
+        extraction_method: str | None = None,
     ) -> Memory:
         with self.session_factory() as session:
             source_id = None
@@ -49,6 +51,8 @@ class MemoryRepository:
                 source_id=source_id,
                 supersedes=supersedes,
                 slug=slug,
+                confidence=confidence,
+                extraction_method=extraction_method,
                 relations=[{"type": "supersedes", "target": supersedes}] if supersedes else [],
             )
             session.add(row)
@@ -69,15 +73,27 @@ class MemoryRepository:
         slug: str,
         type_: str,
         content: str,
+        confidence: float | None = None,
+        extraction_method: str | None = None,
     ) -> Memory:
         with self.session_factory() as session:
             row = session.scalar(select(Memory).where(Memory.project == project, Memory.slug == slug))
             if row is None:
-                row = Memory(id=id, project=project, slug=slug, type=type_, content=content)
+                row = Memory(
+                    id=id,
+                    project=project,
+                    slug=slug,
+                    type=type_,
+                    content=content,
+                    confidence=confidence,
+                    extraction_method=extraction_method,
+                )
                 session.add(row)
             else:
                 row.type = type_
                 row.content = content
+                row.confidence = confidence
+                row.extraction_method = extraction_method
                 row.updated_at = utc_now()
             session.commit()
             return row

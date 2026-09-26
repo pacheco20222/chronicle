@@ -37,6 +37,7 @@ class MemoryService:
             "source_id": row.source_id,
             "source": row.source_record.locator if row.source_record else None,
             "episode_id": row.episode_id,
+            "episode_title": row.episode_record.title if row.episode_record else None,
             "supersedes": row.supersedes,
             "confidence": row.confidence,
             "extraction_method": row.extraction_method,
@@ -58,6 +59,8 @@ class MemoryService:
         source: str | None = None,
         status: str = "active",
         supersedes: str | None = None,
+        confidence: float | None = None,
+        extraction_method: str | None = None,
     ) -> str:
         memory_id = str(uuid.uuid4())
         self.repository.create_memory(
@@ -68,6 +71,8 @@ class MemoryService:
             source=source,
             status=status,
             supersedes=supersedes,
+            confidence=confidence,
+            extraction_method=extraction_method,
         )
         self.vector_index.upsert(memory_id, vector, {"project": project, "type": type_})
         return memory_id
@@ -155,6 +160,8 @@ class MemoryService:
         project: str,
         slug: str,
         type_: str,
+        confidence: float | None = None,
+        extraction_method: str | None = None,
     ) -> str:
         memory_id = str(uuid.uuid5(DOCUMENT_NAMESPACE, f"{project}:{slug}"))
         row = self.repository.upsert_document(
@@ -163,6 +170,8 @@ class MemoryService:
             slug=slug,
             type_=type_,
             content=content,
+            confidence=confidence,
+            extraction_method=extraction_method,
         )
         self.vector_index.upsert(row.id, vector, {"project": project, "type": type_})
         return row.id

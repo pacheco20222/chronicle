@@ -15,6 +15,7 @@ mcp = FastMCP(
         "state, what's been tried (including things that did NOT work), "
         "and the concrete next step. Write it so that someone with zero "
         "memory of this conversation could resume the work from it alone. "
+        "Optional memory_add provenance fields are confidence and extraction_method. "
         "For content that should persist and update in place over time "
         "(a project overview, an evolving bug list, anything that "
         "supersedes its previous version rather than adding to it), use "
@@ -75,12 +76,34 @@ def _get_service():
 
 
 @mcp.tool
-def memory_add(content: str, type: str, supersedes: str | None = None) -> dict:
+def memory_add(
+    content: str,
+    type: str,
+    supersedes: str | None = None,
+    confidence: float | None = None,
+    extraction_method: str | None = None,
+) -> dict:
     project = config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
-    memory_id = _get_service().add_memory(vector, content, project, type, supersedes=supersedes)
-    return {"id": memory_id, "project": project, "type": type, "content": content, "supersedes": supersedes}
+    memory_id = _get_service().add_memory(
+        vector,
+        content,
+        project,
+        type,
+        supersedes=supersedes,
+        confidence=confidence,
+        extraction_method=extraction_method,
+    )
+    return {
+        "id": memory_id,
+        "project": project,
+        "type": type,
+        "content": content,
+        "supersedes": supersedes,
+        "confidence": confidence,
+        "extraction_method": extraction_method,
+    }
 
 
 @mcp.tool
@@ -114,12 +137,34 @@ def memory_search_global(query: str, type: str | None = None, k: int = 5) -> lis
 
 
 @mcp.tool
-def memory_set_document(slug: str, content: str, type: str) -> dict:
+def memory_set_document(
+    slug: str,
+    content: str,
+    type: str,
+    confidence: float | None = None,
+    extraction_method: str | None = None,
+) -> dict:
     project = config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
-    doc_id = _get_service().set_document(vector, content, project, slug, type)
-    return {"id": doc_id, "project": project, "slug": slug, "type": type, "content": content}
+    doc_id = _get_service().set_document(
+        vector,
+        content,
+        project,
+        slug,
+        type,
+        confidence=confidence,
+        extraction_method=extraction_method,
+    )
+    return {
+        "id": doc_id,
+        "project": project,
+        "slug": slug,
+        "type": type,
+        "content": content,
+        "confidence": confidence,
+        "extraction_method": extraction_method,
+    }
 
 
 @mcp.tool

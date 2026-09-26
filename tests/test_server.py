@@ -17,6 +17,25 @@ def test_memory_add_and_search_round_trip():
     assert any(r["id"] == added["id"] for r in results)
 
 
+def test_memory_add_provenance_round_trip():
+    added = server.memory_add(
+        "manual provenance via MCP tool",
+        "note",
+        confidence=0.8,
+        extraction_method="manual",
+    )
+
+    latest = server.memory_get_latest("note")
+    results = server.memory_search("manual provenance via MCP tool")
+
+    assert latest["id"] == added["id"]
+    assert latest["confidence"] == 0.8
+    assert latest["extraction_method"] == "manual"
+    result = next(row for row in results if row["id"] == added["id"])
+    assert result["confidence"] == 0.8
+    assert result["extraction_method"] == "manual"
+
+
 def test_memory_add_rejects_invalid_type():
     with pytest.raises(ValueError):
         server.memory_add("bad type memory", "nonsense")
@@ -109,6 +128,21 @@ def test_memory_set_document_creates_and_replaces():
     fetched_again = server.memory_get_document("plan-test-doc")
     assert fetched_again["content"] == "version two"
     assert fetched_again["id"] == first["id"]
+
+
+def test_memory_set_document_provenance_round_trip():
+    server.memory_set_document(
+        "provenance-protocol-doc",
+        "document provenance",
+        "note",
+        confidence=0.8,
+        extraction_method="manual",
+    )
+
+    document = server.memory_get_document("provenance-protocol-doc")
+
+    assert document["confidence"] == 0.8
+    assert document["extraction_method"] == "manual"
 
 
 def test_memory_get_document_returns_none_for_unknown_slug():
