@@ -1,3 +1,4 @@
+import inspect
 from pathlib import Path
 
 import anyio
@@ -219,6 +220,12 @@ def test_mcp_protocol_global_search_round_trip():
 def test_server_instructions_cover_global_search_scope():
     assert "memory_search_global" in server.mcp.instructions
     assert "every project" in server.mcp.instructions
+    assert "max_tokens" in server.mcp.instructions
+
+
+def test_search_tools_accept_optional_token_budget():
+    assert "max_tokens" in inspect.signature(server.memory_search).parameters
+    assert "max_tokens" in inspect.signature(server.memory_search_global).parameters
 
 
 def test_memory_register_project_writes_registry(tmp_path, monkeypatch):

@@ -203,3 +203,54 @@ def test_project_scoped_search_returns_only_requested_project(service):
     results = service.search([1.0], "p", query_text="scope probe", k=5)
 
     assert {row["id"] for row in results} == {project_id}
+
+
+def test_search_packs_ranked_items_without_truncating_content(service):
+    contents = [
+        "first ranked memory " + "a" * 28,
+        "second ranked memory " + "b" * 36,
+        "third ranked memory " + "c" * 52,
+    ]
+    memory_ids = [
+        service.add_memory([3.0], contents[0], "p", "note"),
+        service.add_memory([2.0], contents[1], "p", "note"),
+        service.add_memory([1.0], contents[2], "p", "note"),
+    ]
+    budget = len(contents[0]) // 4 + len(contents[1]) // 4
+
+    unbounded = service.search([1.0], "p", k=3)
+    packed = service.search([1.0], "p", k=3, max_tokens=budget)
+
+    assert len(unbounded) == 3
+    assert [row["id"] for row in packed] == memory_ids[:2]
+    assert [row["content"] for row in packed] == contents[:2]
+
+
+def test_search_with_no_budget_preserves_top_k_behavior(service):
+    memory_ids = [
+        service.add_memory([3.0], "first result", "p", "note"),
+        service.add_memory([2.0], "second result", "p", "note"),
+        service.add_memory([1.0], "third result", "p", "note"),
+    ]
+
+    expected = service.search([1.0], "p", k=2)
+    actual = service.search([1.0], "p", k=2, max_tokens=None)
+
+    assert [row["id"] for row in expected] == memory_ids[:2]
+    assert actual == expected
+
+
+def test_search_keeps_best_item_when_it_exceeds_budget(service):
+    best_content = "best result " + "x" * 100
+    service.add_memory([3.0], best_content, "p", "note")
+    service.add_memory([1.0], "smaller result", "p", "note")
+
+    results = service.search(
+        [1.0],
+        "p",
+        k=2,
+        max_tokens=len(best_content) // 4 - 1,
+    )
+
+    assert len(results) == 1
+    assert results[0]["content"] == best_content

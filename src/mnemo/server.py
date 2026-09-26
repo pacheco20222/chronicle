@@ -33,10 +33,11 @@ mcp = FastMCP(
         "newest-first (query ignored), so it can never surface a stale one "
         "ahead of the latest. The project overview document is NOT a checkpoint — never "
         "present it as one. There is also memory_search_global(query, "
-        "type, k), which searches across every project, not just this "
+        "type, k, max_tokens), which searches across every project, not just this "
         "one. Only call it when the user explicitly asks for something "
         "cross-project (e.g. \"what have I done across all my "
-        "projects\") — never as a fallback or default when the normal "
+        "projects\") — optional max_tokens bounds returned memory content; never as a "
+        "fallback or default when the normal "
         "memory_search, scoped to this project, would do. If any memory "
         "tool call fails because no project is set for this folder, or "
         "the user explicitly asks to set up Mnemo here, call "
@@ -121,19 +122,42 @@ def memory_link(source_id: str, relation_type: str, target_id: str) -> dict:
 
 
 @mcp.tool
-def memory_search(query: str, type: str | None = None, k: int = 5) -> list[dict]:
+def memory_search(
+    query: str,
+    type: str | None = None,
+    k: int = 5,
+    max_tokens: int | None = None,
+) -> list[dict]:
     project = config.get_project()
     if type == "checkpoint":
         # Checkpoints are a timeline, not a topic: newest first, query ignored.
         return _get_service().get_recent(project, "checkpoint", k=k)
     vector = embeddings.embed_text(query)
-    return _get_service().search(vector, project, query_text=query, type_=type, k=k)
+    return _get_service().search(
+        vector,
+        project,
+        query_text=query,
+        type_=type,
+        k=k,
+        max_tokens=max_tokens,
+    )
 
 
 @mcp.tool
-def memory_search_global(query: str, type: str | None = None, k: int = 5) -> list[dict]:
+def memory_search_global(
+    query: str,
+    type: str | None = None,
+    k: int = 5,
+    max_tokens: int | None = None,
+) -> list[dict]:
     vector = embeddings.embed_text(query)
-    return _get_service().search_global(vector, query_text=query, type_=type, k=k)
+    return _get_service().search_global(
+        vector,
+        query_text=query,
+        type_=type,
+        k=k,
+        max_tokens=max_tokens,
+    )
 
 
 @mcp.tool

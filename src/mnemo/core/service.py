@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 import uuid
 
+from mnemo.core.budget import estimate_tokens
 from mnemo.core.repository import HIDDEN_STATUSES, MemoryRepository, _require_project
 from mnemo.core.vector_index import VectorIndex
 from mnemo.storage.models import Memory
@@ -101,6 +102,7 @@ class MemoryService:
         type_: str | None,
         k: int,
         include_superseded: bool,
+        max_tokens: int | None,
     ) -> list[dict]:
         pool = max(k * 4, HYBRID_POOL)
         vector_hits = self.vector_index.search(
@@ -120,7 +122,21 @@ class MemoryService:
             for memory_id, row in rows.items()
             if row.status != "deleted" and (include_superseded or row.status not in HIDDEN_STATUSES)
         }
-        return self._merge(ranked_lists, rows, k)
+        results = self._merge(ranked_lists, rows, k)
+        if max_tokens is None:
+            return results
+
+        packed = []
+        total_tokens = 0
+        for item in results:
+            item_tokens = estimate_tokens(item["content"])
+            if not packed and item_tokens > max_tokens:
+                return [item]
+            if total_tokens + item_tokens > max_tokens:
+                break
+            packed.append(item)
+            total_tokens += item_tokens
+        return packed
 
     def search(
         self,
@@ -130,9 +146,10 @@ class MemoryService:
         type_: str | None = None,
         k: int = 5,
         include_superseded: bool = False,
+        max_tokens: int | None = None,
     ) -> list[dict]:
         project = _require_project(project)
-        return self._search(vector, project, query_text, type_, k, include_superseded)
+        return self._search(vector, project, query_text, type_, k, include_superseded, max_tokens)
 
     def search_global(
         self,
@@ -141,8 +158,9 @@ class MemoryService:
         type_: str | None = None,
         k: int = 5,
         include_superseded: bool = False,
+        max_tokens: int | None = None,
     ) -> list[dict]:
-        return self._search(vector, None, query_text, type_, k, include_superseded)
+        return self._search(vector, None, query_text, type_, k, include_superseded, max_tokens)
 
     def get_latest(self, project: str, type_: str, include_superseded: bool = False) -> dict | None:
         project = _require_project(project)
