@@ -150,6 +150,91 @@ def test_memory_get_document_returns_none_for_unknown_slug():
     assert server.memory_get_document("a-slug-that-was-never-set") is None
 
 
+def test_memory_list_scopes_tool(service):
+    service.repository.get_or_create_scope("work/azure")
+    result = server.memory_list_scopes(prefix="work")
+    assert {item["path"] for item in result} == {"work", "work/azure"}
+
+
+def test_memory_list_scopes_no_match_returns_empty():
+    assert server.memory_list_scopes(prefix="nonexistent") == []
+
+
+def test_memory_set_document_at_scope_path_creates_ancestors(service):
+    result = server.memory_set_document(
+        slug="work", content="work domain core", type="overview", scope_path="work/azure"
+    )
+    assert result["project"] == "work/azure"
+    assert service.repository.get_scope_by_path("work") is not None
+    assert service.repository.get_scope_by_path("work/azure") is not None
+
+
+def test_memory_get_document_at_scope_path(service):
+    server.memory_set_document(
+        slug="work/azure", content="azure notes", type="overview", scope_path="work/azure"
+    )
+    result = server.memory_get_document(slug="work/azure", scope_path="work/azure")
+    assert result["content"] == "azure notes"
+
+
+def test_memory_get_document_at_missing_scope_path_returns_none():
+    assert server.memory_get_document(slug="x", scope_path="never/created") is None
+
+
+def test_memory_set_document_without_scope_path_unchanged():
+    result = server.memory_set_document(slug="chronicle-test", content="c", type="overview")
+    assert result["project"] == "chronicle-test"
+
+
+def test_memory_get_by_source_tool(service):
+    v = [0.1] * 768
+    id0 = service.add_memory(v, "chunk 0", "chronicle-test", "document", source="doc.md", chunk_index=0)
+    source_id = service.repository.get(id0).source_id
+    result = server.memory_get_by_source(source_id=source_id)
+    assert result[0]["id"] == id0
+
+
+def test_memory_link_accepts_relates_to_project(service):
+    v = [0.1] * 768
+    target_id = service.set_document(v, "overview", "chronicle-test", "chronicle-test", "overview")
+    doc_id = service.add_memory(v, "doc", "docs/general", "document")
+    result = server.memory_link(
+        source_id=doc_id, relation_type="relates_to_project", target_id=target_id
+    )
+    assert result["relation_type"] == "relates_to_project"
+
+
+def test_memory_search_include_linked_param(service):
+    v = [0.1] * 768
+    target_id = service.set_document(v, "overview", "chronicle-test", "chronicle-test", "overview")
+    doc_id = service.add_memory(v, "widget spec details", "docs/general", "document")
+    service.link_memories(doc_id, "relates_to_project", target_id)
+    results = server.memory_search(query="widget", include_linked=True)
+    assert any(r["id"] == doc_id for r in results)
+
+
+def test_memory_dashboard_graph_includes_scopes(service):
+    v = [0.1] * 768
+    service.set_document(v, "azure core", "work/azure", "work/azure", "overview")
+    service.add_memory(v, "unrelated memory", "chronicle-test", "note")
+    service.repository.get_or_create_scope("work/azure/vm_config")
+
+    result = server.memory_dashboard_graph(project="chronicle-test")
+    assert "scopes" in result
+    paths = {s["path"] for s in result["scopes"]}
+    assert {"work", "work/azure", "work/azure/vm_config", "chronicle-test"} <= paths
+    azure = next(s for s in result["scopes"] if s["path"] == "work/azure")
+    assert azure["core_present"] is True
+    assert azure["child_count"] == 1
+
+
+def test_memory_scope_reparent_tool(service):
+    service.repository.get_or_create_scope("chronicle")
+    service.repository.get_or_create_scope("work")
+    result = server.memory_scope_reparent(path="chronicle", new_parent_path="work")
+    assert result["path"] == "work/chronicle"
+
+
 def test_memory_get_latest_returns_newest_by_timestamp_not_relevance():
     server.memory_add("older checkpoint, textually very similar to the query", "checkpoint")
     newest = server.memory_add("totally unrelated wording checkpoint", "checkpoint")

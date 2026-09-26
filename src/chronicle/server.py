@@ -191,6 +191,7 @@ def memory_search(
     type: str | None = None,
     k: int = 5,
     max_tokens: int | None = None,
+    include_linked: bool = False,
 ) -> list[dict]:
     project = config.get_project()
     if type == "checkpoint":
@@ -204,6 +205,7 @@ def memory_search(
         type_=type,
         k=k,
         max_tokens=max_tokens,
+        include_linked=include_linked,
     )
 
 
@@ -213,6 +215,7 @@ def memory_search_global(
     type: str | None = None,
     k: int = 5,
     max_tokens: int | None = None,
+    include_linked: bool = False,
 ) -> list[dict]:
     vector = embeddings.embed_text(query)
     return _get_service().search_global(
@@ -221,6 +224,7 @@ def memory_search_global(
         type_=type,
         k=k,
         max_tokens=max_tokens,
+        include_linked=include_linked,
     )
 
 
@@ -231,8 +235,12 @@ def memory_set_document(
     type: str,
     confidence: float | None = None,
     extraction_method: str | None = None,
+    scope_path: str | None = None,
 ) -> dict:
-    project = config.get_project()
+    if scope_path:
+        project = _get_service().repository.get_or_create_scope(scope_path).path
+    else:
+        project = config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
     doc_id = _get_service().set_document(
@@ -256,8 +264,14 @@ def memory_set_document(
 
 
 @mcp.tool
-def memory_get_document(slug: str) -> dict | None:
-    project = config.get_project()
+def memory_get_document(slug: str, scope_path: str | None = None) -> dict | None:
+    if scope_path:
+        scope = _get_service().repository.get_scope_by_path(scope_path)
+        if scope is None:
+            return None
+        project = scope.path
+    else:
+        project = config.get_project()
     return _get_service().get_document(project, slug)
 
 
@@ -279,6 +293,20 @@ def memory_register_project(name: str) -> dict:
 
 
 @mcp.tool
+def memory_list_scopes(prefix: str = "") -> list[dict]:
+    return _get_service().list_scopes(prefix)
+
+
+@mcp.tool
+def memory_scope_reparent(path: str, new_parent_path: str | None = None) -> dict:
+    """Move a scope (and its descendants) under a different parent, or to
+    root if new_parent_path is omitted. This reorganizes the user's own
+    taxonomy — call it only when the user explicitly asks to reorganize or
+    re-file something, never as a side effect of another task."""
+    return _get_service().reparent_scope(path, new_parent_path)
+
+
+@mcp.tool
 def memory_dashboard_graph(
     project: str | None = None,
     cross_project: bool = False,
@@ -286,18 +314,25 @@ def memory_dashboard_graph(
     min_similarity: float = graph_cli.MIN_SIMILARITY,
 ) -> dict:
     records = _get_service().get_all_with_vectors(project=project)
-    return graph_cli._build_graph_data(
+    graph = graph_cli._build_graph_data(
         records,
         k=k,
         cross_project=cross_project,
         min_similarity=min_similarity,
         current_project=project,
     )
+    graph["scopes"] = _get_service().scope_graph_nodes()
+    return graph
 
 
 @mcp.tool
 def memory_dashboard_snapshot() -> dict:
     return dashboard.build_snapshot(_get_service())
+
+
+@mcp.tool
+def memory_get_by_source(source_id: str) -> list[dict]:
+    return _get_service().get_by_source(source_id)
 
 
 def main() -> None:

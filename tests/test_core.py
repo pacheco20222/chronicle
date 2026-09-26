@@ -339,3 +339,191 @@ def test_split_creates_fragments_that_supersede_source(service):
     source = service.repository.get(source_id)
     assert source.status == "superseded"
     assert source.invalid_at is not None
+
+
+def test_get_or_create_scope_creates_missing_ancestors(service):
+    repo = service.repository
+    leaf = repo.get_or_create_scope("work/azure/vm_config")
+    assert leaf.path == "work/azure/vm_config"
+    assert leaf.name == "vm_config"
+
+    work = repo.get_scope_by_path("work")
+    azure = repo.get_scope_by_path("work/azure")
+    assert work is not None and work.parent_id is None
+    assert azure is not None and azure.parent_id == work.id
+    assert leaf.parent_id == azure.id
+
+
+def test_get_or_create_scope_is_idempotent(service):
+    repo = service.repository
+    first = repo.get_or_create_scope("work/azure")
+    second = repo.get_or_create_scope("work/azure")
+    assert first.id == second.id
+
+
+def test_get_scope_by_path_missing_returns_none(service):
+    assert service.repository.get_scope_by_path("nope") is None
+
+
+def test_list_scopes_prefix_filters(service):
+    repo = service.repository
+    repo.get_or_create_scope("work/azure/vm_config")
+    repo.get_or_create_scope("work/azure/cosmos_db")
+    repo.get_or_create_scope("personal/health")
+
+    under_azure = {s.path for s in repo.list_scopes("work/azure")}
+    assert under_azure == {"work/azure", "work/azure/vm_config", "work/azure/cosmos_db"}
+
+    everything = {s.path for s in repo.list_scopes("")}
+    assert "personal/health" in everything
+
+    assert repo.list_scopes("nonexistent") == []
+
+
+def test_child_scope_count(service):
+    repo = service.repository
+    repo.get_or_create_scope("work/azure/vm_config")
+    repo.get_or_create_scope("work/azure/cosmos_db")
+    work = repo.get_scope_by_path("work")
+    azure = repo.get_scope_by_path("work/azure")
+    assert repo.child_scope_count(work.id) == 1
+    assert repo.child_scope_count(azure.id) == 2
+
+
+def test_service_list_scopes(service):
+    service.repository.get_or_create_scope("work/azure/vm_config")
+    result = service.list_scopes("work")
+    paths = {item["path"] for item in result}
+    assert paths == {"work", "work/azure", "work/azure/vm_config"}
+    vm_config = next(item for item in result if item["path"] == "work/azure/vm_config")
+    assert vm_config["name"] == "vm_config"
+    assert vm_config["parent_path"] == "work/azure"
+    assert vm_config["child_count"] == 0
+    work = next(item for item in result if item["path"] == "work")
+    assert work["parent_path"] is None
+    assert work["child_count"] == 1
+
+
+def test_create_memory_with_chunk_index(service):
+    repo = service.repository
+    row = repo.create_memory(
+        id="m1", project="p", type_="document", content="part 1", chunk_index=0
+    )
+    assert row.chunk_index == 0
+
+
+def test_get_by_source_orders_by_chunk_index(service):
+    repo = service.repository
+    repo.create_memory(id="m1", project="p", type_="document", content="c1", source="doc.md", chunk_index=1)
+    repo.create_memory(id="m0", project="p", type_="document", content="c0", source="doc.md", chunk_index=0)
+    row = repo.get(("m0"))
+    chunks = repo.get_by_source(row.source_id)
+    assert [c.id for c in chunks] == ["m0", "m1"]
+
+
+def test_get_active_by_source_locator_all_returns_every_active_chunk(service):
+    repo = service.repository
+    repo.create_memory(id="m0", project="p", type_="document", content="c0", source="doc.md", chunk_index=0)
+    repo.create_memory(id="m1", project="p", type_="document", content="c1", source="doc.md", chunk_index=1)
+    rows = repo.get_active_by_source_locator_all("p", "doc.md")
+    assert {r.id for r in rows} == {"m0", "m1"}
+
+
+def test_service_get_by_source_returns_ordered_chunks(service):
+    v = [0.1] * 768
+    id0 = service.add_memory(v, "chunk 0", "p", "document", source="doc.md", chunk_index=0)
+    id1 = service.add_memory(v, "chunk 1", "p", "document", source="doc.md", chunk_index=1)
+    source_id = service.repository.get(id0).source_id
+    result = service.get_by_source(source_id)
+    assert [r["id"] for r in result] == [id0, id1]
+
+
+def test_search_bundles_neighbor_chunks(service):
+    v = [0.1] * 768
+    ids = [
+        service.add_memory(v, f"chunk {i} about widgets", "p", "document", source="doc.md", chunk_index=i)
+        for i in range(3)
+    ]
+    results = service.search(v, "p", query_text="widgets", k=1)
+    assert len(results) == 1
+    hit = results[0]
+    context_ids = {c["id"] for c in hit["context"]}
+    assert context_ids <= set(ids)
+    assert hit["id"] not in context_ids
+
+
+def test_search_non_chunked_memory_has_empty_context(service):
+    v = [0.1] * 768
+    service.add_memory(v, "a plain note", "p", "note")
+    results = service.search(v, "p", query_text="plain")
+    assert results[0]["context"] == []
+
+
+def test_find_relation_sources(service):
+    v = [0.1] * 768
+    target_id = service.set_document(v, "proj overview", "proj", "proj", "overview")
+    doc_id = service.add_memory(v, "a linked doc chunk", "docs/general", "document")
+    service.link_memories(doc_id, "relates_to_project", target_id)
+    service.add_memory(v, "unrelated", "docs/general", "document")
+
+    matches = service.repository.find_relation_sources("relates_to_project", target_id)
+    assert [m.id for m in matches] == [doc_id]
+
+
+def test_search_include_linked_pulls_linked_docs(service):
+    v = [0.1] * 768
+    target_id = service.set_document(v, "proj overview", "proj", "proj", "overview")
+    doc_id = service.add_memory(v, "azure runbook contents", "docs/azure", "document")
+    service.link_memories(doc_id, "relates_to_project", target_id)
+
+    without_link = service.search(v, "proj", query_text="runbook", include_linked=False)
+    assert all(r["id"] != doc_id for r in without_link)
+
+    with_link = service.search(v, "proj", query_text="runbook", include_linked=True)
+    linked_hit = next(r for r in with_link if r["id"] == doc_id)
+    assert linked_hit["via_link"] is True
+
+
+def test_search_include_linked_no_link_matches_default(service):
+    v = [0.1] * 768
+    service.set_document(v, "proj overview", "proj", "proj", "overview")
+    default = service.search(v, "proj", query_text="anything", include_linked=False)
+    with_flag = service.search(v, "proj", query_text="anything", include_linked=True)
+    assert [r["id"] for r in default] == [r["id"] for r in with_flag]
+
+
+def test_reparent_scope_moves_node_and_updates_path(service):
+    repo = service.repository
+    repo.get_or_create_scope("chronicle")
+    repo.get_or_create_scope("work")
+
+    moved = repo.reparent_scope("chronicle", "work")
+    assert moved.path == "work/chronicle"
+    assert repo.get_scope_by_path("chronicle") is None
+    assert repo.get_scope_by_path("work/chronicle") is not None
+
+
+def test_reparent_scope_updates_descendant_paths(service):
+    repo = service.repository
+    repo.get_or_create_scope("azure/vm_config")
+    repo.get_or_create_scope("work")
+
+    repo.reparent_scope("azure", "work")
+    assert repo.get_scope_by_path("work/azure") is not None
+    assert repo.get_scope_by_path("work/azure/vm_config") is not None
+    assert repo.get_scope_by_path("azure/vm_config") is None
+
+
+def test_reparent_scope_to_root(service):
+    repo = service.repository
+    repo.get_or_create_scope("work/chronicle")
+    moved = repo.reparent_scope("work/chronicle", None)
+    assert moved.path == "chronicle"
+    assert moved.parent_id is None
+
+
+def test_reparent_scope_rejects_moving_under_own_descendant(service):
+    repo = service.repository
+    repo.get_or_create_scope("work/azure")
+    with pytest.raises(ValueError):
+        repo.reparent_scope("work", "work/azure")

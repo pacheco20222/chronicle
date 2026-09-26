@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import Select, String, Text, column, select, table, text, update
 
 from chronicle.storage.database import Database
-from chronicle.storage.models import Episode, Memory, Source, utc_now
+from chronicle.storage.models import Episode, Memory, Scope, Source, utc_now
 
 
 HIDDEN_STATUSES = {"superseded", "deleted", "wrong"}
@@ -42,6 +42,7 @@ class MemoryRepository:
         confidence: float | None = None,
         extraction_method: str | None = None,
         episode_id: str | None = None,
+        chunk_index: int | None = None,
     ) -> Memory:
         project = _require_project(project)
         with self.session_factory() as session:
@@ -69,6 +70,7 @@ class MemoryRepository:
                 slug=slug,
                 confidence=confidence,
                 extraction_method=extraction_method,
+                chunk_index=chunk_index,
                 relations=[{"type": "supersedes", "target": supersedes}] if supersedes else [],
             )
             session.add(row)
@@ -188,6 +190,29 @@ class MemoryRepository:
         with self.session_factory() as session:
             return session.scalar(statement)
 
+    def get_by_source(self, source_id: str) -> list[Memory]:
+        with self.session_factory() as session:
+            rows = session.scalars(
+                select(Memory).where(Memory.source_id == source_id)
+            ).all()
+            return sorted(rows, key=lambda row: (row.chunk_index is None, row.chunk_index or 0))
+
+    def get_active_by_source_locator_all(self, project: str, locator: str) -> list[Memory]:
+        project = _require_project(project)
+        statement = (
+            select(Memory)
+            .join(Source, Memory.source_id == Source.id)
+            .where(
+                Memory.project == project,
+                Source.project == project,
+                Source.locator == locator,
+                Memory.status.not_in(HIDDEN_STATUSES),
+            )
+        )
+        with self.session_factory() as session:
+            rows = session.scalars(statement).all()
+            return sorted(rows, key=lambda row: (row.chunk_index is None, row.chunk_index or 0))
+
     def set_status(self, memory_id: str, status: str) -> None:
         with self.session_factory() as session:
             updated_at = utc_now()
@@ -216,6 +241,20 @@ class MemoryRepository:
                     target.invalid_at = invalid_at
                     target.updated_at = invalid_at
             session.commit()
+
+    def find_relation_sources(self, relation_type: str, target_id: str) -> list[Memory]:
+        with self.session_factory() as session:
+            candidates = session.scalars(
+                select(Memory).where(Memory.relations.isnot(None))
+            ).all()
+            return [
+                row
+                for row in candidates
+                if any(
+                    relation.get("type") == relation_type and relation.get("target") == target_id
+                    for relation in (row.relations or [])
+                )
+            ]
 
     def lexical(
         self,
@@ -267,3 +306,78 @@ class MemoryRepository:
             statement = statement.where(Memory.project == project)
         with self.session_factory() as session:
             return list(session.scalars(statement.order_by(Memory.created_at)).all())
+
+    def get_scope_by_path(self, path: str) -> Scope | None:
+        with self.session_factory() as session:
+            return session.scalar(select(Scope).where(Scope.path == path))
+
+    def get_or_create_scope(self, path: str) -> Scope:
+        segments = [segment for segment in path.split("/") if segment]
+        if not segments:
+            raise ValueError("scope path must not be empty")
+        with self.session_factory() as session:
+            parent_id = None
+            current_path = ""
+            scope_row = None
+            for segment in segments:
+                current_path = f"{current_path}/{segment}" if current_path else segment
+                scope_row = session.scalar(select(Scope).where(Scope.path == current_path))
+                if scope_row is None:
+                    scope_row = Scope(
+                        id=str(uuid.uuid4()),
+                        name=segment,
+                        parent_id=parent_id,
+                        path=current_path,
+                    )
+                    session.add(scope_row)
+                    session.flush()
+                parent_id = scope_row.id
+            session.commit()
+            return scope_row
+
+    def list_scopes(self, prefix: str = "") -> list[Scope]:
+        with self.session_factory() as session:
+            statement = select(Scope)
+            if prefix:
+                statement = statement.where(
+                    (Scope.path == prefix) | (Scope.path.like(f"{prefix}/%"))
+                )
+            return list(session.scalars(statement.order_by(Scope.path)).all())
+
+    def child_scope_count(self, scope_id: str) -> int:
+        with self.session_factory() as session:
+            return session.scalar(
+                select(text("count(*)")).select_from(Scope).where(Scope.parent_id == scope_id)
+            ) or 0
+
+    def reparent_scope(self, path: str, new_parent_path: str | None) -> Scope:
+        with self.session_factory() as session:
+            scope_row = session.scalar(select(Scope).where(Scope.path == path))
+            if scope_row is None:
+                raise ValueError(f"no scope found at path {path!r}")
+
+            new_parent_id = None
+            new_prefix = ""
+            if new_parent_path is not None:
+                if new_parent_path == path or new_parent_path.startswith(f"{path}/"):
+                    raise ValueError("cannot move a scope under its own descendant")
+                parent_row = session.scalar(select(Scope).where(Scope.path == new_parent_path))
+                if parent_row is None:
+                    raise ValueError(f"no scope found at path {new_parent_path!r}")
+                new_parent_id = parent_row.id
+                new_prefix = new_parent_path
+
+            old_path = scope_row.path
+            new_path = f"{new_prefix}/{scope_row.name}" if new_prefix else scope_row.name
+            scope_row.parent_id = new_parent_id
+            scope_row.path = new_path
+            session.flush()
+
+            descendants = session.scalars(
+                select(Scope).where(Scope.path.like(f"{old_path}/%"))
+            ).all()
+            for descendant in descendants:
+                descendant.path = new_path + descendant.path[len(old_path):]
+
+            session.commit()
+            return scope_row

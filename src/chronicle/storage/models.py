@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, Float, ForeignKey, Index, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -65,6 +66,7 @@ class Memory(Base):
     valid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     invalid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     relations: Mapped[list[dict]] = mapped_column(JSON, default=list, nullable=False)
+    chunk_index: Mapped[int | None] = mapped_column(sa.Integer, index=True)
 
     source_record: Mapped[Source | None] = relationship(lazy="joined")
     episode_record: Mapped[Episode | None] = relationship(lazy="joined")

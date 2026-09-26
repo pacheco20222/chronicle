@@ -6,7 +6,7 @@ from chronicle import config, embeddings
 from chronicle.core.runtime import get_runtime
 
 
-_FOLDER_IMPORT_MAX_CHARS = 24000
+_DOCS_CHUNK_MAX_CHARS = 6000  # ~1500 tokens at ~4 chars/token
 
 
 def _chunk_text(text: str, max_chars: int = 24000) -> list[str]:
@@ -46,29 +46,31 @@ def _import_directory(path: str, project: str, type_: str) -> None:
             content = f.read()
         content_hash = hashlib.sha256(content.encode()).hexdigest()
         episode_title = f"{os.path.basename(file_path)} sha256:{content_hash[:16]}"
-        active = service.repository.get_active_by_source_locator(project, file_path)
-        if active is not None and active.episode_record and active.episode_record.title == episode_title:
+        active_chunks = service.repository.get_active_by_source_locator_all(project, file_path)
+        if active_chunks and active_chunks[0].episode_record and active_chunks[0].episode_record.title == episode_title:
             unchanged += 1
             continue
 
-        stored_content = content[:_FOLDER_IMPORT_MAX_CHARS]
-        if len(content) > _FOLDER_IMPORT_MAX_CHARS:
-            print(f"Truncated {file_path} to {_FOLDER_IMPORT_MAX_CHARS} characters")
+        for old in active_chunks:
+            service.set_status(old.id, "superseded")
+
         episode = service.repository.create_episode(
             project=project,
             locator=file_path,
             title=episode_title,
         )
-        vector = embeddings.embed_text(stored_content)
-        service.add_memory(
-            vector,
-            stored_content,
-            project,
-            type_,
-            source=file_path,
-            supersedes=active.id if active is not None else None,
-            episode_id=episode.id,
-        )
+        pieces = _chunk_text(content, max_chars=_DOCS_CHUNK_MAX_CHARS)
+        for index, piece in enumerate(pieces):
+            vector = embeddings.embed_text(piece)
+            service.add_memory(
+                vector,
+                piece,
+                project,
+                type_,
+                source=file_path,
+                episode_id=episode.id,
+                chunk_index=index if len(pieces) > 1 else None,
+            )
         ingested += 1
 
     print(f"Scanned {len(file_paths)} files: {ingested} ingested, {unchanged} unchanged.")

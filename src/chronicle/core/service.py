@@ -43,6 +43,7 @@ class MemoryService:
             "confidence": row.confidence,
             "extraction_method": row.extraction_method,
             "slug": row.slug,
+            "chunk_index": row.chunk_index,
             "valid_at": _iso(row.valid_at),
             "invalid_at": _iso(row.invalid_at),
             "relations": list(row.relations or []),
@@ -63,8 +64,10 @@ class MemoryService:
         confidence: float | None = None,
         extraction_method: str | None = None,
         episode_id: str | None = None,
+        chunk_index: int | None = None,
     ) -> str:
         project = _require_project(project)
+        self.repository.get_or_create_scope(project)
         memory_id = str(uuid.uuid4())
         self.repository.create_memory(
             id=memory_id,
@@ -77,6 +80,7 @@ class MemoryService:
             confidence=confidence,
             extraction_method=extraction_method,
             episode_id=episode_id,
+            chunk_index=chunk_index,
         )
         self.vector_index.upsert(memory_id, vector, {"project": project, "type": type_})
         return memory_id
@@ -147,6 +151,7 @@ class MemoryService:
         k: int,
         include_superseded: bool,
         max_tokens: int | None,
+        include_linked: bool = False,
     ) -> list[dict]:
         pool = max(k * 4, HYBRID_POOL)
         vector_hits = self.vector_index.search(
@@ -167,13 +172,44 @@ class MemoryService:
             if row.status != "deleted" and (include_superseded or row.status not in HIDDEN_STATUSES)
         }
         results = self._merge(ranked_lists, rows, k)
+        for item in results:
+            item["context"] = []
+            if item.get("chunk_index") is None or not item.get("source_id"):
+                continue
+            siblings = self.repository.get_by_source(item["source_id"])
+            neighbors = [
+                self._serialize(sibling)
+                for sibling in siblings
+                if sibling.chunk_index is not None
+                and sibling.id != item["id"]
+                and abs(sibling.chunk_index - item["chunk_index"]) == 1
+            ]
+            item["context"] = neighbors
+        for item in results:
+            item["via_link"] = False
+        if include_linked and project is not None:
+            doc = self.repository.get_document(project, project)
+            if doc is not None:
+                linked_sources = self.repository.find_relation_sources("relates_to_project", doc.id)
+                seen = {item["id"] for item in results}
+                for linked in linked_sources:
+                    for sibling in self.repository.get_by_source(linked.source_id):
+                        if sibling.id in seen or sibling.status in HIDDEN_STATUSES:
+                            continue
+                        serialized = self._serialize(sibling)
+                        serialized["context"] = []
+                        serialized["via_link"] = True
+                        results.append(serialized)
+                        seen.add(sibling.id)
         if max_tokens is None:
             return results
 
         packed = []
         total_tokens = 0
         for item in results:
-            item_tokens = estimate_tokens(item["content"])
+            item_tokens = estimate_tokens(item["content"]) + sum(
+                estimate_tokens(c["content"]) for c in item["context"]
+            )
             if not packed and item_tokens > max_tokens:
                 return [item]
             if total_tokens + item_tokens > max_tokens:
@@ -191,9 +227,12 @@ class MemoryService:
         k: int = 5,
         include_superseded: bool = False,
         max_tokens: int | None = None,
+        include_linked: bool = False,
     ) -> list[dict]:
         project = _require_project(project)
-        return self._search(vector, project, query_text, type_, k, include_superseded, max_tokens)
+        return self._search(
+            vector, project, query_text, type_, k, include_superseded, max_tokens, include_linked
+        )
 
     def search_global(
         self,
@@ -203,8 +242,11 @@ class MemoryService:
         k: int = 5,
         include_superseded: bool = False,
         max_tokens: int | None = None,
+        include_linked: bool = False,
     ) -> list[dict]:
-        return self._search(vector, None, query_text, type_, k, include_superseded, max_tokens)
+        return self._search(
+            vector, None, query_text, type_, k, include_superseded, max_tokens, include_linked
+        )
 
     def get_latest(self, project: str, type_: str, include_superseded: bool = False) -> dict | None:
         project = _require_project(project)
@@ -220,6 +262,9 @@ class MemoryService:
         row = self.repository.get_document(project, slug)
         return self._serialize(row) if row else None
 
+    def get_by_source(self, source_id: str) -> list[dict]:
+        return [self._serialize(row) for row in self.repository.get_by_source(source_id)]
+
     def set_document(
         self,
         vector: Sequence[float],
@@ -231,6 +276,7 @@ class MemoryService:
         extraction_method: str | None = None,
     ) -> str:
         project = _require_project(project)
+        self.repository.get_or_create_scope(project)
         memory_id = str(uuid.uuid5(DOCUMENT_NAMESPACE, f"{project}:{slug}"))
         row = self.repository.upsert_document(
             id=memory_id,
@@ -255,3 +301,39 @@ class MemoryService:
 
     def count(self, project: str | None = None) -> int:
         return len(self.repository.all(project))
+
+    def scope_graph_nodes(self) -> list[dict]:
+        scopes = self.repository.list_scopes("")
+        nodes = []
+        for scope in scopes:
+            core = self.repository.get_document(scope.path, scope.path)
+            linked_count = 0
+            if core is not None:
+                linked_count = len(self.repository.find_relation_sources("relates_to_project", core.id))
+            nodes.append(
+                {
+                    "path": scope.path,
+                    "name": scope.name,
+                    "parent_path": scope.path.rsplit("/", 1)[0] if "/" in scope.path else None,
+                    "child_count": self.repository.child_scope_count(scope.id),
+                    "core_present": core is not None,
+                    "linked_doc_count": linked_count,
+                }
+            )
+        return nodes
+
+    def reparent_scope(self, path: str, new_parent_path: str | None) -> dict:
+        scope = self.repository.reparent_scope(path, new_parent_path)
+        return {"path": scope.path, "name": scope.name}
+
+    def list_scopes(self, prefix: str = "") -> list[dict]:
+        scopes = self.repository.list_scopes(prefix)
+        return [
+            {
+                "path": scope.path,
+                "name": scope.name,
+                "parent_path": scope.path.rsplit("/", 1)[0] if "/" in scope.path else None,
+                "child_count": self.repository.child_scope_count(scope.id),
+            }
+            for scope in scopes
+        ]

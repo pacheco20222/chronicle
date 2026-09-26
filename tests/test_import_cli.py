@@ -120,7 +120,6 @@ def test_import_main_directory_changed_file_supersedes_only_previous_version(
     assert len(service.repository.all("chronicle-test")) == 3
     assert current_changed is not None
     assert current_changed.id != old_changed.id
-    assert current_changed.supersedes == old_changed.id
     assert service.repository.get(old_changed.id).status == "superseded"
     assert rows[str(unchanged_path.resolve())].id == old_unchanged.id
     with service.repository.session_factory() as session:
@@ -149,7 +148,7 @@ def test_import_main_directory_skips_hidden_and_unsupported_files(tmp_path, serv
     assert rows[0].source_record.locator == str((folder / "visible.md").resolve())
 
 
-def test_import_main_directory_hashes_full_content_when_storing_truncated_content(tmp_path, service, monkeypatch, capsys):
+def test_import_main_directory_hashes_full_content_without_truncating(tmp_path, service, monkeypatch, capsys):
     monkeypatch.setattr(import_cli.embeddings, "embed_text", lambda text: [1.0])
     folder = tmp_path / "notes"
     folder.mkdir()
@@ -160,9 +159,113 @@ def test_import_main_directory_hashes_full_content_when_storing_truncated_conten
     import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
 
     row = service.repository.all("chronicle-test")[0]
-    assert row.content == content[:24000]
+    assert row.content == content
     assert row.episode_record.title == f"large.md sha256:{hashlib.sha256(content.encode()).hexdigest()[:16]}"
-    assert f"Truncated {path.resolve()} to 24000 characters" in capsys.readouterr().out
+    assert capsys.readouterr().out == "Scanned 1 files: 1 ingested, 0 unchanged.\n"
+
+
+def test_import_directory_file_at_exact_threshold_stays_single_chunk(tmp_path, service, monkeypatch):
+    from chronicle import import_cli
+    from chronicle.core import runtime
+
+    monkeypatch.setattr(runtime, "_runtime", service)
+    exact = tmp_path / "exact.md"
+    # Exactly _DOCS_CHUNK_MAX_CHARS characters, no paragraph break, so
+    # _chunk_text has nothing to split on and must not produce a
+    # trailing near-empty chunk.
+    exact.write_text("a" * import_cli._DOCS_CHUNK_MAX_CHARS)
+
+    import_cli._import_directory(str(tmp_path), "p", "note")
+
+    rows = service.repository.all("p")
+    assert len(rows) == 1
+    assert rows[0].chunk_index is None
+
+
+def test_import_directory_file_one_over_threshold_splits_cleanly(tmp_path, service, monkeypatch):
+    from chronicle import import_cli
+    from chronicle.core import runtime
+
+    monkeypatch.setattr(runtime, "_runtime", service)
+    over = tmp_path / "over.md"
+    half = import_cli._DOCS_CHUNK_MAX_CHARS // 2
+    over.write_text(("a" * half) + "\n\n" + ("b" * (half + 10)))
+
+    import_cli._import_directory(str(tmp_path), "p", "note")
+
+    rows = [r for r in service.repository.all("p") if r.status == "active"]
+    assert len(rows) == 2
+    assert all(r.content.strip() for r in rows)
+    assert [r.chunk_index for r in sorted(rows, key=lambda r: r.chunk_index)] == [0, 1]
+
+
+def test_import_directory_chunks_large_file(tmp_path, service, monkeypatch):
+    from chronicle import import_cli
+    from chronicle.core import runtime
+
+    monkeypatch.setattr(runtime, "_runtime", service)
+    big = tmp_path / "big.md"
+    big.write_text(("word " * 3000) + "\n\n" + ("more " * 3000))
+
+    import_cli._import_directory(str(tmp_path), "p", "note")
+
+    source = service.repository.database.session_factory().execute(
+        __import__("sqlalchemy").select(__import__("chronicle.storage.models", fromlist=["Source"]).Source)
+    ).scalars().all()
+    assert len(source) == 1
+    chunks = service.repository.get_by_source(source[0].id)
+    assert len(chunks) > 1
+    assert [c.chunk_index for c in chunks] == list(range(len(chunks)))
+
+
+def test_import_directory_small_file_stays_single_row(tmp_path, service, monkeypatch):
+    from chronicle import import_cli
+    from chronicle.core import runtime
+
+    monkeypatch.setattr(runtime, "_runtime", service)
+    small = tmp_path / "small.md"
+    small.write_text("just a short note")
+
+    import_cli._import_directory(str(tmp_path), "p", "note")
+
+    rows = service.repository.all("p")
+    assert len(rows) == 1
+    assert rows[0].chunk_index is None
+
+
+def test_import_directory_rescanning_unchanged_large_file_is_noop(tmp_path, service, monkeypatch):
+    from chronicle import import_cli
+    from chronicle.core import runtime
+
+    monkeypatch.setattr(runtime, "_runtime", service)
+    big = tmp_path / "big.md"
+    big.write_text(("word " * 3000) + "\n\n" + ("more " * 3000))
+
+    import_cli._import_directory(str(tmp_path), "p", "note")
+    first_pass_count = len(service.repository.all("p"))
+
+    import_cli._import_directory(str(tmp_path), "p", "note")
+    assert len(service.repository.all("p")) == first_pass_count
+
+
+def test_import_directory_changed_large_file_supersedes_all_chunks(tmp_path, service, monkeypatch):
+    from chronicle import import_cli
+    from chronicle.core import runtime
+
+    monkeypatch.setattr(runtime, "_runtime", service)
+    big = tmp_path / "big.md"
+    big.write_text(("word " * 3000) + "\n\n" + ("more " * 3000))
+    import_cli._import_directory(str(tmp_path), "p", "note")
+    old_active = [r for r in service.repository.all("p") if r.status == "active"]
+
+    big.write_text(("changed " * 3000) + "\n\n" + ("content " * 3000))
+    import_cli._import_directory(str(tmp_path), "p", "note")
+
+    all_rows = {r.id: r for r in service.repository.all("p")}
+    for old in old_active:
+        assert all_rows[old.id].status == "superseded"
+    new_active = [r for r in all_rows.values() if r.status == "active"]
+    assert len(new_active) >= 1
 
 
 def test_chunk_text_default_matches_new_token_budget():

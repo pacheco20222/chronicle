@@ -10,7 +10,7 @@ VECTOR_SIZE = 768
 COLLECTION_NAME = os.environ.get("CHRONICLE_COLLECTION", "memories")
 VALID_TYPES = frozenset({"decision", "architecture", "bug", "todo", "note", "checkpoint", "overview"})
 VALID_STATUSES = frozenset({"active", "proposed", "resolved", "superseded", "expired", "deleted", "wrong"})
-VALID_RELATION_TYPES = frozenset({"related_to", "supersedes", "caused_by", "blocked_by", "implements"})
+VALID_RELATION_TYPES = frozenset({"related_to", "supersedes", "caused_by", "blocked_by", "implements", "relates_to_project"})
 
 
 def get_project() -> str:
