@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 import uuid
 
-from mnemo.core.repository import HIDDEN_STATUSES, MemoryRepository
+from mnemo.core.repository import HIDDEN_STATUSES, MemoryRepository, _require_project
 from mnemo.core.vector_index import VectorIndex
 from mnemo.storage.models import Memory
 
@@ -62,6 +62,7 @@ class MemoryService:
         confidence: float | None = None,
         extraction_method: str | None = None,
     ) -> str:
+        project = _require_project(project)
         memory_id = str(uuid.uuid4())
         self.repository.create_memory(
             id=memory_id,
@@ -130,6 +131,7 @@ class MemoryService:
         k: int = 5,
         include_superseded: bool = False,
     ) -> list[dict]:
+        project = _require_project(project)
         return self._search(vector, project, query_text, type_, k, include_superseded)
 
     def search_global(
@@ -143,13 +145,16 @@ class MemoryService:
         return self._search(vector, None, query_text, type_, k, include_superseded)
 
     def get_latest(self, project: str, type_: str, include_superseded: bool = False) -> dict | None:
+        project = _require_project(project)
         rows = self.repository.recent(project, type_, 1, include_superseded)
         return self._serialize(rows[0]) if rows else None
 
     def get_recent(self, project: str, type_: str, k: int = 5, include_superseded: bool = False) -> list[dict]:
+        project = _require_project(project)
         return [self._serialize(row) for row in self.repository.recent(project, type_, k, include_superseded)]
 
     def get_document(self, project: str, slug: str) -> dict | None:
+        project = _require_project(project)
         row = self.repository.get_document(project, slug)
         return self._serialize(row) if row else None
 
@@ -163,6 +168,7 @@ class MemoryService:
         confidence: float | None = None,
         extraction_method: str | None = None,
     ) -> str:
+        project = _require_project(project)
         memory_id = str(uuid.uuid5(DOCUMENT_NAMESPACE, f"{project}:{slug}"))
         row = self.repository.upsert_document(
             id=memory_id,

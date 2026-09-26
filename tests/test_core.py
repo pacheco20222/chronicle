@@ -1,3 +1,5 @@
+import pytest
+
 from sqlalchemy import select, text, update
 
 from mnemo.core.repository import MemoryRepository
@@ -163,3 +165,41 @@ def test_fts_query_special_characters_do_not_crash(service):
     service.add_memory([1.0], "ordinary content", "p", "note")
 
     assert service.repository.lexical("p", '"*-', None, 5, False) == []
+
+
+@pytest.mark.parametrize(
+    ("method", "args"),
+    [
+        ("search", ([1.0], "")),
+        ("get_latest", ("", "note")),
+        ("get_recent", ("", "note")),
+        ("get_document", ("", "slug")),
+        ("add_memory", ([1.0], "content", "", "note")),
+        ("set_document", ([1.0], "content", "", "slug", "note")),
+    ],
+)
+def test_project_scoped_service_methods_reject_empty_project(service, method, args):
+    with pytest.raises(ValueError, match="project must not be empty"):
+        getattr(service, method)(*args)
+
+
+def test_explicit_global_paths_remain_unfiltered(service):
+    project_id = service.add_memory([1.0], "project scope probe", "p", "note")
+    other_project_id = service.add_memory([1.0], "other scope probe", "q", "note")
+
+    search_ids = {
+        row["id"] for row in service.search_global([1.0], query_text="scope probe", k=5)
+    }
+    vector_ids = {row["id"] for row in service.get_all_with_vectors()}
+
+    assert search_ids == {project_id, other_project_id}
+    assert vector_ids == {project_id, other_project_id}
+
+
+def test_project_scoped_search_returns_only_requested_project(service):
+    project_id = service.add_memory([1.0], "project scope probe", "p", "note")
+    service.add_memory([1.0], "other scope probe", "q", "note")
+
+    results = service.search([1.0], "p", query_text="scope probe", k=5)
+
+    assert {row["id"] for row in results} == {project_id}

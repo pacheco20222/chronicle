@@ -17,6 +17,12 @@ def _fts_phrase(query_text: str) -> str:
     return f'"{escaped}"'
 
 
+def _require_project(project: str) -> str:
+    if not project:
+        raise ValueError("project must not be empty")
+    return project
+
+
 class MemoryRepository:
     def __init__(self, database: Database):
         self.database = database
@@ -36,6 +42,7 @@ class MemoryRepository:
         confidence: float | None = None,
         extraction_method: str | None = None,
     ) -> Memory:
+        project = _require_project(project)
         with self.session_factory() as session:
             source_id = None
             if source is not None:
@@ -80,6 +87,7 @@ class MemoryRepository:
         confidence: float | None = None,
         extraction_method: str | None = None,
     ) -> Memory:
+        project = _require_project(project)
         with self.session_factory() as session:
             row = session.scalar(select(Memory).where(Memory.project == project, Memory.slug == slug))
             if row is None:
@@ -115,6 +123,7 @@ class MemoryRepository:
             return {row.id: row for row in rows}
 
     def get_document(self, project: str, slug: str) -> Memory | None:
+        project = _require_project(project)
         with self.session_factory() as session:
             return session.scalar(select(Memory).where(Memory.project == project, Memory.slug == slug))
 
@@ -155,6 +164,8 @@ class MemoryRepository:
         limit: int,
         include_superseded: bool,
     ) -> list[Memory]:
+        if project is not None:
+            project = _require_project(project)
         statement: Select[tuple[Memory]] = (
             select(Memory)
             .join(memory_fts, memory_fts.c.memory_id == Memory.id)
@@ -179,6 +190,7 @@ class MemoryRepository:
         limit: int,
         include_superseded: bool,
     ) -> list[Memory]:
+        project = _require_project(project)
         statement = select(Memory).where(Memory.project == project, Memory.type == type_)
         if not include_superseded:
             statement = statement.where(Memory.status.not_in(HIDDEN_STATUSES))
