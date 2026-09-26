@@ -11,7 +11,7 @@ import { colorForType } from "../types";
 const BRASS = "#d8a84e";
 const SEMANTIC = "#c5cee0";
 const EXPLICIT = BRASS;
-const STATUS_OPACITY = { active: 1, resolved: 0.62, superseded: 0.34 } as const;
+const STATUS_OPACITY = { active: 1, resolved: 0.62, superseded: 0.34, wrong: 0.34 } as const;
 type LayoutNode = GraphNode & { position: THREE.Vector3; degree: number };
 type Cluster = { project: string; center: THREE.Vector3; radius: number; color: string };
 

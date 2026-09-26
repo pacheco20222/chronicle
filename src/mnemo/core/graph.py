@@ -72,6 +72,16 @@ def build_graph_data(
             "created_at": record.get("created_at"),
             "status": record.get("status") or "active",
             "role": role(record),
+            "source_id": record.get("source_id"),
+            "source": record.get("source"),
+            "episode_id": record.get("episode_id"),
+            "episode_title": record.get("episode_title"),
+            "confidence": record.get("confidence"),
+            "extraction_method": record.get("extraction_method"),
+            "valid_at": record.get("valid_at"),
+            "invalid_at": record.get("invalid_at"),
+            "supersedes": record.get("supersedes"),
+            "relations": record.get("relations"),
         }
         for record in records
     ]

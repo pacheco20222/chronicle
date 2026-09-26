@@ -1,5 +1,5 @@
 export type MemoryType = "decision" | "architecture" | "bug" | "todo" | "note" | "checkpoint" | "overview";
-export type MemoryStatus = "active" | "resolved" | "superseded";
+export type MemoryStatus = "active" | "resolved" | "superseded" | "wrong";
 
 export const TYPE_COLORS: Record<MemoryType, string> = {
   decision: "#e7c77a",
@@ -24,6 +24,16 @@ export interface GraphNode {
   created_at?: string | null;
   status: MemoryStatus;
   role?: string;
+  source_id?: string | null;
+  source?: string | null;
+  episode_id?: string | null;
+  episode_title?: string | null;
+  confidence?: number | null;
+  extraction_method?: string | null;
+  valid_at?: string | null;
+  invalid_at?: string | null;
+  supersedes?: string | null;
+  relations?: Array<{ type: string; target: string }>;
 }
 
 export interface GraphEdge {

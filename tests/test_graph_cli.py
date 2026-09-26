@@ -38,6 +38,52 @@ def test_build_graph_data_nodes_carry_status_defaulting_to_active():
     assert nodes["b"]["status"] == "active"
 
 
+def test_build_graph_data_nodes_carry_provenance_and_temporal_fields():
+    records = [
+        {
+            "id": "a",
+            "vector": [1.0, 0.0],
+            "project": "p",
+            "type": "note",
+            "content": "a",
+            "source_id": "source-a",
+            "source": "notes.md#L4",
+            "episode_id": "episode-a",
+            "episode_title": "Research session",
+            "confidence": 0.8,
+            "extraction_method": "manual",
+            "valid_at": "2026-09-01T00:00:00+00:00",
+            "invalid_at": None,
+            "supersedes": "old-a",
+            "relations": [{"type": "related_to", "target": "b"}],
+        },
+        {"id": "b", "vector": [0.0, 1.0], "project": "p", "type": "note", "content": "b"},
+    ]
+
+    node = next(node for node in graph_cli._build_graph_data(records, min_similarity=1.0)["nodes"] if node["id"] == "a")
+
+    assert node == {
+        "id": "a",
+        "project": "p",
+        "type": "note",
+        "content": "a",
+        "slug": None,
+        "created_at": None,
+        "status": "active",
+        "role": "",
+        "source_id": "source-a",
+        "source": "notes.md#L4",
+        "episode_id": "episode-a",
+        "episode_title": "Research session",
+        "confidence": 0.8,
+        "extraction_method": "manual",
+        "valid_at": "2026-09-01T00:00:00+00:00",
+        "invalid_at": None,
+        "supersedes": "old-a",
+        "relations": [{"type": "related_to", "target": "b"}],
+    }
+
+
 def test_build_graph_data_carries_current_project():
     records = [
         {"id": "a", "vector": [1.0, 0.0, 0.0], "project": "p", "type": "note", "content": "a"},
