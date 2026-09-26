@@ -64,7 +64,12 @@ mcp = FastMCP(
         "blocked_by, implements. Only call it when the relationship is "
         "worth remembering on its own, not for every passing mention. "
         "For human correction, use memory_confirm to adjust confidence, "
-        "memory_edit for typo or extraction fixes in place, memory_retract "
+        "memory_edit to correct representation or extraction errors in "
+        "place without creating history — use it only when the underlying "
+        "meaning is unchanged (a typo, a misheard word, a formatting "
+        "slip). If the correction changes what the memory actually "
+        "claims, use memory_add with supersedes=<old memory id> instead, "
+        "which preserves the old version as history. memory_retract "
         "to mark unwanted memory deleted, memory_mark_wrong for facts that "
         "were never true, memory_merge to combine sources, and memory_split "
         "to replace one source with fragments; use memory_add with "
@@ -129,7 +134,8 @@ def memory_confirm(memory_id: str, confidence: float = 1.0) -> dict:
 
 @mcp.tool
 def memory_edit(memory_id: str, content: str) -> dict:
-    _get_service().edit_memory(memory_id, content)
+    vector = embeddings.embed_text(content)
+    _get_service().edit_memory(memory_id, content, vector)
     return {"id": memory_id, "content": content}
 
 

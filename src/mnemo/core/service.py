@@ -85,8 +85,12 @@ class MemoryService:
     def confirm_memory(self, memory_id: str, confidence: float = 1.0) -> None:
         self.repository.set_confidence(memory_id, confidence)
 
-    def edit_memory(self, memory_id: str, content: str) -> None:
+    def edit_memory(self, memory_id: str, content: str, vector: Sequence[float]) -> None:
+        source = self.repository.get(memory_id)
+        if source is None:
+            raise ValueError(f"no memory found with id {memory_id!r}")
         self.repository.edit_content(memory_id, content)
+        self.vector_index.upsert(memory_id, vector, {"project": source.project, "type": source.type})
 
     def retract_memory(self, memory_id: str) -> None:
         self.set_status(memory_id, "deleted")

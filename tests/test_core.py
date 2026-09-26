@@ -266,16 +266,27 @@ def test_confirm_updates_confidence_without_changing_status(service):
     assert row.status == "active"
 
 
-def test_edit_updates_existing_memory_and_fts_content(service):
-    memory_id = service.add_memory([1.0], "old exact correction phrase", "p", "note")
+def test_edit_updates_existing_memory_fts_and_vector(service):
+    memory_id = service.add_memory([1.0, 0.0], "old exact correction phrase", "p", "note")
+    service.add_memory([0.9, 0.1], "other vector result", "p", "note")
+    old_vector = list(service.vector_index.points[memory_id]["vector"])
+    new_vector = [0.0, 1.0]
 
-    service.edit_memory(memory_id, "new exact correction phrase")
+    service.edit_memory(memory_id, "new exact correction phrase", new_vector)
 
     row = service.repository.get(memory_id)
     assert row.id == memory_id
     assert row.content == "new exact correction phrase"
+    assert service.vector_index.points[memory_id]["vector"] == new_vector
+    assert service.vector_index.points[memory_id]["vector"] != old_vector
+    assert service.search(new_vector, "p", query_text=None, k=1)[0]["id"] == memory_id
     assert service.repository.lexical("p", "new exact correction phrase", None, 5, False)[0].id == memory_id
     assert service.repository.lexical("p", "old exact correction phrase", None, 5, False) == []
+
+
+def test_edit_rejects_missing_memory(service):
+    with pytest.raises(ValueError, match="no memory found with id 'missing'"):
+        service.edit_memory("missing", "new content", [1.0])
 
 
 def test_retract_hides_memory_but_keeps_direct_record(service):
