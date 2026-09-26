@@ -2,10 +2,10 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 import uuid
 
-from mnemo.core.budget import estimate_tokens
-from mnemo.core.repository import HIDDEN_STATUSES, MemoryRepository, _require_project
-from mnemo.core.vector_index import VectorIndex
-from mnemo.storage.models import Memory
+from chronicle.core.budget import estimate_tokens
+from chronicle.core.repository import HIDDEN_STATUSES, MemoryRepository, _require_project
+from chronicle.core.vector_index import VectorIndex
+from chronicle.storage.models import Memory
 
 
 DOCUMENT_NAMESPACE = uuid.UUID("332f0123-010a-412a-bca4-41426a0d7997")

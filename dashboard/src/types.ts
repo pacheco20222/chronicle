@@ -65,7 +65,7 @@ export interface DashboardSnapshot {
   control: {
     qdrant: { healthy: boolean; collection: string; point_count: number | null; error?: string };
     docker: { available: boolean; health: string; name?: string; cpu?: string | null; memory?: string | null };
-    mnemo_processes: Array<{ pid: number; cpu_percent: string; rss_kb: number; command: string }>;
+    chronicle_processes: Array<{ pid: number; cpu_percent: string; rss_kb: number; command: string }>;
     sampled: boolean;
   };
 }

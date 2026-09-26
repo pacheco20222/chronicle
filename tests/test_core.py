@@ -2,16 +2,16 @@ import pytest
 
 from sqlalchemy import select, text, update
 
-from mnemo.core.repository import MemoryRepository
-from mnemo.core.service import MemoryService
-from mnemo.storage.database import Database
-from mnemo.storage.models import Episode, Memory
+from chronicle.core.repository import MemoryRepository
+from chronicle.core.service import MemoryService
+from chronicle.storage.database import Database
+from chronicle.storage.models import Episode, Memory
 
 from fake_vector import FakeVectorIndex
 
 
 def make_service(tmp_path):
-    database = Database(f"sqlite:///{tmp_path / 'mnemo.db'}")
+    database = Database(f"sqlite:///{tmp_path / 'chronicle.db'}")
     return MemoryService(MemoryRepository(database), FakeVectorIndex())
 
 

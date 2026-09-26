@@ -1,5 +1,5 @@
 ---
-name: Mnemo Dashboard
+name: Chronicle Dashboard
 description: A star-chart instrument for reading a local memory store — memories as stars, relationships as traced lines, health as gauge readouts.
 colors:
   ground: "#090d1d"
@@ -91,13 +91,13 @@ components:
     padding: "8px 9px"
 ---
 
-# Design System: Mnemo Dashboard
+# Design System: Chronicle Dashboard
 
 ## Overview
 
 **Creative North Star: "The Chart Room"**
 
-The dashboard reads mnemo's memory store the way a navigator reads a star chart, not the way a SaaS product reads a graph. A near-black deep-indigo ground carries a faint star-field texture across nearly the whole viewport; memories plot onto it as small geometric points sized and lit by significance and status; relationships trace as lines, not force-directed spaghetti. A single warm brass/gold accent marks selection, active state, and the two things worth highlighting from mnemo's own CLI vocabulary (a ring for a core memory, a wireframe diamond for the latest checkpoint). Everything else — chrome, labels, plates, buttons — is flat, sharp-cornered (2px radius), and instrument-panel plain: this is Operate mode, not a marketing surface.
+The dashboard reads chronicle's memory store the way a navigator reads a star chart, not the way a SaaS product reads a graph. A near-black deep-indigo ground carries a faint star-field texture across nearly the whole viewport; memories plot onto it as small geometric points sized and lit by significance and status; relationships trace as lines, not force-directed spaghetti. A single warm brass/gold accent marks selection, active state, and the two things worth highlighting from chronicle's own CLI vocabulary (a ring for a core memory, a wireframe diamond for the latest checkpoint). Everything else — chrome, labels, plates, buttons — is flat, sharp-cornered (2px radius), and instrument-panel plain: this is Operate mode, not a marketing surface.
 
 Two build-time corrections are now load-bearing parts of the system, not incidental fixes: node geometry is deliberately small (point-like polyhedra 0.09–0.14 scene units, not large flat shapes), and semantic-similarity edges are hidden by default behind an explicit legend toggle because at real data volume (87 nodes / 183 edges) they produce unreadable crosshatch density — only explicit, directional, typed-relation edges render by default. The chart must read as a chart first.
 

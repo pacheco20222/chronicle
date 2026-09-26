@@ -1,4 +1,4 @@
-const endpoint = import.meta.env.VITE_MNEMO_MCP_URL || "/mcp";
+const endpoint = import.meta.env.VITE_CHRONICLE_MCP_URL || "/mcp";
 const protocolVersion = "2025-06-18";
 let requestId = 0;
 let initialized = false;
@@ -24,7 +24,7 @@ async function initialize() {
   await postRpc("initialize", {
     protocolVersion,
     capabilities: {},
-    clientInfo: { name: "mnemo-dashboard", version: "0.1.0" },
+    clientInfo: { name: "chronicle-dashboard", version: "0.1.0" },
   }, ++requestId);
   initialized = true;
 }

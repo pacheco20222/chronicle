@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Project renamed from `mnemo` to `chronicle`.
+
 ## 3.0.0 — 2026-09-26
 
 ### Changed

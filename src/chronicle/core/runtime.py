@@ -1,9 +1,9 @@
-from mnemo import config
-from mnemo.core.qdrant_index import QdrantVectorIndex
-from mnemo.core.repository import MemoryRepository
-from mnemo.core.service import MemoryService
-from mnemo.core.vector_index import VectorIndex
-from mnemo.storage.database import Database
+from chronicle import config
+from chronicle.core.qdrant_index import QdrantVectorIndex
+from chronicle.core.repository import MemoryRepository
+from chronicle.core.service import MemoryService
+from chronicle.core.vector_index import VectorIndex
+from chronicle.storage.database import Database
 
 
 _runtime: MemoryService | None = None

@@ -3,14 +3,14 @@ import time
 import webbrowser
 from pathlib import Path
 
-from mnemo import config
-from mnemo.core.graph import (
+from chronicle import config
+from chronicle.core.graph import (
     K_NEIGHBORS,
     MIN_SIMILARITY,
     build_graph_data as _build_graph_data,
     cosine as _cosine,
 )
-from mnemo.core.runtime import get_runtime
+from chronicle.core.runtime import get_runtime
 
 def _render_html(graph: dict) -> str:
     import json
@@ -20,7 +20,7 @@ def _render_html(graph: dict) -> str:
 
 
 def main(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(prog="mnemo graph")
+    parser = argparse.ArgumentParser(prog="chronicle graph")
     parser.add_argument("--project", default=None)
     parser.add_argument("--all", action="store_true", help="graph every project together, not just one")
     parser.add_argument(
@@ -64,14 +64,14 @@ def main(argv: list[str]) -> None:
     )
     html = _render_html(graph)
 
-    out_path = Path(args.out) if args.out else Path.cwd() / f"mnemo-graph-{int(time.time())}.html"
+    out_path = Path(args.out) if args.out else Path.cwd() / f"chronicle-graph-{int(time.time())}.html"
     out_path.write_text(html, encoding="utf-8")
     print(f"Graph written to {out_path}")
     webbrowser.open(out_path.as_uri())
 
 
 _TEMPLATE = r"""<meta charset="utf-8">
-<title>Mnemo Graph</title>
+<title>Chronicle Graph</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -312,7 +312,7 @@ _TEMPLATE = r"""<meta charset="utf-8">
 
 <header class="hud">
   <div class="eyebrow">Recalled from Qdrant · linked by meaning, not by hand</div>
-  <h1 class="title">Mnemo Graph</h1>
+  <h1 class="title">Chronicle Graph</h1>
   <div class="sub" id="stat-line"></div>
 </header>
 

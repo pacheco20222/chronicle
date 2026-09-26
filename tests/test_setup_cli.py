@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from mnemo import setup_cli
+from chronicle import setup_cli
 
 
 def _printed_json_documents(out: str) -> tuple[dict, dict]:
@@ -52,9 +52,9 @@ def test_powershell_quote_round_trips_via_encoded_command():
 def test_setup_prints_mcp_json_and_codex_command(capsys):
     setup_cli.main(["--project", "myproj"])
     out = capsys.readouterr().out
-    assert '"MNEMO_PROJECT": "myproj"' in out
-    assert "codex mcp add mnemo --" in out
-    assert "MNEMO_PROJECT" not in _codex_command(out)
+    assert '"CHRONICLE_PROJECT": "myproj"' in out
+    assert "codex mcp add chronicle --" in out
+    assert "CHRONICLE_PROJECT" not in _codex_command(out)
     assert '"command": "uv"' in out
 
 
@@ -62,7 +62,7 @@ def test_setup_prints_cursor_block_matching_claude_code_block(capsys):
     setup_cli.main(["--project", "myproj"])
     out = capsys.readouterr().out
     assert "For Cursor, add the same block to your repo's .cursor/mcp.json" in out
-    assert out.count('"MNEMO_PROJECT": "myproj"') == 2
+    assert out.count('"CHRONICLE_PROJECT": "myproj"') == 2
 
 
 def test_setup_uses_placeholder_when_no_project_given(capsys):
@@ -82,11 +82,11 @@ def test_setup_prints_session_start_hook_block(capsys):
         assert command.startswith("powershell.exe -NoProfile -EncodedCommand ")
         encoded = command.split("-EncodedCommand ", maxsplit=1)[1]
         script = base64.b64decode(encoded).decode("utf-16le")
-        assert "MNEMO_PROJECT='myproj'" in script
-        assert "mnemo-recall" in script
+        assert "CHRONICLE_PROJECT='myproj'" in script
+        assert "chronicle-recall" in script
     else:
-        assert "MNEMO_PROJECT=myproj uv run --directory" in command
-        assert "mnemo-recall" in command
+        assert "CHRONICLE_PROJECT=myproj uv run --directory" in command
+        assert "chronicle-recall" in command
 
 
 @pytest.mark.parametrize("platform", ["win32", "linux"])
@@ -100,7 +100,7 @@ def test_setup_json_round_trips_special_project_on_both_platforms(
     mcp_config, hook_config = _printed_json_documents(capsys.readouterr().out)
     hook_command = hook_config["hooks"]["SessionStart"][0]["hooks"][0]["command"]
 
-    assert mcp_config["mcpServers"]["mnemo"]["env"]["MNEMO_PROJECT"] == project
+    assert mcp_config["mcpServers"]["chronicle"]["env"]["CHRONICLE_PROJECT"] == project
     if platform == "win32":
         encoded = hook_command.split("-EncodedCommand ", maxsplit=1)[1]
         script = base64.b64decode(encoded).decode("utf-16le")
@@ -121,7 +121,7 @@ def test_windows_hook_and_codex_commands_encode_every_interpolated_value(
     setup_cli.main(["--project", project])
     out = capsys.readouterr().out
     mcp_config, hook_config = _printed_json_documents(out)
-    install_path = mcp_config["mcpServers"]["mnemo"]["args"][1]
+    install_path = mcp_config["mcpServers"]["chronicle"]["args"][1]
     hook_command = hook_config["hooks"]["SessionStart"][0]["hooks"][0]["command"]
 
     assert hook_command.startswith("powershell.exe -NoProfile -EncodedCommand ")
@@ -129,12 +129,12 @@ def test_windows_hook_and_codex_commands_encode_every_interpolated_value(
     script = base64.b64decode(encoded).decode("utf-16le")
 
     expected_script = (
-        f"$env:MNEMO_PROJECT={setup_cli._powershell_quote(project)}; "
-        f"uv run --directory {setup_cli._powershell_quote(install_path)} mnemo-recall"
+        f"$env:CHRONICLE_PROJECT={setup_cli._powershell_quote(project)}; "
+        f"uv run --directory {setup_cli._powershell_quote(install_path)} chronicle-recall"
     )
     expected_codex = (
-        "codex mcp add mnemo -- "
-        f"uv run --project {setup_cli._powershell_quote(install_path)} mnemo"
+        "codex mcp add chronicle -- "
+        f"uv run --project {setup_cli._powershell_quote(install_path)} chronicle"
     )
 
     assert script == expected_script

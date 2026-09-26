@@ -3,9 +3,9 @@ import math
 import random
 import time
 
-from mnemo.core.budget import estimate_tokens
-from mnemo.core.runtime import get_runtime
-from mnemo.embeddings import embed_text
+from chronicle.core.budget import estimate_tokens
+from chronicle.core.runtime import get_runtime
+from chronicle.embeddings import embed_text
 
 
 SAMPLE_LIMIT = 50
@@ -48,7 +48,7 @@ def _print_unavailable_metric(label, missing):
 
 
 def main(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(prog="mnemo eval")
+    parser = argparse.ArgumentParser(prog="chronicle eval")
     parser.add_argument("--project", required=True)
     args = parser.parse_args(argv)
 

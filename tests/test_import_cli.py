@@ -3,8 +3,8 @@ import hashlib
 import pytest
 from sqlalchemy import select
 
-from mnemo import embeddings, import_cli
-from mnemo.storage.models import Episode, Memory, Source
+from chronicle import embeddings, import_cli
+from chronicle.storage.models import Episode, Memory, Source
 
 
 def test_chunk_text_single_chunk_for_short_text():
@@ -32,9 +32,9 @@ def test_import_main_creates_memories_from_file(tmp_path, service):
     file_path = tmp_path / "test_import.md"
     file_path.write_text("First paragraph about the test project.\n\nSecond paragraph with more detail.")
 
-    import_cli.main([str(file_path), "--project", "mnemo-test", "--type", "note"])
+    import_cli.main([str(file_path), "--project", "chronicle-test", "--type", "note"])
 
-    results = service.search(embeddings.embed_text("test project"), "mnemo-test")
+    results = service.search(embeddings.embed_text("test project"), "chronicle-test")
     assert any("First paragraph about the test project" in r["content"] for r in results)
 
 
@@ -43,7 +43,7 @@ def test_import_main_rejects_invalid_type(tmp_path):
     file_path.write_text("content")
 
     with pytest.raises(ValueError):
-        import_cli.main([str(file_path), "--project", "mnemo-test", "--type", "nonsense"])
+        import_cli.main([str(file_path), "--project", "chronicle-test", "--type", "nonsense"])
 
 
 def test_import_main_directory_creates_one_episode_backed_memory_per_file(tmp_path, service, monkeypatch, capsys):
@@ -59,7 +59,7 @@ def test_import_main_directory_creates_one_episode_backed_memory_per_file(tmp_pa
     for path, content in files.items():
         path.write_text(content)
 
-    import_cli.main([str(folder), "--project", "mnemo-test", "--type", "note"])
+    import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
 
     with service.repository.session_factory() as session:
         memories = list(session.scalars(select(Memory).order_by(Memory.created_at)).all())
@@ -86,13 +86,13 @@ def test_import_main_directory_skips_unchanged_files(tmp_path, service, monkeypa
     (folder / "first.md").write_text("first folder note")
     (folder / "second.txt").write_text("second folder note")
 
-    import_cli.main([str(folder), "--project", "mnemo-test", "--type", "note"])
-    first_ids = {row.id for row in service.repository.all("mnemo-test")}
+    import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
+    first_ids = {row.id for row in service.repository.all("chronicle-test")}
     capsys.readouterr()
 
-    import_cli.main([str(folder), "--project", "mnemo-test", "--type", "note"])
+    import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
 
-    assert {row.id for row in service.repository.all("mnemo-test")} == first_ids
+    assert {row.id for row in service.repository.all("chronicle-test")} == first_ids
     assert capsys.readouterr().out == "Scanned 2 files: 0 ingested, 2 unchanged.\n"
 
 
@@ -107,17 +107,17 @@ def test_import_main_directory_changed_file_supersedes_only_previous_version(
     changed_path.write_text("version one")
     unchanged_path.write_text("unchanged content")
 
-    import_cli.main([str(folder), "--project", "mnemo-test", "--type", "note"])
-    old_rows = {row.source_record.locator: row for row in service.repository.all("mnemo-test")}
+    import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
+    old_rows = {row.source_record.locator: row for row in service.repository.all("chronicle-test")}
     old_changed = old_rows[str(changed_path.resolve())]
     old_unchanged = old_rows[str(unchanged_path.resolve())]
 
     changed_path.write_text("version two")
-    import_cli.main([str(folder), "--project", "mnemo-test", "--type", "note"])
+    import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
 
-    rows = {row.source_record.locator: row for row in service.repository.all("mnemo-test")}
-    current_changed = service.repository.get_active_by_source_locator("mnemo-test", str(changed_path.resolve()))
-    assert len(service.repository.all("mnemo-test")) == 3
+    rows = {row.source_record.locator: row for row in service.repository.all("chronicle-test")}
+    current_changed = service.repository.get_active_by_source_locator("chronicle-test", str(changed_path.resolve()))
+    assert len(service.repository.all("chronicle-test")) == 3
     assert current_changed is not None
     assert current_changed.id != old_changed.id
     assert current_changed.supersedes == old_changed.id
@@ -142,9 +142,9 @@ def test_import_main_directory_skips_hidden_and_unsupported_files(tmp_path, serv
     (hidden_folder / "nested.md").write_text("hidden directory")
     (folder / "image.png").write_text("not imported")
 
-    import_cli.main([str(folder), "--project", "mnemo-test", "--type", "note"])
+    import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
 
-    rows = service.repository.all("mnemo-test")
+    rows = service.repository.all("chronicle-test")
     assert len(rows) == 1
     assert rows[0].source_record.locator == str((folder / "visible.md").resolve())
 
@@ -157,9 +157,9 @@ def test_import_main_directory_hashes_full_content_when_storing_truncated_conten
     content = "x" * 24001
     path.write_text(content)
 
-    import_cli.main([str(folder), "--project", "mnemo-test", "--type", "note"])
+    import_cli.main([str(folder), "--project", "chronicle-test", "--type", "note"])
 
-    row = service.repository.all("mnemo-test")[0]
+    row = service.repository.all("chronicle-test")[0]
     assert row.content == content[:24000]
     assert row.episode_record.title == f"large.md sha256:{hashlib.sha256(content.encode()).hexdigest()[:16]}"
     assert f"Truncated {path.resolve()} to 24000 characters" in capsys.readouterr().out

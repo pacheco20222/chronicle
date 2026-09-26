@@ -2,8 +2,8 @@ import argparse
 import hashlib
 import os
 
-from mnemo import config, embeddings
-from mnemo.core.runtime import get_runtime
+from chronicle import config, embeddings
+from chronicle.core.runtime import get_runtime
 
 
 _FOLDER_IMPORT_MAX_CHARS = 24000
@@ -75,7 +75,7 @@ def _import_directory(path: str, project: str, type_: str) -> None:
 
 
 def main(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(prog="mnemo import")
+    parser = argparse.ArgumentParser(prog="chronicle import")
     parser.add_argument("file")
     parser.add_argument("--project", required=True)
     parser.add_argument("--type", required=True, dest="type_")

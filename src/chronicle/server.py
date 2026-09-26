@@ -2,11 +2,11 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from mnemo import config, dashboard, embeddings, graph_cli, registry
-from mnemo.core.runtime import get_runtime
+from chronicle import config, dashboard, embeddings, graph_cli, registry
+from chronicle.core.runtime import get_runtime
 
 mcp = FastMCP(
-    "mnemo",
+    "chronicle",
     instructions=(
         "This server stores project-scoped memories. When the user asks to "
         "checkpoint progress (e.g. says \"checkpoint this\" or asks to save "
@@ -40,7 +40,7 @@ mcp = FastMCP(
         "fallback or default when the normal "
         "memory_search, scoped to this project, would do. If any memory "
         "tool call fails because no project is set for this folder, or "
-        "the user explicitly asks to set up Mnemo here, call "
+        "the user explicitly asks to set up Chronicle here, call "
         "memory_register_project(name) with a short project id — it "
         "registers the current folder so every future call in it "
         "resolves automatically, immediately, no restart needed. Beyond "

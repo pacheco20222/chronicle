@@ -6,7 +6,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from mnemo.storage.models import Base
+from chronicle.storage.models import Base
 
 
 class Database:

@@ -17,7 +17,7 @@ def _powershell_quote(value: str) -> str:
 
 
 def main(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(prog="mnemo setup")
+    parser = argparse.ArgumentParser(prog="chronicle setup")
     parser.add_argument("--project", default=None)
     args = parser.parse_args(argv)
 
@@ -27,37 +27,37 @@ def main(argv: list[str]) -> None:
     if sys.platform == "win32":
         install_path = install_dir.as_posix()
         ps_script = (
-            f"$env:MNEMO_PROJECT={_powershell_quote(project)}; "
-            f"uv run --directory {_powershell_quote(install_path)} mnemo-recall"
+            f"$env:CHRONICLE_PROJECT={_powershell_quote(project)}; "
+            f"uv run --directory {_powershell_quote(install_path)} chronicle-recall"
         )
         encoded_script = base64.b64encode(ps_script.encode("utf-16le")).decode("ascii")
         hook_command = f"powershell.exe -NoProfile -EncodedCommand {encoded_script}"
         codex_cmd = (
-            "codex mcp add mnemo -- "
-            f"uv run --project {_powershell_quote(install_path)} mnemo"
+            "codex mcp add chronicle -- "
+            f"uv run --project {_powershell_quote(install_path)} chronicle"
         )
         register_cmd = (
             f"uv run --project {_powershell_quote(install_path)} "
-            f"mnemo register --project {_powershell_quote(project)}"
+            f"chronicle register --project {_powershell_quote(project)}"
         )
     else:
         install_path = str(install_dir)
         hook_command = (
-            f"MNEMO_PROJECT={shlex.quote(project)} "
-            f"uv run --directory {shlex.quote(install_path)} mnemo-recall"
+            f"CHRONICLE_PROJECT={shlex.quote(project)} "
+            f"uv run --directory {shlex.quote(install_path)} chronicle-recall"
         )
-        codex_cmd = f"codex mcp add mnemo -- uv run --project {shlex.quote(install_path)} mnemo"
+        codex_cmd = f"codex mcp add chronicle -- uv run --project {shlex.quote(install_path)} chronicle"
         register_cmd = (
             f"uv run --project {shlex.quote(install_path)} "
-            f"mnemo register --project {shlex.quote(project)}"
+            f"chronicle register --project {shlex.quote(project)}"
         )
 
     mcp_config = {
         "mcpServers": {
-            "mnemo": {
+            "chronicle": {
                 "command": "uv",
-                "args": ["--directory", install_path, "run", "mnemo"],
-                "env": {"MNEMO_PROJECT": project},
+                "args": ["--directory", install_path, "run", "chronicle"],
+                "env": {"CHRONICLE_PROJECT": project},
             }
         }
     }
@@ -89,7 +89,7 @@ def main(argv: list[str]) -> None:
     print(
         "\nThen, for EVERY project folder you want memory in, register it "
         "(once per folder, from inside that folder) — skip this if you "
-        "already registered it via Claude Code's /mnemo:mnemo-register, "
+        "already registered it via Claude Code's /chronicle:chronicle-register, "
         "same shared registry:\n"
     )
     print(f"cd /path/to/your-project && {register_cmd}")

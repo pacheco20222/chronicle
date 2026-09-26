@@ -24,17 +24,17 @@ Every memory is one Qdrant point:
 | `type` | string | `decision` \| `architecture` \| `bug` \| `todo` \| `note` \| `checkpoint` \| `overview` |
 | `content` | string | The memory text |
 | `created_at` | ISO8601 UTC | |
-| `source` | string, optional | File path for `mnemo import`-created memories |
+| `source` | string, optional | File path for `chronicle import`-created memories |
 | `slug` | string, optional | Present only on named documents |
 | `updated_at` | ISO8601 UTC, optional | Present only on named documents, refreshed on every `memory_set_document` call |
 
 ## Project isolation
 
 Every tool except `memory_search_global` is implicitly scoped to a
-project, resolved fresh on every call: `MNEMO_PROJECT` from the
+project, resolved fresh on every call: `CHRONICLE_PROJECT` from the
 environment if set, else a lookup of the current folder in a small
-local registry (`~/.mnemo/projects.json`, written by
-`memory_register_project` or `mnemo register --project X`) — fail-closed
+local registry (`~/.chronicle/projects.json`, written by
+`memory_register_project` or `chronicle register --project X`) — fail-closed
 if neither resolves. No tool takes a `project` parameter, so there's
 no way to accidentally read or write another project's memories from
 inside a session. `memory_search_global` is the one deliberate,
@@ -57,7 +57,7 @@ permission check.
 convention: the server's own `instructions` field tells the connected
 model to use it when asked to checkpoint, and to write it so someone
 with zero memory of the conversation could resume from it alone.
-Recall is a `SessionStart` hook running `mnemo-recall`, which does a
+Recall is a `SessionStart` hook running `chronicle-recall`, which does a
 direct, chronological (`order_by`, not semantic search) Qdrant lookup
 for the newest checkpoint — no embedding call on the read path.
 
@@ -69,9 +69,9 @@ document uses the project's own id as its `slug`. The same
 that one document and prints it, so both show up automatically at the
 start of every session.
 
-## `mnemo import`
+## `chronicle import`
 
-`mnemo import <file> --project X --type Y` splits the file on
+`chronicle import <file> --project X --type Y` splits the file on
 paragraph breaks, grouping consecutive paragraphs up to ~24000
 characters (~6000 tokens) per chunk — comfortably under
 `nomic-embed-text-v1.5`'s 8192-token context window. Multi-chunk files
@@ -85,29 +85,29 @@ chars/token, JSON ~1.6, Chinese ~1.0), so a normally-sized chunk of
 code-heavy or non-English content can already exceed the 8192-token limit
 and get silently truncated, not only an oversized single paragraph. No
 validation catches this today — a real fix (a token-count guard in
-`mnemo import`, using the tokenizer already loaded in-process) is a
+`chronicle import`, using the tokenizer already loaded in-process) is a
 follow-up, not part of this change.
 
-## `mnemo graph`
+## `chronicle graph`
 
-`mnemo graph [--project NAME] [--out PATH]` computes real pairwise
+`chronicle graph [--project NAME] [--out PATH]` computes real pairwise
 cosine similarity between every matching memory's embedding, keeps
 each node's top-3 nearest neighbors as edges, and renders it as a
 self-contained HTML file (dark, force-directed, Canvas-rendered) that
 opens in your browser. Not decorative — the connections are the
 model's own actual similarity judgments.
 
-## `mnemo setup` / `mnemo register`
+## `chronicle setup` / `chronicle register`
 
-`mnemo setup` resolves its own install location at runtime
+`chronicle setup` resolves its own install location at runtime
 (`Path(__file__).resolve().parents[2]`) and prints ready-to-paste
 Claude Code and Codex configuration — still the right tool for a
 manual, non-plugin install, or for generating the Codex command by
-hand. `mnemo register --project X` is the plugin-install path instead:
+hand. `chronicle register --project X` is the plugin-install path instead:
 it writes `Path.cwd()` (the folder it's run from) against that project
-name into `~/.mnemo/projects.json`, nothing into the repo itself. Both
+name into `~/.chronicle/projects.json`, nothing into the repo itself. Both
 are thin CLI wrappers with no logic of their own beyond argument
-parsing — `mnemo setup` around string formatting, `mnemo register`
+parsing — `chronicle setup` around string formatting, `chronicle register`
 around `registry.register`.
 
 ## Backups
@@ -115,5 +115,5 @@ around `registry.register`.
 `scripts/backup.sh` creates a Qdrant snapshot; `scripts/export_json.sh`
 exports every memory as a flat, human-readable JSON file (no vectors).
 Both prune to the newest 14. `scripts/daily_backup.sh` runs both in
-sequence — see `scripts/com.mnemo.dailybackup.plist` for the macOS
+sequence — see `scripts/com.chronicle.dailybackup.plist` for the macOS
 `launchd` schedule (3 AM daily).

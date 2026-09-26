@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-09-22T00:00:00Z",
-  "title": "Design System: Mnemo Dashboard",
+  "title": "Design System: Chronicle Dashboard",
   "extensions": {
     "colorMeta": {
       "brass": { "role": "primary", "displayName": "Brass", "canonical": "#d8a84e", "tonalRamp": ["#2b2010", "#4a3a1c", "#6e5828", "#957536", "#bd9548", "#d8a84e", "#e8bf72", "#f0ca76"] },
@@ -106,7 +106,7 @@
   ],
   "narrative": {
     "northStar": "The Chart Room",
-    "overview": "The dashboard reads mnemo's memory store the way a navigator reads a star chart, not the way a SaaS product reads a graph. A near-black deep-indigo ground carries a faint star-field texture across nearly the whole viewport; memories plot onto it as small geometric points sized and lit by significance and status; relationships trace as lines, not force-directed spaghetti. A single warm brass/gold accent marks selection, active state, and the two things worth highlighting from mnemo's own CLI vocabulary (a ring for a core memory, a wireframe diamond for the latest checkpoint). Everything else — chrome, labels, plates, buttons — is flat, sharp-cornered (2px radius), and instrument-panel plain: this is Operate mode, not a marketing surface.\n\nTwo build-time corrections are now load-bearing parts of the system, not incidental fixes: node geometry is deliberately small (point-like polyhedra 0.09-0.14 scene units, not large flat shapes), and semantic-similarity edges are hidden by default behind an explicit legend toggle because at real data volume (87 nodes / 183 edges) they produce unreadable crosshatch density — only explicit, directional, typed-relation edges render by default. The chart must read as a chart first.",
+    "overview": "The dashboard reads chronicle's memory store the way a navigator reads a star chart, not the way a SaaS product reads a graph. A near-black deep-indigo ground carries a faint star-field texture across nearly the whole viewport; memories plot onto it as small geometric points sized and lit by significance and status; relationships trace as lines, not force-directed spaghetti. A single warm brass/gold accent marks selection, active state, and the two things worth highlighting from chronicle's own CLI vocabulary (a ring for a core memory, a wireframe diamond for the latest checkpoint). Everything else — chrome, labels, plates, buttons — is flat, sharp-cornered (2px radius), and instrument-panel plain: this is Operate mode, not a marketing surface.\n\nTwo build-time corrections are now load-bearing parts of the system, not incidental fixes: node geometry is deliberately small (point-like polyhedra 0.09-0.14 scene units, not large flat shapes), and semantic-similarity edges are hidden by default behind an explicit legend toggle because at real data volume (87 nodes / 183 edges) they produce unreadable crosshatch density — only explicit, directional, typed-relation edges render by default. The chart must read as a chart first.",
     "keyCharacteristics": [
       "Near-black indigo ground (~70%+ of visual weight), one warm brass accent, everything else desaturated cool grays",
       "Flat 2px-radius \"chart-plate\" surfaces (frosted glass via backdrop-blur, not drop-shadow cards)",

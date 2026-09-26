@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-QDRANT_URL="${MNEMO_QDRANT_URL:-http://localhost:6333}"
-COLLECTION="${MNEMO_COLLECTION:-memories}"
+QDRANT_URL="${CHRONICLE_QDRANT_URL:-http://localhost:6333}"
+COLLECTION="${CHRONICLE_COLLECTION:-memories}"
 BACKUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/backups"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 

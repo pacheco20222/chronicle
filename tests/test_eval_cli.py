@@ -1,6 +1,6 @@
 import re
 
-from mnemo import eval_cli
+from chronicle import eval_cli
 
 
 def _patch_runtime(monkeypatch, service):
@@ -63,8 +63,8 @@ def test_eval_dispatches_from_cli(service, monkeypatch, capsys):
     _patch_runtime(monkeypatch, service)
     service.add_memory([1.0, 0.0], "dispatch memory", "dispatch-project", "note")
 
-    monkeypatch.setattr("sys.argv", ["mnemo", "eval", "--project", "dispatch-project"])
-    from mnemo import cli
+    monkeypatch.setattr("sys.argv", ["chronicle", "eval", "--project", "dispatch-project"])
+    from chronicle import cli
 
     cli.main()
 

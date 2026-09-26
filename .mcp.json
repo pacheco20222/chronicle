@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "mnemo": {
+    "chronicle": {
       "command": "uv",
-      "args": ["--project", "${CLAUDE_PLUGIN_ROOT}", "run", "mnemo"]
+      "args": ["--project", "${CLAUDE_PLUGIN_ROOT}", "run", "chronicle"]
     }
   }
 }

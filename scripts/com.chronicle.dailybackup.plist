@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.mnemo.dailybackup</string>
+    <string>com.chronicle.dailybackup</string>
     <key>ProgramArguments</key>
     <array>
         <string>/Users/pacheco/projects/software/mcp-llm-brain/scripts/daily_backup.sh</string>

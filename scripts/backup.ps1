@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-$QdrantUrl = if ($env:MNEMO_QDRANT_URL) { $env:MNEMO_QDRANT_URL } else { "http://localhost:6333" }
-$Collection = if ($env:MNEMO_COLLECTION) { $env:MNEMO_COLLECTION } else { "memories" }
+$QdrantUrl = if ($env:CHRONICLE_QDRANT_URL) { $env:CHRONICLE_QDRANT_URL } else { "http://localhost:6333" }
+$Collection = if ($env:CHRONICLE_COLLECTION) { $env:CHRONICLE_COLLECTION } else { "memories" }
 $BackupDir = Join-Path (Split-Path -Parent $PSScriptRoot) "backups"
 $Timestamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
 

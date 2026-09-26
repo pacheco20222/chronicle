@@ -1,7 +1,7 @@
 import subprocess
 from collections import Counter
 
-from mnemo import config, graph_cli, registry
+from chronicle import config, graph_cli, registry
 
 
 def _docker_status() -> dict:
@@ -49,7 +49,7 @@ def _docker_status() -> dict:
         return {"available": False, "health": "unavailable"}
 
 
-def _mnemo_processes() -> list[dict]:
+def _chronicle_processes() -> list[dict]:
     try:
         result = subprocess.run(
             ["ps", "-axo", "pid=,pcpu=,rss=,command="],
@@ -64,7 +64,7 @@ def _mnemo_processes() -> list[dict]:
     processes = []
     for line in result.stdout.splitlines():
         fields = line.strip().split(None, 3)
-        if len(fields) != 4 or "uv run mnemo" not in fields[3]:
+        if len(fields) != 4 or "uv run chronicle" not in fields[3]:
             continue
         try:
             processes.append(
@@ -126,7 +126,7 @@ def build_snapshot(service) -> dict:
         "control": {
             "qdrant": qdrant,
             "docker": _docker_status(),
-            "mnemo_processes": _mnemo_processes(),
+            "chronicle_processes": _chronicle_processes(),
             "sampled": True,
         },
     }

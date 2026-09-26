@@ -2,13 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from mnemo import registry
+from chronicle import registry
 
 
 @pytest.fixture
 def isolated_registry(tmp_path, monkeypatch):
     path = tmp_path / "projects.json"
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(path))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(path))
     return path
 
 
@@ -24,7 +24,7 @@ def test_register_then_lookup_returns_project(isolated_registry):
 
 def test_register_creates_parent_directory(tmp_path, monkeypatch):
     nested = tmp_path / "nested" / "dir" / "projects.json"
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(nested))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(nested))
     registry.register(Path("/a/b"), "proj")
     assert nested.exists()
 
@@ -64,7 +64,7 @@ def _git(cwd, *args):
 
 
 def test_lookup_resolves_git_worktree_to_main_repo_project(tmp_path, monkeypatch):
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     main = tmp_path / "main"
     main.mkdir()
     _git(main, "init", "-q")
@@ -76,7 +76,7 @@ def test_lookup_resolves_git_worktree_to_main_repo_project(tmp_path, monkeypatch
 
 
 def test_lookup_worktree_own_registration_wins(tmp_path, monkeypatch):
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     main = tmp_path / "main"
     main.mkdir()
     _git(main, "init", "-q")
@@ -89,14 +89,14 @@ def test_lookup_worktree_own_registration_wins(tmp_path, monkeypatch):
 
 
 def test_lookup_non_git_dir_unregistered_returns_none(tmp_path, monkeypatch):
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     d = tmp_path / "plain"
     d.mkdir()
     assert registry.lookup(d) is None
 
 
 def test_register_refuses_home_directory(tmp_path, monkeypatch):
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(ValueError):
         registry.register(Path.home(), "oops")
     assert not (tmp_path / "projects.json").exists()

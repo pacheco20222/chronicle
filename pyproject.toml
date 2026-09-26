@@ -1,5 +1,5 @@
 [project]
-name = "mnemo"
+name = "chronicle"
 version = "3.0.0"
 description = "Self-hosted, project-scoped memory MCP server for Claude Code and Codex"
 readme = "README.md"
@@ -19,8 +19,8 @@ dependencies = [
 ]
 
 [project.scripts]
-mnemo = "mnemo.cli:main"
-mnemo-recall = "mnemo.recall:main"
+chronicle = "chronicle.cli:main"
+chronicle-recall = "chronicle.recall:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]

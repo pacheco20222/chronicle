@@ -4,15 +4,15 @@ import os
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from mnemo import config
-from mnemo.storage.models import Base
+from chronicle import config
+from chronicle.storage.models import Base
 
 
 if context.config.config_file_name is not None:
     fileConfig(context.config.config_file_name)
 
 database_url = context.config.get_main_option("sqlalchemy.url") or os.environ.get(
-    "MNEMO_SQLITE_URL", config.sqlite_url()
+    "CHRONICLE_SQLITE_URL", config.sqlite_url()
 )
 context.config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = Base.metadata

@@ -25,8 +25,8 @@ is small enough that duplication is cheaper than the indirection of a
 shared Python core, and it means zero changes to the already-working,
 already-shipped bash scripts.
 
-Rejected alternative: move the backup/export logic into the `mnemo`
-CLI itself (`mnemo backup`, `mnemo export`) as new Python subcommands,
+Rejected alternative: move the backup/export logic into the `chronicle`
+CLI itself (`chronicle backup`, `chronicle export`) as new Python subcommands,
 cross-platform for free, eventually deleting both shell-script
 flavors. More maintainable long-term, but a bigger change than "add
 Windows support" — refactors an already-shipped piece for every
@@ -44,7 +44,7 @@ weaken their system-wide PowerShell execution policy.
 - `scripts/backup.ps1` — `Invoke-RestMethod`/`Invoke-WebRequest`
   equivalent of `backup.sh`: snapshot the collection, download it,
   delete the remote copy, prune to newest 14. Same env var overrides
-  (`MNEMO_QDRANT_URL`, `MNEMO_COLLECTION`).
+  (`CHRONICLE_QDRANT_URL`, `CHRONICLE_COLLECTION`).
 - `scripts/export_json.ps1` — equivalent of `export_json.sh`:
   paginated scroll, `ConvertTo-Json -AsArray` (needed explicitly —
   PowerShell's default `ConvertTo-Json` unwraps a single-element

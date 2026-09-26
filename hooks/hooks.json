@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project ${CLAUDE_PLUGIN_ROOT} mnemo-recall",
+            "command": "uv run --project ${CLAUDE_PLUGIN_ROOT} chronicle-recall",
             "timeout": 10
           }
         ]

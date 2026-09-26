@@ -5,7 +5,7 @@ import threading
 import time
 from types import SimpleNamespace
 
-from mnemo import embeddings
+from chronicle import embeddings
 
 
 embed_text = embeddings.embed_text
@@ -16,7 +16,7 @@ def test_import_does_not_import_fastembed():
         [
             sys.executable,
             "-c",
-            "import sys; import mnemo.embeddings; print('fastembed' in sys.modules)",
+            "import sys; import chronicle.embeddings; print('fastembed' in sys.modules)",
         ],
         check=True,
         capture_output=True,

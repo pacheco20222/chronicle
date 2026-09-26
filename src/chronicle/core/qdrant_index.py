@@ -2,8 +2,8 @@ from collections.abc import Mapping, Sequence
 
 from qdrant_client import QdrantClient, models
 
-from mnemo import config
-from mnemo.core.vector_index import VectorHit
+from chronicle import config
+from chronicle.core.vector_index import VectorHit
 
 
 class QdrantVectorIndex:

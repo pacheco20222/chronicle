@@ -5,7 +5,7 @@ import anyio
 import pytest
 from fastmcp import Client
 
-from mnemo import config, registry, server
+from chronicle import config, registry, server
 
 
 def test_memory_add_and_search_round_trip():
@@ -229,7 +229,7 @@ def test_search_tools_accept_optional_token_budget():
 
 
 def test_memory_register_project_writes_registry(tmp_path, monkeypatch):
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     result = server.memory_register_project("registered-via-tool")
     assert result["project"] == "registered-via-tool"
     assert registry.lookup(Path.cwd()) == "registered-via-tool"
@@ -282,7 +282,7 @@ def test_server_instructions_cover_correction_workflow():
 
 
 def test_memory_register_project_rejects_empty_name(tmp_path, monkeypatch):
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(ValueError):
         server.memory_register_project("   ")
 

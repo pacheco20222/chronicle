@@ -1,7 +1,7 @@
 from pathlib import Path
 from threading import Lock
 
-from mnemo import config
+from chronicle import config
 
 _model = None
 _model_lock = Lock()
@@ -16,7 +16,7 @@ def embed_text(text: str) -> list[float]:
 
                 _model = TextEmbedding(
                     model_name=config.EMBED_MODEL,
-                    cache_dir=str(Path.home() / ".mnemo" / "models"),
+                    cache_dir=str(Path.home() / ".chronicle" / "models"),
                     lazy_load=True,
                 )
 

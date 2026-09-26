@@ -1,4 +1,4 @@
-# Installing Mnemo
+# Installing Chronicle
 
 ## Prerequisites
 
@@ -12,21 +12,21 @@ automatically, once, the first time you save a memory.
 
 ## Option A: Plugin install (recommended for Claude Code)
 
-Inside Claude Code, in whichever repo you want Mnemo available in:
+Inside Claude Code, in whichever repo you want Chronicle available in:
 
 ```
-/plugin marketplace add pacheco20222/mnemo
-/plugin install mnemo --scope project
-/mnemo:mnemo-register my-project-name
+/plugin marketplace add pacheco20222/chronicle
+/plugin install chronicle --scope project
+/chronicle:chronicle-register my-project-name
 ```
 
 `--scope project` installs the plugin for this repo only — it will not
 appear in any other project. This is the recommended default: each
 repo you do this in gets its own isolated memory, and nothing connects
-across repos unless you deliberately make it. `/mnemo:mnemo-register`
+across repos unless you deliberately make it. `/chronicle:chronicle-register`
 starts Qdrant (via the plugin's own bundled `docker-compose.yml`) if
 it isn't already running, then registers this folder under that
-project name in `~/.mnemo/projects.json` — a file outside any repo,
+project name in `~/.chronicle/projects.json` — a file outside any repo,
 not `.mcp.json`. Nothing gets written into this repo at all. The first
 `memory_add` you make afterward downloads the embedding model
 automatically (~500MB, one-time). `memory_add`/`memory_search` work
@@ -40,39 +40,39 @@ optional, only happens on a yes, and can be added or replaced later
 with `memory_set_document` regardless.
 
 Repeat both commands (with that repo's own project name) in any other
-repo you want Mnemo in — no cloning or hand-edited config, ever, and by
+repo you want Chronicle in — no cloning or hand-edited config, ever, and by
 default each repo's memory stays separate from every other repo's.
 
-Already registered this folder some other way — via Codex, or `mnemo
-register` run from a terminal? Skip `/mnemo:mnemo-register` and just
+Already registered this folder some other way — via Codex, or `chronicle
+register` run from a terminal? Skip `/chronicle:chronicle-register` and just
 install the plugin:
 
 ```
-/plugin marketplace add pacheco20222/mnemo
-/plugin install mnemo --scope project
+/plugin marketplace add pacheco20222/chronicle
+/plugin install chronicle --scope project
 ```
 
 The plugin resolves the project the same way Codex does — an explicit
 env var if one's set, otherwise a lookup of this folder in the shared
-registry (`~/.mnemo/projects.json`) — so an existing registration is
+registry (`~/.chronicle/projects.json`) — so an existing registration is
 picked up automatically. Nothing about registration is tool-specific;
 it only ever needs doing once, by whichever tool you happen to be
 using first.
 
-If you'd rather have Mnemo available in *every* project without
+If you'd rather have Chronicle available in *every* project without
 installing it repo by repo, use `--scope user` instead (Claude Code's
 default if `--scope` is omitted) — the plugin and its MCP server are
 then present everywhere, but each repo still needs its own
-`/mnemo:mnemo-register` before memory tools work there, so nothing is
+`/chronicle:chronicle-register` before memory tools work there, so nothing is
 silently connected just because the plugin is present. The only way
 two repos end up sharing memories is registering both of them under
 the *same* project name — a deliberate choice, never a default.
 
-If `/plugin install mnemo --scope project` reports "already installed"
-instead of enabling it, mnemo is already installed elsewhere on this
+If `/plugin install chronicle --scope project` reports "already installed"
+instead of enabling it, chronicle is already installed elsewhere on this
 machine (e.g. at `user` scope from an earlier setup) — Claude Code
 installs a plugin's code once, machine-wide. Use
-`/plugin enable mnemo --scope project` instead, which toggles a scope
+`/plugin enable chronicle --scope project` instead, which toggles a scope
 on for an already-installed plugin.
 
 This covers the Claude Code side only; Codex still needs the one-time
@@ -80,17 +80,17 @@ server setup in [§5](#5-codex) below, since Codex has no
 plugin/marketplace system of its own. Codex still needs each folder
 registered too, same as Claude Code — but it reads the same shared
 registry, so if you already registered a folder via
-`/mnemo:mnemo-register`, Codex picks it up with no separate step.
+`/chronicle:chronicle-register`, Codex picks it up with no separate step.
 
 The rest of this doc (Option B) is the manual path — read it if you're
 not using Claude Code, want to see exactly what the plugin command
-does under the hood, or ran into something `/mnemo:mnemo-register` didn't
+does under the hood, or ran into something `/chronicle:chronicle-register` didn't
 handle.
 
 ### Updating
 
 The plugin isn't per-project — every project that has it enabled reads
-from one shared cache (`~/.claude/plugins/cache/mnemo`), so you only
+from one shared cache (`~/.claude/plugins/cache/chronicle`), so you only
 update once, not once per project:
 
 ```
@@ -100,8 +100,8 @@ update once, not once per project:
 or by hand:
 
 ```
-/plugin marketplace update mnemo
-/plugin update mnemo
+/plugin marketplace update chronicle
+/plugin update chronicle
 ```
 
 Restart any open Claude Code or Codex session afterward to pick up the
@@ -112,12 +112,12 @@ new version.
 ### 1. Clone and start the services
 
 ```bash
-git clone git@github.com:pacheco20222/mnemo.git
-cd mnemo
+git clone git@github.com:pacheco20222/chronicle.git
+cd chronicle
 docker compose up -d
 ```
 
-This starts one Qdrant container — the only always-on process Mnemo
+This starts one Qdrant container — the only always-on process Chronicle
 needs. Verify it's up:
 
 ```bash
@@ -127,7 +127,7 @@ curl -s http://localhost:6333/collections
 ### 2. Get your install path
 
 ```bash
-uv run mnemo setup
+uv run chronicle setup
 ```
 
 This prints a ready-to-paste `.mcp.json` block, an optional
@@ -142,31 +142,31 @@ Claude Code scopes MCP servers **per repository**, automatically —
 whichever repo's `.mcp.json` is present is what's active for that
 session, with zero manual switching.
 
-Copy the block `mnemo setup` printed into a `.mcp.json` file at the
-root of whichever repo you want Mnemo available in:
+Copy the block `chronicle setup` printed into a `.mcp.json` file at the
+root of whichever repo you want Chronicle available in:
 
 ```json
 {
   "mcpServers": {
-    "mnemo": {
+    "chronicle": {
       "command": "uv",
-      "args": ["--directory", "/absolute/path/to/mnemo", "run", "mnemo"],
+      "args": ["--directory", "/absolute/path/to/chronicle", "run", "chronicle"],
       "env": {
-        "MNEMO_PROJECT": "your-project-name"
+        "CHRONICLE_PROJECT": "your-project-name"
       }
     }
   }
 }
 ```
 
-`MNEMO_PROJECT` should be different per repo — it's what keeps one
+`CHRONICLE_PROJECT` should be different per repo — it's what keeps one
 project's memories from ever showing up in another's. Open (or
 restart) a Claude Code session in that repo and `memory_add`/
 `memory_search` will be available.
 
 #### Optional: auto-loading checkpoints and documents
 
-Mnemo can automatically surface your latest checkpoint and project
+Chronicle can automatically surface your latest checkpoint and project
 overview at the start of every session, via a Claude Code hook. Add a
 `.claude/settings.json` in the same repo:
 
@@ -179,7 +179,7 @@ overview at the start of every session, via a Claude Code hook. Add a
         "hooks": [
           {
             "type": "command",
-            "command": "MNEMO_PROJECT=your-project-name uv run --directory /absolute/path/to/mnemo mnemo-recall"
+            "command": "CHRONICLE_PROJECT=your-project-name uv run --directory /absolute/path/to/chronicle chronicle-recall"
           }
         ]
       }
@@ -196,28 +196,28 @@ the file.
 
 Cursor's MCP config is the same `mcpServers` JSON shape as Claude
 Code's, just a different file: `.cursor/mcp.json` at the root of
-whichever repo you want Mnemo in, instead of `.mcp.json`. Cursor scopes
+whichever repo you want Chronicle in, instead of `.mcp.json`. Cursor scopes
 it per-repo automatically the same way Claude Code does — a project's
 `.cursor/mcp.json` only applies inside that project.
 
-Copy the exact same block `mnemo setup` printed for Claude Code into
+Copy the exact same block `chronicle setup` printed for Claude Code into
 `.cursor/mcp.json` instead:
 
 ```json
 {
   "mcpServers": {
-    "mnemo": {
+    "chronicle": {
       "command": "uv",
-      "args": ["--directory", "/absolute/path/to/mnemo", "run", "mnemo"],
+      "args": ["--directory", "/absolute/path/to/chronicle", "run", "chronicle"],
       "env": {
-        "MNEMO_PROJECT": "your-project-name"
+        "CHRONICLE_PROJECT": "your-project-name"
       }
     }
   }
 }
 ```
 
-Same rule as Claude Code: give each repo its own `MNEMO_PROJECT` value.
+Same rule as Claude Code: give each repo its own `CHRONICLE_PROJECT` value.
 Restart Cursor (or reload the window) after adding or editing this
 file for it to pick up the server.
 
@@ -238,31 +238,31 @@ version, to make this automatic instead of asked-for.
 
 Codex's MCP configuration is global (`~/.codex/config.toml`), not a
 per-repo file like Claude Code's `.mcp.json` — but Codex *does* launch
-the `mnemo` server with your actual current directory as its working
+the `chronicle` server with your actual current directory as its working
 directory, and the server resolves the project the same way it does
-for Claude Code's plugin: `MNEMO_PROJECT` if set, otherwise a lookup
+for Claude Code's plugin: `CHRONICLE_PROJECT` if set, otherwise a lookup
 of the current directory in the shared registry
-(`~/.mnemo/projects.json`). So as long as you don't hardcode
-`MNEMO_PROJECT`, Codex automatically picks up whichever project a
+(`~/.chronicle/projects.json`). So as long as you don't hardcode
+`CHRONICLE_PROJECT`, Codex automatically picks up whichever project a
 folder is registered as — using Claude Code's own registration
-mechanism (`mnemo register` / `/mnemo:mnemo-register`), not a
+mechanism (`chronicle register` / `/chronicle:chronicle-register`), not a
 Codex-specific one.
 
 This is two separate steps, not one command per project — easy to
 miss since the whole point is that step 1 never mentions a project at
 all.
 
-**Step 1 — once, ever, on this machine.** Run the command `mnemo setup`
+**Step 1 — once, ever, on this machine.** Run the command `chronicle setup`
 printed:
 
 ```bash
-codex mcp add mnemo -- uv run --project /absolute/path/to/mnemo mnemo
+codex mcp add chronicle -- uv run --project /absolute/path/to/chronicle chronicle
 ```
 
 Use `--project`, not `--directory` — `--directory` changes Codex's
-own working directory before running `mnemo`, which breaks the
+own working directory before running `chronicle`, which breaks the
 cwd-based lookup step 2 depends on. `--project` only tells `uv` where
-to find mnemo's own code to run, without touching the working
+to find chronicle's own code to run, without touching the working
 directory. Never repeat this step for a new project; one server entry
 serves all of them.
 
@@ -271,10 +271,10 @@ inside that folder:
 
 ```bash
 cd /path/to/your-project
-uv run --project /absolute/path/to/mnemo mnemo register --project your-project-name
+uv run --project /absolute/path/to/chronicle chronicle register --project your-project-name
 ```
 
-(Already registered that folder via Claude Code's `/mnemo:mnemo-register`
+(Already registered that folder via Claude Code's `/chronicle:chronicle-register`
 instead? Same registry, so this step is already done — skip it.)
 
 After that, any Codex session started in that folder resolves to
@@ -290,33 +290,33 @@ works automatically too, since resolution happens per-invocation from
 each session's own working directory — there's no shared state between
 them beyond the registry file both read from.
 
-### 6. Running `mnemo`'s other commands (import, graph)
+### 6. Running `chronicle`'s other commands (import, graph)
 
-`mnemo import` and `mnemo graph` aren't called by Claude Code or
-Codex — you run these yourself, directly. Like every `uv run mnemo`
-invocation, `uv` needs to find mnemo's own code, either by cwd or by
+`chronicle import` and `chronicle graph` aren't called by Claude Code or
+Codex — you run these yourself, directly. Like every `uv run chronicle`
+invocation, `uv` needs to find chronicle's own code, either by cwd or by
 `--directory`:
 
 ```bash
-cd /path/to/mnemo   # wherever you cloned it
-uv run mnemo graph --project your-project-name
-uv run mnemo import notes.md --project your-project-name --type note
+cd /path/to/chronicle   # wherever you cloned it
+uv run chronicle graph --project your-project-name
+uv run chronicle import notes.md --project your-project-name --type note
 ```
 
 or from anywhere else:
 
 ```bash
-uv run --directory /path/to/mnemo mnemo graph --project your-project-name
+uv run --directory /path/to/chronicle chronicle graph --project your-project-name
 ```
 
 Real gotcha with `--directory`: it changes the command's working
-directory to wherever you cloned mnemo, not wherever you actually are
-— so a relative file path passed to `mnemo import` (e.g. `notes.md`)
-resolves against **mnemo's** folder, not yours, unless you `cd` into
-mnemo first (first example above) or pass an absolute path to the
+directory to wherever you cloned chronicle, not wherever you actually are
+— so a relative file path passed to `chronicle import` (e.g. `notes.md`)
+resolves against **chronicle's** folder, not yours, unless you `cd` into
+chronicle first (first example above) or pass an absolute path to the
 file instead.
 
-`mnemo graph` defaults to the same project `memory_add`/`memory_search`
+`chronicle graph` defaults to the same project `memory_add`/`memory_search`
 would resolve to from your current directory (env var, then the
 registry) — same isolation as everything else. Pass `--project X` to
 graph a specific project regardless of where you're standing, or
@@ -343,44 +343,44 @@ except two things:
 
 - Paths in `.mcp.json`, `~/.codex/config.toml`, or the `codex mcp add`
   command need either forward slashes or doubled backslashes — both
-  `C:/Users/you/mnemo` and `C:\\Users\\you\\mnemo` are valid; a single
+  `C:/Users/you/chronicle` and `C:\\Users\\you\\chronicle` are valid; a single
   backslash isn't, in JSON or TOML.
 - The backup scripts are PowerShell twins (`backup.ps1`,
   `export_json.ps1`, `daily_backup.ps1` in `scripts/`) — same
   behavior as the `.sh` versions, same env vars
-  (`MNEMO_QDRANT_URL`, `MNEMO_COLLECTION`). Run them directly:
+  (`CHRONICLE_QDRANT_URL`, `CHRONICLE_COLLECTION`). Run them directly:
   ```powershell
   .\scripts\daily_backup.ps1
   ```
   For the daily schedule (replaces `launchd` on macOS), one command —
   no separate task-definition file needed:
   ```
-  schtasks /create /tn "MnemoDailyBackup" /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\path\to\mnemo\scripts\daily_backup.ps1\"" /sc daily /st 03:00
+  schtasks /create /tn "ChronicleDailyBackup" /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\path\to\chronicle\scripts\daily_backup.ps1\"" /sc daily /st 03:00
   ```
   `-ExecutionPolicy Bypass` is scoped to just this scheduled task —
   it doesn't change your system-wide PowerShell execution policy.
 
-`mnemo import` and `mnemo graph` (§5 above) need nothing extra on
-Windows — both are plain, cross-platform Python: `mnemo graph`'s
-browser-opening and `mnemo import`'s file reading have no OS-specific
+`chronicle import` and `chronicle graph` (§5 above) need nothing extra on
+Windows — both are plain, cross-platform Python: `chronicle graph`'s
+browser-opening and `chronicle import`'s file reading have no OS-specific
 code path to work around. The same `cd` / `--directory` rule from §5
 applies exactly as written.
 
 #### MCP connects, but the first memory tool fails
 
-Mnemo now waits until the first `memory_add` or `memory_search` call to
+Chronicle now waits until the first `memory_add` or `memory_search` call to
 load FastEmbed and, on a new install, download the embedding model. This
 keeps model setup out of the MCP initialization handshake. If that first
 tool call fails or times out, while the MCP itself still shows as
 connected, look for a FastEmbed, Hugging Face, ONNX, download, or model
 cache error in the tool result. Check your network connection, available
-disk space, and write access to `%USERPROFILE%\.mnemo\models`.
+disk space, and write access to `%USERPROFILE%\.chronicle\models`.
 
 You can retry the model load directly in PowerShell and see the complete
 error outside the MCP client:
 
 ```powershell
-uv run --directory 'C:/path/to/mnemo' python -c "from mnemo.embeddings import embed_text; print(len(embed_text('warmup')))"
+uv run --directory 'C:/path/to/chronicle' python -c "from chronicle.embeddings import embed_text; print(len(embed_text('warmup')))"
 ```
 
 A successful run prints `768`. If the first MCP call merely timed out
@@ -395,7 +395,7 @@ This is just seeding one test memory so there's something to recall —
 on a fresh install the collection is empty, so say anything you like.
 In a Claude Code or Codex session in your configured repo:
 
-> "Remember that we're using Mnemo to give you persistent memory."
+> "Remember that we're using Chronicle to give you persistent memory."
 
 Then in a later session:
 

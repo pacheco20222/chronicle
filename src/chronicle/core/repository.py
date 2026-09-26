@@ -4,8 +4,8 @@ import uuid
 
 from sqlalchemy import Select, String, Text, column, select, table, text, update
 
-from mnemo.storage.database import Database
-from mnemo.storage.models import Episode, Memory, Source, utc_now
+from chronicle.storage.database import Database
+from chronicle.storage.models import Episode, Memory, Source, utc_now
 
 
 HIDDEN_STATUSES = {"superseded", "deleted", "wrong"}

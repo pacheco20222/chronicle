@@ -1,5 +1,5 @@
 {
-  "name": "mnemo",
+  "name": "chronicle",
   "version": "3.0.0",
   "description": "Self-hosted, project-scoped memory MCP server for Claude Code and Codex. No cloud services, no paid APIs.",
   "author": {
@@ -7,8 +7,8 @@
     "email": "jrp2022@gmail.com",
     "url": "https://github.com/pacheco20222"
   },
-  "homepage": "https://github.com/pacheco20222/mnemo",
-  "repository": "https://github.com/pacheco20222/mnemo",
+  "homepage": "https://github.com/pacheco20222/chronicle",
+  "repository": "https://github.com/pacheco20222/chronicle",
   "license": "MIT",
   "keywords": ["memory", "mcp", "qdrant", "context"]
 }

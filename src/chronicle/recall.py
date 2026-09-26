@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 
-from mnemo import config, registry
-from mnemo.core.runtime import get_runtime
+from chronicle import config, registry
+from chronicle.core.runtime import get_runtime
 
 
 def latest_checkpoint(project: str) -> str | None:
@@ -16,7 +16,7 @@ def latest_checkpoint(project: str) -> str | None:
     if record is None:
         return None
     return (
-        f"[Mnemo] LATEST CHECKPOINT (saved {record['created_at']}) — the most recent "
+        f"[Chronicle] LATEST CHECKPOINT (saved {record['created_at']}) — the most recent "
         f"saved state for this project. Treat this as the answer to \"what is the "
         f"latest checkpoint\" and resume from it:\n{record['content']}"
     )
@@ -31,13 +31,13 @@ def overview_document(project: str) -> str | None:
     if record is None:
         return None
     return (
-        f"[Mnemo] Project overview — background reference only, NOT a checkpoint "
+        f"[Chronicle] Project overview — background reference only, NOT a checkpoint "
         f"(updated {record['updated_at']}):\n{record['content']}"
     )
 
 
 def main() -> None:
-    project = os.environ.get("MNEMO_PROJECT", "").strip()
+    project = os.environ.get("CHRONICLE_PROJECT", "").strip()
     if not project:
         try:
             project = registry.lookup(Path.cwd()) or ""

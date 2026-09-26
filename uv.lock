@@ -1255,7 +1255,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mnemo"
+name = "chronicle"
 version = "3.0.0"
 source = { editable = "." }
 dependencies = [

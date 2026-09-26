@@ -2,11 +2,11 @@ import uuid
 
 import pytest
 
-from mnemo.core.qdrant_index import QdrantVectorIndex
+from chronicle.core.qdrant_index import QdrantVectorIndex
 
 
 def test_qdrant_adapter_round_trip_against_local_service():
-    collection = f"mnemo_test_{uuid.uuid4().hex}"
+    collection = f"chronicle_test_{uuid.uuid4().hex}"
     try:
         index = QdrantVectorIndex(collection=collection)
     except Exception as exc:

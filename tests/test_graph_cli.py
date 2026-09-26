@@ -3,7 +3,7 @@ import math
 import pytest
 from types import SimpleNamespace
 
-from mnemo import graph_cli
+from chronicle import graph_cli
 
 
 def test_cosine_identical_vectors_is_one():
@@ -168,20 +168,20 @@ def test_build_graph_data_min_similarity_drops_weak_edges():
 def test_render_html_embeds_graph_json():
     graph = {"nodes": [{"id": "a", "project": "p", "type": "note", "content": "hello"}], "edges": [], "k": 3}
     html = graph_cli._render_html(graph)
-    assert "<title>Mnemo Graph</title>" in html
+    assert "<title>Chronicle Graph</title>" in html
     assert json.dumps(graph, ensure_ascii=False) in html
 
 
 def test_main_writes_html_file_and_opens_browser(tmp_path, monkeypatch, service):
-    service.add_memory([1.0, 0.0], "graph cli test alpha", "mnemo-test", "note")
-    service.add_memory([0.9, 0.1], "graph cli test beta", "mnemo-test", "note")
+    service.add_memory([1.0, 0.0], "graph cli test alpha", "chronicle-test", "note")
+    service.add_memory([0.9, 0.1], "graph cli test beta", "chronicle-test", "note")
 
     opened = []
     monkeypatch.setattr(graph_cli.webbrowser, "open", lambda uri: opened.append(uri))
     monkeypatch.setattr(graph_cli, "get_runtime", lambda: service)
 
     out_path = tmp_path / "graph.html"
-    graph_cli.main(["--project", "mnemo-test", "--out", str(out_path)])
+    graph_cli.main(["--project", "chronicle-test", "--out", str(out_path)])
 
     assert out_path.exists()
     content = out_path.read_text()
@@ -198,7 +198,7 @@ def test_main_handles_fewer_than_two_records(tmp_path, monkeypatch, capsys):
 
 
 def test_main_without_project_or_all_uses_current_project(monkeypatch):
-    monkeypatch.setenv("MNEMO_PROJECT", "env-project")
+    monkeypatch.setenv("CHRONICLE_PROJECT", "env-project")
     seen = {}
 
     def fake_get_all_with_vectors(project=None):
@@ -212,7 +212,7 @@ def test_main_without_project_or_all_uses_current_project(monkeypatch):
 
 
 def test_main_with_all_flag_ignores_current_project(monkeypatch):
-    monkeypatch.setenv("MNEMO_PROJECT", "env-project")
+    monkeypatch.setenv("CHRONICLE_PROJECT", "env-project")
     seen = {}
 
     def fake_get_all_with_vectors(project=None):
@@ -226,7 +226,7 @@ def test_main_with_all_flag_ignores_current_project(monkeypatch):
 
 
 def test_main_rejects_project_and_all_together(monkeypatch):
-    monkeypatch.setenv("MNEMO_PROJECT", "env-project")
+    monkeypatch.setenv("CHRONICLE_PROJECT", "env-project")
     with pytest.raises(SystemExit):
         graph_cli.main(["--project", "x", "--all"])
 

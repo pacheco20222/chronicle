@@ -2,24 +2,24 @@ from pathlib import Path
 
 import pytest
 
-from mnemo import config, registry
+from chronicle import config, registry
 
 
 def test_get_project_reads_env(monkeypatch):
-    monkeypatch.setenv("MNEMO_PROJECT", "villenca")
+    monkeypatch.setenv("CHRONICLE_PROJECT", "villenca")
     assert config.get_project() == "villenca"
 
 
 def test_get_project_raises_when_unset(monkeypatch, tmp_path):
-    monkeypatch.delenv("MNEMO_PROJECT", raising=False)
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(RuntimeError):
         config.get_project()
 
 
 def test_get_project_raises_when_blank(monkeypatch, tmp_path):
-    monkeypatch.setenv("MNEMO_PROJECT", "   ")
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_PROJECT", "   ")
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(RuntimeError):
         config.get_project()
 
@@ -55,30 +55,30 @@ def test_validate_relation_type_rejects_unknown():
 
 
 def test_get_project_falls_back_to_registry(monkeypatch, tmp_path):
-    monkeypatch.delenv("MNEMO_PROJECT", raising=False)
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     registry.register(Path.cwd(), "registry-project")
     assert config.get_project() == "registry-project"
 
 
 def test_get_project_env_wins_over_registry(monkeypatch, tmp_path):
-    monkeypatch.setenv("MNEMO_PROJECT", "env-project")
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setenv("CHRONICLE_PROJECT", "env-project")
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     registry.register(Path.cwd(), "registry-project")
     assert config.get_project() == "env-project"
 
 
 def test_get_project_raises_when_neither_env_nor_registry(monkeypatch, tmp_path):
-    monkeypatch.delenv("MNEMO_PROJECT", raising=False)
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(RuntimeError):
         config.get_project()
 
 
 def test_get_project_raises_runtime_error_on_corrupt_registry(monkeypatch, tmp_path):
-    monkeypatch.delenv("MNEMO_PROJECT", raising=False)
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
     registry_path = tmp_path / "projects.json"
     registry_path.write_text("{not valid json")
-    monkeypatch.setenv("MNEMO_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(registry_path))
     with pytest.raises(RuntimeError):
         config.get_project()

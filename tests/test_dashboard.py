@@ -1,6 +1,6 @@
 from starlette.routing import Mount, Route
 
-from mnemo import cli, dashboard_cli, server
+from chronicle import cli, dashboard_cli, server
 
 
 def test_dashboard_app_exposes_streamable_http_on_mcp_path():
@@ -50,7 +50,7 @@ def test_dashboard_graph_tool_reuses_existing_graph_builder(monkeypatch, service
 def test_cli_dispatches_dashboard_subcommand(monkeypatch):
     called = {}
 
-    monkeypatch.setattr(cli.sys, "argv", ["mnemo", "dashboard", "stop"])
+    monkeypatch.setattr(cli.sys, "argv", ["chronicle", "dashboard", "stop"])
     monkeypatch.setattr(
         dashboard_cli,
         "main",

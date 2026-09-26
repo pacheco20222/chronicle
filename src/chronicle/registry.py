@@ -5,10 +5,10 @@ from pathlib import Path
 
 
 def registry_path() -> Path:
-    override = os.environ.get("MNEMO_REGISTRY_PATH", "").strip()
+    override = os.environ.get("CHRONICLE_REGISTRY_PATH", "").strip()
     if override:
         return Path(override)
-    return Path.home() / ".mnemo" / "projects.json"
+    return Path.home() / ".chronicle" / "projects.json"
 
 
 class RegistryError(Exception):

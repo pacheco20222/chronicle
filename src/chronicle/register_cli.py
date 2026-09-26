@@ -2,11 +2,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from mnemo import registry
+from chronicle import registry
 
 
 def main(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(prog="mnemo register")
+    parser = argparse.ArgumentParser(prog="chronicle register")
     parser.add_argument("--project", required=True)
     args = parser.parse_args(argv)
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import uvicorn
 from starlette.staticfiles import StaticFiles
 
-from mnemo import server
+from chronicle import server
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -17,11 +17,11 @@ MCP_PATH = "/mcp"
 
 
 def _port_default() -> int:
-    return int(os.environ.get("MNEMO_DASHBOARD_PORT", DEFAULT_PORT))
+    return int(os.environ.get("CHRONICLE_DASHBOARD_PORT", DEFAULT_PORT))
 
 
 def pid_path() -> Path:
-    state_dir = Path(os.environ.get("MNEMO_STATE_DIR", Path.home() / ".mnemo"))
+    state_dir = Path(os.environ.get("CHRONICLE_STATE_DIR", Path.home() / ".chronicle"))
     return state_dir / "dashboard.pid"
 
 
@@ -44,7 +44,7 @@ def build_app():
 
 
 def run_foreground(port: int) -> None:
-    print(f"Mnemo dashboard: http://{HOST}:{port}")
+    print(f"Chronicle dashboard: http://{HOST}:{port}")
     print(f"MCP endpoint: http://{HOST}:{port}{MCP_PATH}")
     uvicorn.run(build_app(), host=HOST, port=port, lifespan="on")
 
@@ -72,20 +72,20 @@ def start_background(port: int) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     child = subprocess.Popen(
-        [sys.executable, "-m", "mnemo.dashboard_cli", "start", "--port", str(port)],
+        [sys.executable, "-m", "chronicle.dashboard_cli", "start", "--port", str(port)],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
     path.write_text(str(child.pid))
-    print(f"Mnemo dashboard started in background (PID {child.pid})")
+    print(f"Chronicle dashboard started in background (PID {child.pid})")
 
 
 def stop() -> None:
     path = pid_path()
     if not path.exists():
-        print("Mnemo dashboard is not running")
+        print("Chronicle dashboard is not running")
         return
     try:
         pid = int(path.read_text().strip())
@@ -94,7 +94,7 @@ def stop() -> None:
 
     if not _pid_is_running(pid):
         path.unlink(missing_ok=True)
-        print("Removed stale Mnemo dashboard PID file")
+        print("Removed stale Chronicle dashboard PID file")
         return
 
     os.kill(pid, signal.SIGTERM)
@@ -102,11 +102,11 @@ def stop() -> None:
     while _pid_is_running(pid) and time.monotonic() < deadline:
         time.sleep(0.05)
     path.unlink(missing_ok=True)
-    print(f"Mnemo dashboard stopped (PID {pid})")
+    print(f"Chronicle dashboard stopped (PID {pid})")
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="mnemo dashboard")
+    parser = argparse.ArgumentParser(prog="chronicle dashboard")
     subparsers = parser.add_subparsers(dest="command")
     start = subparsers.add_parser("start")
     start.add_argument("--background", action="store_true")
