@@ -32,6 +32,12 @@ def main() -> None:
         dashboard_main(sys.argv[2:])
         return
 
+    if len(sys.argv) > 1 and sys.argv[1] == "eval":
+        from mnemo.eval_cli import main as eval_main
+
+        eval_main(sys.argv[2:])
+        return
+
     from mnemo.server import main as server_main
 
     server_main()
