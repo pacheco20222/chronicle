@@ -5,10 +5,11 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 
 import { edgesForRender, edgesForVisibility } from "../graphEdges";
-import type { GraphEdge, GraphNode } from "../types";
+import type { GraphEdge, GraphNode, ScopeNode } from "../types";
 import { colorForType } from "../types";
 
 const BRASS = "#d8a84e";
+const BRASS_BRIGHT = "#f0ca76";
 const SEMANTIC = "#c5cee0";
 const EXPLICIT = BRASS;
 const STATUS_OPACITY = { active: 1, resolved: 0.62, superseded: 0.34, wrong: 0.34 } as const;
@@ -39,7 +40,62 @@ function fibonacciPoint(index: number, total: number, radius: number) {
   );
 }
 
-function useLayout(nodes: GraphNode[], edges: GraphEdge[]) {
+type ScopePosition = { position: THREE.Vector3; isBlackHole: boolean; radius: number; scope: ScopeNode };
+
+function computeProjectRadii(nodes: GraphNode[]) {
+  const counts = new Map<string, number>();
+  nodes.forEach((node) => counts.set(node.project, (counts.get(node.project) || 0) + 1));
+  const radii = new Map<string, number>();
+  counts.forEach((count, project) => radii.set(project, localClusterRadius(count)));
+  return radii;
+}
+
+/* A scope with no memories of its own (a pure organizational node, e.g.
+ * "work" created only because "work/azure" needed an ancestor) has no
+ * node-count to size itself by, so its extent is a heuristic based on how
+ * many children it holds instead — same shape as localClusterRadius, just
+ * fed a different quantity. */
+function scopeExtent(scope: ScopeNode, projectRadii: Map<string, number>) {
+  return projectRadii.get(scope.path) ?? Math.max(0.9, 0.6 + Math.sqrt(Math.max(scope.child_count, 1)) * 0.5);
+}
+
+/* Recursively places every scope node using the exact same fibonacci-orbit
+ * technique the flat per-project layout already used for a single level —
+ * applied once per tree depth instead of once total. When no scope has ever
+ * been reparented (the common case: every project is still a top-level
+ * scope), this produces the same flat ring the dashboard always rendered;
+ * nesting only appears once the user actually organizes their taxonomy. */
+function useScopeLayout(scopes: ScopeNode[], projectRadii: Map<string, number>) {
+  return useMemo(() => {
+    const byParent = new Map<string | null, ScopeNode[]>();
+    scopes.forEach((scope) => {
+      const list = byParent.get(scope.parent_path);
+      if (list) list.push(scope);
+      else byParent.set(scope.parent_path, [scope]);
+    });
+
+    const positions = new Map<string, ScopePosition>();
+
+    function place(parentPath: string | null, center: THREE.Vector3) {
+      const children = [...(byParent.get(parentPath) || [])].sort((a, b) => a.path.localeCompare(b.path));
+      if (children.length === 0) return;
+      const extents = children.map((child) => scopeExtent(child, projectRadii));
+      const maxExtent = Math.max(0.75, ...extents);
+      const orbitRadius = children.length <= 1 ? 0 : Math.max(4, maxExtent * 2.4 + Math.sqrt(children.length) * 1.1);
+      children.forEach((child, index) => {
+        const local = children.length === 1 ? new THREE.Vector3() : fibonacciPoint(index, children.length, orbitRadius);
+        const position = center.clone().add(local);
+        positions.set(child.path, { position, isBlackHole: child.child_count > 0, radius: extents[index], scope: child });
+        place(child.path, position);
+      });
+    }
+
+    place(null, new THREE.Vector3(0, 0, 0));
+    return positions;
+  }, [scopes, projectRadii]);
+}
+
+function useLayout(nodes: GraphNode[], edges: GraphEdge[], scopePositions: Map<string, ScopePosition>) {
   return useMemo(() => {
     const degree = new Map(nodes.map((node) => [node.id, 0]));
     edges.forEach((edge) => {
@@ -58,10 +114,14 @@ function useLayout(nodes: GraphNode[], edges: GraphEdge[]) {
     const localRadii = projects.map((project) => localClusterRadius(byProject.get(project)!.length));
     const maxLocalRadius = Math.max(0.75, ...localRadii);
     const clusterRadius = projectCount <= 1 ? 0 : Math.max(4.5, maxLocalRadius * 2.4 + Math.sqrt(projectCount) * 1.1);
+    const fallbackCenter = (clusterIndex: number) =>
+      projectCount <= 1 ? new THREE.Vector3() : fibonacciPoint(clusterIndex, projectCount, clusterRadius);
 
     const layout: LayoutNode[] = [];
+    const clusterCenters: THREE.Vector3[] = [];
     projects.forEach((project, clusterIndex) => {
-      const center = projectCount <= 1 ? new THREE.Vector3() : fibonacciPoint(clusterIndex, projectCount, clusterRadius);
+      const center = scopePositions.get(project)?.position ?? fallbackCenter(clusterIndex);
+      clusterCenters.push(center);
       const projectNodes = byProject.get(project)!;
       const total = Math.max(projectNodes.length, 1);
       const radius = localClusterRadius(total);
@@ -77,13 +137,19 @@ function useLayout(nodes: GraphNode[], edges: GraphEdge[]) {
 
     const clusters: Cluster[] = projects.map((project, clusterIndex) => ({
       project,
-      center: projectCount <= 1 ? new THREE.Vector3() : fibonacciPoint(clusterIndex, projectCount, clusterRadius),
+      center: clusterCenters[clusterIndex],
       radius: localRadii[clusterIndex],
       color: projectColor(project),
     }));
 
-    return { layout, clusters, extent: clusterRadius + maxLocalRadius };
-  }, [edges, nodes]);
+    let extent = clusterRadius + maxLocalRadius;
+    clusters.forEach((cluster) => { extent = Math.max(extent, cluster.center.length() + cluster.radius); });
+    scopePositions.forEach((scopePosition) => {
+      extent = Math.max(extent, scopePosition.position.length() + scopePosition.radius);
+    });
+
+    return { layout, clusters, extent };
+  }, [edges, nodes, scopePositions]);
 }
 
 let glowTexture: THREE.Texture | null = null;
@@ -125,6 +191,49 @@ function ProjectLabel({ cluster }: { cluster: Cluster }) {
     <Html position={position} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "13px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: cluster.color, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
       {cluster.project}
     </Html>
+  );
+}
+
+/* The scope-hierarchy signature element: a scope with children renders as
+ * a black hole (a dark, light-occluding sphere — depthWrite true, unlike
+ * every additive glow sprite elsewhere in this scene, so it actually reads
+ * as a body blocking what's behind it) ringed by a brass accretion torus.
+ * Children of any kind (sub-scopes or leaf projects) orbit it via
+ * useScopeLayout; a leaf project scope with no children renders no body
+ * here at all — it's still just its existing star cluster. */
+function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; onSelect: (scope: ScopeNode) => void }) {
+  const coreGlowRef = useRef<THREE.SpriteMaterial>(null);
+  useFrame((_, delta) => {
+    if (!coreGlowRef.current) return;
+    const target = scope.core_present ? 0.4 : 0;
+    coreGlowRef.current.opacity = THREE.MathUtils.damp(coreGlowRef.current.opacity, target, 5, delta);
+  });
+
+  if (!isBlackHole) return null;
+
+  return (
+    <group position={position} onPointerDown={(event) => { event.stopPropagation(); onSelect(scope); }}>
+      <mesh renderOrder={1}>
+        <sphereGeometry args={[radius * 0.62, 24, 18]} />
+        <meshBasicMaterial color="#03040a" depthWrite toneMapped={false} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2.4, 0, 0]}>
+        <torusGeometry args={[radius * 0.62, radius * 0.028, 10, 48]} />
+        <meshBasicMaterial color={BRASS} transparent opacity={0.85} toneMapped={false} />
+      </mesh>
+      {scope.linked_doc_count > 0 && (
+        <mesh rotation={[Math.PI / 2.4 + Math.PI / 5, Math.PI / 7, 0]}>
+          <torusGeometry args={[radius * 0.86, radius * 0.016, 8, 40]} />
+          <meshBasicMaterial color={SEMANTIC} transparent opacity={0.45} toneMapped={false} />
+        </mesh>
+      )}
+      <sprite scale={[radius * 1.5, radius * 1.5, 1]}>
+        <spriteMaterial ref={coreGlowRef} map={getGlowTexture()} color={BRASS} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </sprite>
+      <Html position={[0, radius * 0.62 + 0.4, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
+        {scope.name}
+      </Html>
+    </group>
   );
 }
 
@@ -247,7 +356,7 @@ function RelationArrow({ source, target, highlighted, focusActive }: { source: T
   </mesh>;
 }
 
-function GraphObjects({ layout, clusters, edges, selectedId, onSelect }: { layout: LayoutNode[]; clusters: Cluster[]; edges: GraphEdge[]; selectedId: string | null; onSelect: (node: GraphNode) => void }) {
+function GraphObjects({ layout, clusters, edges, scopePositions, selectedId, onSelect, onSelectScope }: { layout: LayoutNode[]; clusters: Cluster[]; edges: GraphEdge[]; scopePositions: Map<string, ScopePosition>; selectedId: string | null; onSelect: (node: GraphNode) => void; onSelectScope: (scope: ScopeNode) => void }) {
   const positionById = useMemo(() => new Map(layout.map((node) => [node.id, node.position])), [layout]);
   const connectedIds = useMemo(() => {
     if (!selectedId) return new Set<string>();
@@ -262,6 +371,9 @@ function GraphObjects({ layout, clusters, edges, selectedId, onSelect }: { layou
   return <group>
     {clusters.map((cluster) => <ProjectNebula key={`nebula-${cluster.project}`} cluster={cluster} />)}
     {clusters.map((cluster) => <ProjectLabel key={`label-${cluster.project}`} cluster={cluster} />)}
+    {[...scopePositions.entries()].map(([path, scopePosition]) => (
+      <ScopeBody key={`scope-${path}`} scope={scopePosition.scope} position={scopePosition.position} radius={scopePosition.radius} isBlackHole={scopePosition.isBlackHole} onSelect={onSelectScope} />
+    ))}
     <SemanticEdgeField edges={semanticEdges} positionById={positionById} connectedIds={connectedIds} focusActive={focusActive} />
     {explicitEdges.map((edge, index) => {
       const source = positionById.get(edge.source);
@@ -330,8 +442,10 @@ function ChartMotion({ chartRef, controlsRef, layout, selectedId, interactionRef
   return null;
 }
 
-export function GraphScene({ nodes, edges, selectedId, onSelect, showSemanticEdges }: { nodes: GraphNode[]; edges: GraphEdge[]; selectedId: string | null; onSelect: (node: GraphNode) => void; showSemanticEdges: boolean }) {
-  const { layout, clusters, extent } = useLayout(nodes, edges);
+export function GraphScene({ nodes, edges, scopes, selectedId, onSelect, onSelectScope, showSemanticEdges }: { nodes: GraphNode[]; edges: GraphEdge[]; scopes: ScopeNode[]; selectedId: string | null; onSelect: (node: GraphNode) => void; onSelectScope: (scope: ScopeNode) => void; showSemanticEdges: boolean }) {
+  const projectRadii = useMemo(() => computeProjectRadii(nodes), [nodes]);
+  const scopePositions = useScopeLayout(scopes, projectRadii);
+  const { layout, clusters, extent } = useLayout(nodes, edges, scopePositions);
   const renderedEdges = useMemo(() => edgesForRender(edgesForVisibility(edges, showSemanticEdges)), [edges, showSemanticEdges]);
   const cameraDistance = Math.max(22, extent * 3.1);
   const chartRef = useRef<THREE.Group>(null);
@@ -344,7 +458,7 @@ export function GraphScene({ nodes, edges, selectedId, onSelect, showSemanticEdg
       <Stars radius={90} depth={60} count={9000} factor={2.1} saturation={0} fade speed={0.15} />
       <Stars radius={40} depth={30} count={3200} factor={1.3} saturation={0} fade speed={0.35} />
       <group ref={chartRef}>
-        <GraphObjects layout={layout} clusters={clusters} edges={renderedEdges} selectedId={selectedId} onSelect={onSelect} />
+        <GraphObjects layout={layout} clusters={clusters} edges={renderedEdges} scopePositions={scopePositions} selectedId={selectedId} onSelect={onSelect} onSelectScope={onSelectScope} />
       </group>
       <ChartMotion chartRef={chartRef} controlsRef={controlsRef} layout={layout} selectedId={selectedId} interactionRef={interactionRef} homeDistance={cameraDistance} />
       <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.07} enablePan={false} minDistance={4} maxDistance={Math.max(42, cameraDistance * 1.4)} onStart={() => { interactionRef.current.active = true; }} onEnd={() => { interactionRef.current.active = false; interactionRef.current.lastInteraction = performance.now(); }} />

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from "./components/ui/card";
 import { Checkbox } from "./components/ui/checkbox";
 import { Input } from "./components/ui/input";
 import { ScrollArea } from "./components/ui/scroll-area";
-import { colorForType, TYPE_COLORS, type DashboardSnapshot, type GraphEdge, type GraphNode, type ProjectCard } from "./types";
+import { colorForType, TYPE_COLORS, type DashboardSnapshot, type GraphEdge, type GraphNode, type ProjectCard, type ScopeNode } from "./types";
 
 type Tab = "graph" | "projects" | "control";
 const STATUS_COLORS = { active: "#f2d68f", resolved: "#9ba8bd", superseded: "#667187", wrong: "#667187" };
@@ -45,10 +45,11 @@ function TypeStrip() {
   return <div className="type-strip" aria-label="Memory types">{Object.entries(TYPE_COLORS).map(([type, color]) => <span key={type} className="type-mark" style={{ color }}><i style={{ backgroundColor: color }} />{type}</span>)}</div>;
 }
 
-function GraphTab({ snapshot, project, selectedId, onSelect }: { snapshot: DashboardSnapshot; project: string | null; selectedId: string | null; onSelect: (node: GraphNode) => void }) {
+function GraphTab({ snapshot, project, selectedId, onSelect, onSelectScope }: { snapshot: DashboardSnapshot; project: string | null; selectedId: string | null; onSelect: (node: GraphNode) => void; onSelectScope: (scope: ScopeNode) => void }) {
   const nodes = useMemo(() => project ? snapshot.graph.nodes.filter((node) => node.project === project) : snapshot.graph.nodes, [project, snapshot.graph.nodes]);
   const ids = useMemo(() => new Set(nodes.map((node) => node.id)), [nodes]);
   const edges = useMemo(() => snapshot.graph.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target)), [ids, snapshot.graph.edges]);
+  const scopes = snapshot.graph.scopes;
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GraphNode[]>([]);
   const [searching, setSearching] = useState(false);
@@ -61,8 +62,8 @@ function GraphTab({ snapshot, project, selectedId, onSelect }: { snapshot: Dashb
   }
 
   return <section className="graph-workspace" aria-label="Memory graph">
-    <div className="graph-canvas"><GraphScene nodes={nodes} edges={edges} selectedId={selectedId} onSelect={onSelect} showSemanticEdges={showSemanticEdges} /></div>
-    <GraphLegend query={query} onQueryChange={setQuery} onSearch={() => void search()} searching={searching} results={results} showSemanticEdges={showSemanticEdges} onSemanticToggle={setShowSemanticEdges} /><div className="graph-hint mono">drag / scroll to orbit · click star to focus</div>
+    <div className="graph-canvas"><GraphScene nodes={nodes} edges={edges} scopes={scopes} selectedId={selectedId} onSelect={onSelect} onSelectScope={onSelectScope} showSemanticEdges={showSemanticEdges} /></div>
+    <GraphLegend query={query} onQueryChange={setQuery} onSearch={() => void search()} searching={searching} results={results} showSemanticEdges={showSemanticEdges} onSemanticToggle={setShowSemanticEdges} /><div className="graph-hint mono">drag / scroll to orbit · click star or black hole to focus</div>
   </section>;
 }
 
@@ -132,10 +133,62 @@ function MemoryCasePlate({ selected, snapshot, onSelect, onClose, onRefresh, onE
   </div></CardContent></Card></div>;
 }
 
+function ScopeCasePlate({ scope, onClose, onRefresh, onError, onMoved }: { scope: ScopeNode; onClose: () => void; onRefresh: () => Promise<DashboardSnapshot | null>; onError: (message: string) => void; onMoved: (newPath: string) => void }) {
+  const [content, setContent] = useState<string>("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newParent, setNewParent] = useState("");
+  const [moving, setMoving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoaded(false);
+    setContent("");
+    callTool<{ content: string } | null>("memory_get_document", { slug: scope.path, scope_path: scope.path })
+      .then((doc) => { if (!cancelled) { setContent(doc?.content ?? ""); setLoaded(true); } })
+      .catch(() => { if (!cancelled) setLoaded(true); });
+    return () => { cancelled = true; };
+  }, [scope.path]);
+
+  async function saveCore() {
+    setSaving(true);
+    try {
+      await callTool("memory_set_document", { slug: scope.path, content, type: "overview", scope_path: scope.path });
+      await onRefresh();
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : "Saving scope core failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function move() {
+    setMoving(true);
+    try {
+      const result = await callTool<{ path: string }>("memory_scope_reparent", {
+        path: scope.path,
+        new_parent_path: newParent.trim() || null,
+      });
+      await onRefresh();
+      onMoved(result.path);
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : "Moving scope failed");
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  return <div className="selected-memory"><Card className="case-plate"><CardHeader className="case-head"><div className="case-header"><div><h2>{scope.name}</h2></div><button className="close-button" onClick={onClose} aria-label="Close selected scope">×</button></div><div className="case-meta mono">{scope.path} · {scope.child_count} {scope.child_count === 1 ? "child" : "children"}{scope.linked_doc_count > 0 ? ` · ${scope.linked_doc_count} linked doc${scope.linked_doc_count === 1 ? "" : "s"}` : ""}</div></CardHeader><CardContent className="case-body"><div className="case-sections">
+    <section className="case-section case-editor"><div className="plate-label">scope core</div>{loaded ? <textarea className="case-editor-textarea" value={content} onChange={(event) => setContent(event.target.value)} aria-label="Scope core content" placeholder="No core set for this scope yet." /> : <p className="control-note">Loading…</p>}<Button variant="solid" onClick={() => void saveCore()} disabled={saving || !loaded}>{saving ? "Saving..." : "Save"}</Button></section>
+    <section className="case-section"><div className="plate-label">reorganize</div><div className="case-fields"><div className="case-field"><span className="case-field-label">move under</span><Input value={newParent} onChange={(event) => setNewParent(event.target.value)} placeholder="e.g. work (blank = root)" aria-label="New parent scope path" /></div></div><Button variant="soft" onClick={() => void move()} disabled={moving}>{moving ? "Moving..." : "Move"}</Button></section>
+  </div></CardContent></Card></div>;
+}
+
 export default function App() {
   const [route, setRoute] = useState(readRoute);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [selected, setSelected] = useState<GraphNode | null>(null);
+  const [selectedScope, setSelectedScope] = useState<ScopeNode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -146,6 +199,7 @@ export default function App() {
       const next = await callTool<DashboardSnapshot>("memory_dashboard_snapshot");
       setSnapshot(next);
       setSelected((current) => current ? next.graph.nodes.find((node) => node.id === current.id) || current : current);
+      setSelectedScope((current) => current ? next.graph.scopes.find((scope) => scope.path === current.path) || current : current);
       return next;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Dashboard request failed");
@@ -156,7 +210,7 @@ export default function App() {
   useEffect(() => { const onPopState = () => { setRoute(readRoute()); setSelected(null); }; window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
   useEffect(() => { void refresh(); }, []);
 
-  return <main className="app-shell"><header className="topbar"><button className="brand" onClick={() => navigate("graph")} aria-label="Open all memory graph"><span className="brand-mark">✦</span><span>chronicle</span><small>memory field</small></button><nav className="tab-nav" aria-label="Dashboard sections">{(["graph", "projects", "control"] as Tab[]).map((tab) => <TabButton key={tab} active={route.tab === tab} onClick={() => navigate(tab, tab === "graph" ? route.project : null)}>{tab}<span>{tab === "graph" ? snapshot?.graph.nodes.length ?? "—" : tab === "projects" ? snapshot?.projects.length ?? "—" : ""}</span></TabButton>)}</nav><div className="endpoint-status"><i className={error ? "status-light bad" : "status-light"} />local / <span className="mono">127.0.0.1</span></div></header>{error && <div className="app-alert"><span><b>MCP unavailable:</b> {error}</span><Button variant="soft" onClick={() => void refresh()}>Retry</Button></div>}{!snapshot && !error && <div className="loading-state mono">loading memory field ...</div>}{snapshot && route.tab === "graph" && <GraphTab snapshot={snapshot} project={route.project} selectedId={selected?.id ?? null} onSelect={setSelected} />}{snapshot && route.tab === "projects" && <ProjectsTab snapshot={snapshot} onView={(project) => navigate("graph", project)} />}{snapshot && route.tab === "control" && <ControlTab snapshot={snapshot} onRefresh={() => void refresh()} refreshing={refreshing} />}{selected && snapshot && <MemoryCasePlate selected={selected} snapshot={snapshot} onSelect={setSelected} onClose={() => setSelected(null)} onRefresh={refresh} onError={setError} />}</main>;
+  return <main className="app-shell"><header className="topbar"><button className="brand" onClick={() => navigate("graph")} aria-label="Open all memory graph"><span className="brand-mark">✦</span><span>chronicle</span><small>memory field</small></button><nav className="tab-nav" aria-label="Dashboard sections">{(["graph", "projects", "control"] as Tab[]).map((tab) => <TabButton key={tab} active={route.tab === tab} onClick={() => navigate(tab, tab === "graph" ? route.project : null)}>{tab}<span>{tab === "graph" ? snapshot?.graph.nodes.length ?? "—" : tab === "projects" ? snapshot?.projects.length ?? "—" : ""}</span></TabButton>)}</nav><div className="endpoint-status"><i className={error ? "status-light bad" : "status-light"} />local / <span className="mono">127.0.0.1</span></div></header>{error && <div className="app-alert"><span><b>MCP unavailable:</b> {error}</span><Button variant="soft" onClick={() => void refresh()}>Retry</Button></div>}{!snapshot && !error && <div className="loading-state mono">loading memory field ...</div>}{snapshot && route.tab === "graph" && <GraphTab snapshot={snapshot} project={route.project} selectedId={selected?.id ?? null} onSelect={(node) => { setSelectedScope(null); setSelected(node); }} onSelectScope={(scope) => { setSelected(null); setSelectedScope(scope); }} />}{snapshot && route.tab === "projects" && <ProjectsTab snapshot={snapshot} onView={(project) => navigate("graph", project)} />}{snapshot && route.tab === "control" && <ControlTab snapshot={snapshot} onRefresh={() => void refresh()} refreshing={refreshing} />}{selected && snapshot && <MemoryCasePlate selected={selected} snapshot={snapshot} onSelect={setSelected} onClose={() => setSelected(null)} onRefresh={refresh} onError={setError} />}{selectedScope && <ScopeCasePlate scope={selectedScope} onClose={() => setSelectedScope(null)} onRefresh={refresh} onError={setError} onMoved={(newPath) => setSelectedScope((current) => current ? { ...current, path: newPath } : current)} />}</main>;
 }
 
 function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
