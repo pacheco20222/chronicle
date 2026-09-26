@@ -44,11 +44,21 @@ export interface GraphEdge {
   relation?: string;
 }
 
+export interface ScopeNode {
+  path: string;
+  name: string;
+  parent_path: string | null;
+  child_count: number;
+  core_present: boolean;
+  linked_doc_count: number;
+}
+
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
   k: number;
   current_project?: string | null;
+  scopes: ScopeNode[];
 }
 
 export interface ProjectCard {
