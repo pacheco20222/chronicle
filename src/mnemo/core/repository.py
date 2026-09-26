@@ -42,12 +42,15 @@ class MemoryRepository:
                 source_row = Source(id=str(uuid.uuid4()), project=project, locator=source)
                 session.add(source_row)
                 source_id = source_row.id
+            created_at = utc_now()
             row = Memory(
                 id=id,
                 project=project,
                 type=type_,
                 content=content,
                 status=status,
+                created_at=created_at,
+                valid_at=created_at,
                 source_id=source_id,
                 supersedes=supersedes,
                 slug=slug,
@@ -57,10 +60,11 @@ class MemoryRepository:
             )
             session.add(row)
             if supersedes is not None:
+                invalid_at = utc_now()
                 session.execute(
                     update(Memory)
                     .where(Memory.id == supersedes)
-                    .values(status="superseded", updated_at=utc_now())
+                    .values(status="superseded", invalid_at=invalid_at, updated_at=invalid_at)
                 )
             session.commit()
             return row
@@ -116,10 +120,14 @@ class MemoryRepository:
 
     def set_status(self, memory_id: str, status: str) -> None:
         with self.session_factory() as session:
+            updated_at = utc_now()
+            values = {"status": status, "updated_at": updated_at}
+            if status in {"superseded", "expired"}:
+                values["invalid_at"] = updated_at
             session.execute(
                 update(Memory)
                 .where(Memory.id == memory_id)
-                .values(status=status, updated_at=utc_now())
+                .values(**values)
             )
             session.commit()
 
@@ -133,8 +141,10 @@ class MemoryRepository:
             if relation_type == "supersedes":
                 target = session.scalar(select(Memory).where(Memory.id == target_id))
                 if target is not None:
+                    invalid_at = utc_now()
                     target.status = "superseded"
-                    target.updated_at = utc_now()
+                    target.invalid_at = invalid_at
+                    target.updated_at = invalid_at
             session.commit()
 
     def lexical(

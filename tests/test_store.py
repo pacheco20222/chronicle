@@ -13,6 +13,36 @@ def test_repository_rows_are_project_and_type_scoped(service):
     assert [row["id"] for row in results] == [note_id]
 
 
+def test_new_memory_sets_valid_at_from_created_at(service):
+    memory_id = service.add_memory([1.0], "new memory", "p", "note")
+
+    row = service.repository.get(memory_id)
+    serialized = service.get_latest("p", "note")
+
+    assert row.valid_at is not None
+    assert row.valid_at == row.created_at
+    assert row.invalid_at is None
+    assert serialized["valid_at"] is not None
+    assert serialized["invalid_at"] is None
+
+
+def test_superseding_on_add_preserves_history_and_hides_old_memory(service):
+    old_id = service.add_memory([1.0], "old fact", "p", "note")
+    new_id = service.add_memory([1.0], "new fact", "p", "note", supersedes=old_id)
+
+    old = service.repository.get(old_id)
+
+    assert old is not None
+    assert old.status == "superseded"
+    assert old.invalid_at is not None
+    assert service.repository.get(old_id).id == old_id
+    search_ids = {row["id"] for row in service.search([1.0], "p", query_text="old fact")}
+    assert old_id not in search_ids
+    assert new_id in search_ids
+    assert service.get_latest("p", "note")["id"] == new_id
+    assert [row["id"] for row in service.get_recent("p", "note")] == [new_id]
+
+
 def test_latest_and_recent_use_created_at_and_hide_superseded(service):
     first = service.add_memory([1.0], "first checkpoint", "p", "checkpoint")
     second = service.add_memory([1.0], "second checkpoint", "p", "checkpoint")
@@ -38,7 +68,23 @@ def test_link_records_relation_and_supersedes_target(service):
     service.link_memories(source_id, "supersedes", target_id)
 
     assert service.repository.get(source_id).relations == [{"type": "supersedes", "target": target_id}]
-    assert service.repository.get(target_id).status == "superseded"
+    target = service.repository.get(target_id)
+    assert target.status == "superseded"
+    assert target.invalid_at is not None
+
+
+def test_set_status_sets_invalid_at_only_for_superseded_or_expired(service):
+    resolved_id = service.add_memory([1.0], "resolved", "p", "note")
+    expired_id = service.add_memory([1.0], "expired", "p", "note")
+    superseded_id = service.add_memory([1.0], "superseded", "p", "note")
+
+    service.set_status(resolved_id, "resolved")
+    service.set_status(expired_id, "expired")
+    service.set_status(superseded_id, "superseded")
+
+    assert service.repository.get(resolved_id).invalid_at is None
+    assert service.repository.get(expired_id).invalid_at is not None
+    assert service.repository.get(superseded_id).invalid_at is not None
 
 
 def test_link_requires_existing_source(service):
