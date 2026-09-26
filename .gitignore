@@ -3,6 +3,7 @@ __pycache__/
 *$py.class
 .venv
 .pytest_cache/
+.uv-cache/
 backups/
 mnemo-graph-*.html
 graphify-out/
