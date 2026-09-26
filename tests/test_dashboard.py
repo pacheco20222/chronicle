@@ -1,6 +1,6 @@
 from starlette.routing import Mount, Route
 
-from chronicle import cli, dashboard_cli, server
+from chronicle import cli, dashboard, dashboard_cli, server
 
 
 def test_dashboard_app_exposes_streamable_http_on_mcp_path():
@@ -45,6 +45,18 @@ def test_dashboard_graph_tool_reuses_existing_graph_builder(monkeypatch, service
     assert server.memory_dashboard_graph() == expected
     assert seen["records"] is records
     assert seen["kwargs"]["cross_project"] is False
+
+
+def test_build_snapshot_includes_scopes_for_frontend(service):
+    v = [0.1] * 768
+    service.set_document(v, "azure core", "work/azure", "work/azure", "overview")
+    service.add_memory(v, "note", "chronicle-test", "note")
+
+    snapshot = dashboard.build_snapshot(service)
+
+    assert "scopes" in snapshot["graph"]
+    paths = {s["path"] for s in snapshot["graph"]["scopes"]}
+    assert {"work", "work/azure", "chronicle-test"} <= paths
 
 
 def test_cli_dispatches_dashboard_subcommand(monkeypatch):

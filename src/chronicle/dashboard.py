@@ -83,6 +83,7 @@ def _chronicle_processes() -> list[dict]:
 def build_snapshot(service) -> dict:
     records = service.get_all_with_vectors()
     graph = graph_cli._build_graph_data(records, cross_project=False, current_project=None)
+    graph["scopes"] = service.scope_graph_nodes()
     paths_by_project = registry.list_projects()
     records_by_project: dict[str, list[dict]] = {}
     for record in records:
