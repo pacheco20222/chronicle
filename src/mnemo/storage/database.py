@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
@@ -19,8 +21,17 @@ class Database:
         )
         if url.startswith("sqlite"):
             event.listen(self.engine, "connect", self._enable_foreign_keys)
-        Base.metadata.create_all(self.engine)
+        self._run_migrations()
         self.session_factory = sessionmaker(self.engine, expire_on_commit=False)
+
+    def _run_migrations(self) -> None:
+        repository_root = Path(__file__).resolve().parents[3]
+        alembic_config = Config(str(repository_root / "alembic.ini"))
+        alembic_config.set_main_option("script_location", str(repository_root / "alembic"))
+        alembic_config.set_main_option("sqlalchemy.url", self.url)
+        with self.engine.connect() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
 
     @staticmethod
     def _enable_foreign_keys(dbapi_connection: Any, _connection_record: Any) -> None:

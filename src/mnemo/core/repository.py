@@ -2,13 +2,19 @@ from collections.abc import Iterable
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Select, select, update
+from sqlalchemy import Select, String, Text, column, select, table, text, update
 
 from mnemo.storage.database import Database
 from mnemo.storage.models import Memory, Source, utc_now
 
 
 HIDDEN_STATUSES = {"superseded", "deleted"}
+memory_fts = table("memory_fts", column("memory_id", String), column("content", Text))
+
+
+def _fts_phrase(query_text: str) -> str:
+    escaped = query_text.replace('"', '""')
+    return f'"{escaped}"'
 
 
 class MemoryRepository:
@@ -123,7 +129,11 @@ class MemoryRepository:
         limit: int,
         include_superseded: bool,
     ) -> list[Memory]:
-        statement: Select[tuple[Memory]] = select(Memory).where(Memory.content.ilike(f"%{query_text}%"))
+        statement: Select[tuple[Memory]] = (
+            select(Memory)
+            .join(memory_fts, memory_fts.c.memory_id == Memory.id)
+            .where(memory_fts.c.content.match(_fts_phrase(query_text)))
+        )
         if project is not None:
             statement = statement.where(Memory.project == project)
         if type_ is not None:
@@ -132,7 +142,7 @@ class MemoryRepository:
             statement = statement.where(Memory.status.not_in(HIDDEN_STATUSES))
         else:
             statement = statement.where(Memory.status != "deleted")
-        statement = statement.order_by(Memory.created_at.desc()).limit(limit)
+        statement = statement.order_by(text("bm25(memory_fts)"), Memory.created_at.desc()).limit(limit)
         with self.session_factory() as session:
             return list(session.scalars(statement).all())
 
