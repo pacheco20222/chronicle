@@ -62,6 +62,7 @@ class MemoryService:
         supersedes: str | None = None,
         confidence: float | None = None,
         extraction_method: str | None = None,
+        episode_id: str | None = None,
     ) -> str:
         project = _require_project(project)
         memory_id = str(uuid.uuid4())
@@ -75,6 +76,7 @@ class MemoryService:
             supersedes=supersedes,
             confidence=confidence,
             extraction_method=extraction_method,
+            episode_id=episode_id,
         )
         self.vector_index.upsert(memory_id, vector, {"project": project, "type": type_})
         return memory_id

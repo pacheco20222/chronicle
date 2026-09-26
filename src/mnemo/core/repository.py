@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import Select, String, Text, column, select, table, text, update
 
 from mnemo.storage.database import Database
-from mnemo.storage.models import Memory, Source, utc_now
+from mnemo.storage.models import Episode, Memory, Source, utc_now
 
 
 HIDDEN_STATUSES = {"superseded", "deleted", "wrong"}
@@ -41,13 +41,18 @@ class MemoryRepository:
         slug: str | None = None,
         confidence: float | None = None,
         extraction_method: str | None = None,
+        episode_id: str | None = None,
     ) -> Memory:
         project = _require_project(project)
         with self.session_factory() as session:
             source_id = None
             if source is not None:
-                source_row = Source(id=str(uuid.uuid4()), project=project, locator=source)
-                session.add(source_row)
+                source_row = session.scalar(
+                    select(Source).where(Source.project == project, Source.locator == source)
+                )
+                if source_row is None:
+                    source_row = Source(id=str(uuid.uuid4()), project=project, locator=source)
+                    session.add(source_row)
                 source_id = source_row.id
             created_at = utc_now()
             row = Memory(
@@ -59,6 +64,7 @@ class MemoryRepository:
                 created_at=created_at,
                 valid_at=created_at,
                 source_id=source_id,
+                episode_id=episode_id,
                 supersedes=supersedes,
                 slug=slug,
                 confidence=confidence,
@@ -75,6 +81,26 @@ class MemoryRepository:
                 )
             session.commit()
             return row
+
+    def create_episode(self, *, project: str, locator: str, title: str) -> Episode:
+        project = _require_project(project)
+        with self.session_factory() as session:
+            source_row = session.scalar(
+                select(Source).where(Source.project == project, Source.locator == locator)
+            )
+            if source_row is None:
+                source_row = Source(id=str(uuid.uuid4()), project=project, locator=locator)
+                session.add(source_row)
+                session.flush()
+            episode = Episode(
+                id=str(uuid.uuid4()),
+                project=project,
+                source_id=source_row.id,
+                title=title,
+            )
+            session.add(episode)
+            session.commit()
+            return episode
 
     def upsert_document(
         self,
@@ -144,6 +170,23 @@ class MemoryRepository:
         project = _require_project(project)
         with self.session_factory() as session:
             return session.scalar(select(Memory).where(Memory.project == project, Memory.slug == slug))
+
+    def get_active_by_source_locator(self, project: str, locator: str) -> Memory | None:
+        project = _require_project(project)
+        statement = (
+            select(Memory)
+            .join(Source, Memory.source_id == Source.id)
+            .where(
+                Memory.project == project,
+                Source.project == project,
+                Source.locator == locator,
+                Memory.status.not_in(HIDDEN_STATUSES),
+            )
+            .order_by(Memory.created_at.desc())
+            .limit(1)
+        )
+        with self.session_factory() as session:
+            return session.scalar(statement)
 
     def set_status(self, memory_id: str, status: str) -> None:
         with self.session_factory() as session:
