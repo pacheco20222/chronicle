@@ -12,6 +12,16 @@ class Base(DeclarativeBase):
     pass
 
 
+class Scope(Base):
+    __tablename__ = "scope"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("scope.id"), index=True)
+    path: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class Source(Base):
     __tablename__ = "source"
 
