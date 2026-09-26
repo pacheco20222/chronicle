@@ -4,11 +4,12 @@ from pathlib import Path
 from mnemo import registry
 
 QDRANT_URL = os.environ.get("MNEMO_QDRANT_URL", "http://localhost:6333")
+SQLITE_PATH = Path(os.environ.get("MNEMO_SQLITE_PATH", Path.home() / ".mnemo" / "mnemo.db")).expanduser()
 EMBED_MODEL = "nomic-ai/nomic-embed-text-v1.5"
 VECTOR_SIZE = 768
 COLLECTION_NAME = os.environ.get("MNEMO_COLLECTION", "memories")
 VALID_TYPES = frozenset({"decision", "architecture", "bug", "todo", "note", "checkpoint", "overview"})
-VALID_STATUSES = frozenset({"active", "resolved", "superseded"})
+VALID_STATUSES = frozenset({"active", "proposed", "resolved", "superseded", "expired", "deleted"})
 VALID_RELATION_TYPES = frozenset({"related_to", "supersedes", "caused_by", "blocked_by", "implements"})
 
 
@@ -32,6 +33,10 @@ def get_project() -> str:
         "(memory_register_project), or run `mnemo register --project X` "
         "yourself."
     )
+
+
+def sqlite_url() -> str:
+    return f"sqlite:///{SQLITE_PATH}"
 
 
 def validate_type(type_: str) -> None:

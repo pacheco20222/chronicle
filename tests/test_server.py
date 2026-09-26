@@ -1,11 +1,10 @@
-import os
 from pathlib import Path
 
 import anyio
 import pytest
 from fastmcp import Client
 
-from mnemo import config, embeddings, registry, server, store
+from mnemo import config, registry, server
 
 
 def test_memory_add_and_search_round_trip():
@@ -157,13 +156,12 @@ def test_server_instructions_cover_document_workflow():
     assert "memory_get_document" in server.mcp.instructions
 
 
-def test_memory_search_global_sees_other_projects():
-    client = store.get_client()
-    collection = os.environ["MNEMO_COLLECTION"]
-    other_id = store.add_memory(
-        client, embeddings.embed_text("cross-project global search probe"),
-        "cross-project global search probe", "a-totally-different-project", "note",
-        collection=collection,
+def test_memory_search_global_sees_other_projects(service):
+    other_id = service.add_memory(
+        [0.1] * 768,
+        "cross-project global search probe",
+        "a-totally-different-project",
+        "note",
     )
 
     results = server.memory_search_global("cross-project global search probe")

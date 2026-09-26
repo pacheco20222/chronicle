@@ -1,7 +1,7 @@
 import subprocess
 from collections import Counter
 
-from mnemo import config, graph_cli, registry, store
+from mnemo import config, graph_cli, registry
 
 
 def _docker_status() -> dict:
@@ -80,8 +80,8 @@ def _mnemo_processes() -> list[dict]:
     return processes
 
 
-def build_snapshot(client) -> dict:
-    records = store.get_all_with_vectors(client)
+def build_snapshot(service) -> dict:
+    records = service.get_all_with_vectors()
     graph = graph_cli._build_graph_data(records, cross_project=False, current_project=None)
     paths_by_project = registry.list_projects()
     records_by_project: dict[str, list[dict]] = {}
@@ -100,7 +100,7 @@ def build_snapshot(client) -> dict:
             {
                 "name": project,
                 "paths": paths_by_project.get(project, []),
-                "node_count": store.count_points(client, project=project),
+                "node_count": service.count(project),
                 "edge_count": len(project_graph["edges"]),
                 "type_counts": dict(sorted(Counter(r["type"] for r in project_records).items())),
             }
@@ -110,7 +110,7 @@ def build_snapshot(client) -> dict:
         qdrant = {
             "healthy": True,
             "collection": config.COLLECTION_NAME,
-            "point_count": store.count_points(client),
+            "point_count": len(records),
         }
     except Exception as exc:
         qdrant = {

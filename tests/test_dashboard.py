@@ -27,13 +27,13 @@ def test_dashboard_start_defaults_to_localhost_and_configurable_port(monkeypatch
     assert calls["lifespan"] == "on"
 
 
-def test_dashboard_graph_tool_reuses_existing_graph_builder(monkeypatch):
+def test_dashboard_graph_tool_reuses_existing_graph_builder(monkeypatch, service):
     records = [{"id": "a", "project": "p", "type": "note", "content": "x", "vector": [1.0]}]
     expected = {"nodes": [], "edges": []}
     seen = {}
 
-    monkeypatch.setattr(server, "_get_client", lambda: object())
-    monkeypatch.setattr(server.store, "get_all_with_vectors", lambda client, project=None: records)
+    monkeypatch.setattr(service, "get_all_with_vectors", lambda project=None: records)
+    monkeypatch.setattr(server, "_get_service", lambda: service)
 
     def fake_build(records_arg, **kwargs):
         seen["records"] = records_arg

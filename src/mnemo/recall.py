@@ -1,13 +1,13 @@
 import os
 from pathlib import Path
 
-from mnemo import config, registry, store
+from mnemo import config, registry
+from mnemo.core.runtime import get_runtime
 
 
 def latest_checkpoint(project: str) -> str | None:
     try:
-        client = store.get_client()
-        record = store.get_latest(client, project, "checkpoint")
+        record = get_runtime().get_latest(project, "checkpoint")
     except Exception:
         # Deliberately fail open: a down Qdrant must never block session
         # start. Unlike config.get_project(), this isn't a security
@@ -24,8 +24,7 @@ def latest_checkpoint(project: str) -> str | None:
 
 def overview_document(project: str) -> str | None:
     try:
-        client = store.get_client()
-        record = store.get_document(client, project, project)
+        record = get_runtime().get_document(project, project)
     except Exception:
         # Same fail-open rationale as latest_checkpoint.
         return None

@@ -1,8 +1,6 @@
-import os
-
 import pytest
 
-from mnemo import embeddings, import_cli, store
+from mnemo import embeddings, import_cli
 
 
 def test_chunk_text_single_chunk_for_short_text():
@@ -26,17 +24,13 @@ def test_chunk_text_empty_text_returns_no_chunks():
     assert import_cli._chunk_text("") == []
 
 
-def test_import_main_creates_memories_from_file(tmp_path):
+def test_import_main_creates_memories_from_file(tmp_path, service):
     file_path = tmp_path / "test_import.md"
     file_path.write_text("First paragraph about the test project.\n\nSecond paragraph with more detail.")
 
     import_cli.main([str(file_path), "--project", "mnemo-test", "--type", "note"])
 
-    client = store.get_client()
-    results = store.search_memory(
-        client, embeddings.embed_text("test project"), "mnemo-test",
-        collection=os.environ["MNEMO_COLLECTION"],
-    )
+    results = service.search(embeddings.embed_text("test project"), "mnemo-test")
     assert any("First paragraph about the test project" in r["content"] for r in results)
 
 

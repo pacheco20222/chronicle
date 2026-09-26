@@ -1,105 +1,16 @@
 import argparse
-import math
 import time
 import webbrowser
 from pathlib import Path
 
-from mnemo import config, store
-
-K_NEIGHBORS = 3
-MIN_SIMILARITY = 0.3
-
-
-def _cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(x * x for x in b))
-    return dot / (na * nb) if na and nb else 0.0
-
-
-def _build_graph_data(
-    records: list[dict],
-    k: int = K_NEIGHBORS,
-    cross_project: bool = False,
-    min_similarity: float = MIN_SIMILARITY,
-    current_project: str | None = None,
-) -> dict:
-    n = len(records)
-    sim = [[0.0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                sim[i][j] = _cosine(records[i]["vector"], records[j]["vector"])
-
-    edge_set = set()
-    for i in range(n):
-        candidates = [
-            j
-            for j in range(n)
-            if j != i
-            and (cross_project or records[j]["project"] == records[i]["project"])
-            and sim[i][j] >= min_similarity
-        ]
-        neighbors = sorted(candidates, key=lambda j: -sim[i][j])[:k]
-        for j in neighbors:
-            edge_set.add(tuple(sorted((i, j))))
-
-    latest_checkpoint = {}
-    for r in records:
-        if r["type"] == "checkpoint" and r.get("created_at", "") > latest_checkpoint.get(r["project"], ("", ""))[0]:
-            latest_checkpoint[r["project"]] = (r.get("created_at", ""), r["id"])
-
-    def _role(r: dict) -> str:
-        if r["type"] == "overview" or (r.get("slug") and r.get("slug") == r["project"]):
-            return "core"
-        if latest_checkpoint.get(r["project"], ("", None))[1] == r["id"]:
-            return "latest"
-        return ""
-
-    nodes = [
-        {
-            "id": r["id"],
-            "project": r["project"],
-            "type": r["type"],
-            "content": r["content"],
-            "slug": r.get("slug"),
-            "created_at": r.get("created_at"),
-            "status": r.get("status") or "active",
-            "role": _role(r),
-        }
-        for r in records
-    ]
-    edges = [
-        {"source": records[i]["id"], "target": records[j]["id"], "sim": round(sim[i][j], 3), "kind": "semantic"}
-        for i, j in edge_set
-    ]
-
-    id_to_index = {r["id"]: idx for idx, r in enumerate(records)}
-    for r in records:
-        for rel in _explicit_relations(r):
-            target = rel.get("target")
-            if target not in id_to_index or target == r["id"]:
-                continue
-            edges.append(
-                {
-                    "source": r["id"],
-                    "target": target,
-                    "sim": 0.8,
-                    "kind": "explicit",
-                    "relation": rel.get("type"),
-                }
-            )
-
-    return {"nodes": nodes, "edges": edges, "k": k, "current_project": current_project}
-
-
-def _explicit_relations(record: dict) -> list[dict]:
-    relations = list(record.get("relations") or [])
-    supersedes = record.get("supersedes")
-    if supersedes and not any(r.get("type") == "supersedes" and r.get("target") == supersedes for r in relations):
-        relations.append({"type": "supersedes", "target": supersedes})
-    return relations
-
+from mnemo import config
+from mnemo.core.graph import (
+    K_NEIGHBORS,
+    MIN_SIMILARITY,
+    build_graph_data as _build_graph_data,
+    cosine as _cosine,
+)
+from mnemo.core.runtime import get_runtime
 
 def _render_html(graph: dict) -> str:
     import json
@@ -139,8 +50,7 @@ def main(argv: list[str]) -> None:
         except RuntimeError:
             default_focus = None
 
-    client = store.get_client()
-    records = store.get_all_with_vectors(client, project=project)
+    records = get_runtime().get_all_with_vectors(project=project)
 
     if len(records) < 2:
         print("Need at least 2 memories to build a graph.")

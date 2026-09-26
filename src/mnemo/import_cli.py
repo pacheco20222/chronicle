@@ -1,6 +1,7 @@
 import argparse
 
-from mnemo import config, embeddings, store
+from mnemo import config, embeddings
+from mnemo.core.runtime import get_runtime
 
 
 def _chunk_text(text: str, max_chars: int = 24000) -> list[str]:
@@ -35,12 +36,11 @@ def main(argv: list[str]) -> None:
         text = f.read()
 
     chunks = _chunk_text(text)
-    client = store.get_client()
-    store.ensure_collection(client)
+    service = get_runtime()
 
     for i, chunk in enumerate(chunks, start=1):
         vector = embeddings.embed_text(chunk)
         source = f"{args.file} (chunk {i}/{len(chunks)})" if len(chunks) > 1 else args.file
-        store.add_memory(client, vector, chunk, args.project, args.type_, source=source)
+        service.add_memory(vector, chunk, args.project, args.type_, source=source)
 
     print(f"Imported {len(chunks)} memories from {args.file} into project '{args.project}'")

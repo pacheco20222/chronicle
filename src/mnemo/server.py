@@ -2,7 +2,8 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from mnemo import config, dashboard, embeddings, graph_cli, registry, store
+from mnemo import config, dashboard, embeddings, graph_cli, registry
+from mnemo.core.runtime import get_runtime
 
 mcp = FastMCP(
     "mnemo",
@@ -63,15 +64,14 @@ mcp = FastMCP(
     ),
 )
 
-_client = None
+_service = None
 
 
-def _get_client():
-    global _client
-    if _client is None:
-        _client = store.get_client()
-        store.ensure_collection(_client)
-    return _client
+def _get_service():
+    global _service
+    if _service is None:
+        _service = get_runtime()
+    return _service
 
 
 @mcp.tool
@@ -79,21 +79,21 @@ def memory_add(content: str, type: str, supersedes: str | None = None) -> dict:
     project = config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
-    memory_id = store.add_memory(_get_client(), vector, content, project, type, supersedes=supersedes)
+    memory_id = _get_service().add_memory(vector, content, project, type, supersedes=supersedes)
     return {"id": memory_id, "project": project, "type": type, "content": content, "supersedes": supersedes}
 
 
 @mcp.tool
 def memory_set_status(memory_id: str, status: str) -> dict:
     config.validate_status(status)
-    store.set_status(_get_client(), memory_id, status)
+    _get_service().set_status(memory_id, status)
     return {"id": memory_id, "status": status}
 
 
 @mcp.tool
 def memory_link(source_id: str, relation_type: str, target_id: str) -> dict:
     config.validate_relation_type(relation_type)
-    store.link_memories(_get_client(), source_id, relation_type, target_id)
+    _get_service().link_memories(source_id, relation_type, target_id)
     return {"source_id": source_id, "relation_type": relation_type, "target_id": target_id}
 
 
@@ -102,15 +102,15 @@ def memory_search(query: str, type: str | None = None, k: int = 5) -> list[dict]
     project = config.get_project()
     if type == "checkpoint":
         # Checkpoints are a timeline, not a topic: newest first, query ignored.
-        return store.get_recent(_get_client(), project, "checkpoint", k=k)
+        return _get_service().get_recent(project, "checkpoint", k=k)
     vector = embeddings.embed_text(query)
-    return store.search_memory(_get_client(), vector, project, query_text=query, type_=type, k=k)
+    return _get_service().search(vector, project, query_text=query, type_=type, k=k)
 
 
 @mcp.tool
 def memory_search_global(query: str, type: str | None = None, k: int = 5) -> list[dict]:
     vector = embeddings.embed_text(query)
-    return store.search_memory_global(_get_client(), vector, query_text=query, type_=type, k=k)
+    return _get_service().search_global(vector, query_text=query, type_=type, k=k)
 
 
 @mcp.tool
@@ -118,21 +118,21 @@ def memory_set_document(slug: str, content: str, type: str) -> dict:
     project = config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
-    doc_id = store.set_document(_get_client(), vector, content, project, slug, type)
+    doc_id = _get_service().set_document(vector, content, project, slug, type)
     return {"id": doc_id, "project": project, "slug": slug, "type": type, "content": content}
 
 
 @mcp.tool
 def memory_get_document(slug: str) -> dict | None:
     project = config.get_project()
-    return store.get_document(_get_client(), project, slug)
+    return _get_service().get_document(project, slug)
 
 
 @mcp.tool
 def memory_get_latest(type: str) -> dict | None:
     project = config.get_project()
     config.validate_type(type)
-    return store.get_latest(_get_client(), project, type)
+    return _get_service().get_latest(project, type)
 
 
 @mcp.tool
@@ -152,7 +152,7 @@ def memory_dashboard_graph(
     k: int = graph_cli.K_NEIGHBORS,
     min_similarity: float = graph_cli.MIN_SIMILARITY,
 ) -> dict:
-    records = store.get_all_with_vectors(_get_client(), project=project)
+    records = _get_service().get_all_with_vectors(project=project)
     return graph_cli._build_graph_data(
         records,
         k=k,
@@ -164,7 +164,7 @@ def memory_dashboard_graph(
 
 @mcp.tool
 def memory_dashboard_snapshot() -> dict:
-    return dashboard.build_snapshot(_get_client())
+    return dashboard.build_snapshot(_get_service())
 
 
 def main() -> None:

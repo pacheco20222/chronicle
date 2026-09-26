@@ -1,10 +1,9 @@
 import json
 import math
-import os
-
 import pytest
+from types import SimpleNamespace
 
-from mnemo import embeddings, graph_cli, store
+from mnemo import graph_cli
 
 
 def test_cosine_identical_vectors_is_one():
@@ -127,16 +126,13 @@ def test_render_html_embeds_graph_json():
     assert json.dumps(graph, ensure_ascii=False) in html
 
 
-def test_main_writes_html_file_and_opens_browser(tmp_path, monkeypatch):
-    client = store.get_client()
-    collection = os.environ["MNEMO_COLLECTION"]
-    store.ensure_collection(client, collection)
-    store.add_memory(client, embeddings.embed_text("graph cli test alpha"), "graph cli test alpha", "mnemo-test", "note", collection=collection)
-    store.add_memory(client, embeddings.embed_text("graph cli test beta"), "graph cli test beta", "mnemo-test", "note", collection=collection)
+def test_main_writes_html_file_and_opens_browser(tmp_path, monkeypatch, service):
+    service.add_memory([1.0, 0.0], "graph cli test alpha", "mnemo-test", "note")
+    service.add_memory([0.9, 0.1], "graph cli test beta", "mnemo-test", "note")
 
     opened = []
     monkeypatch.setattr(graph_cli.webbrowser, "open", lambda uri: opened.append(uri))
-    monkeypatch.setattr(graph_cli.config, "COLLECTION_NAME", collection)
+    monkeypatch.setattr(graph_cli, "get_runtime", lambda: service)
 
     out_path = tmp_path / "graph.html"
     graph_cli.main(["--project", "mnemo-test", "--out", str(out_path)])
@@ -159,11 +155,12 @@ def test_main_without_project_or_all_uses_current_project(monkeypatch):
     monkeypatch.setenv("MNEMO_PROJECT", "env-project")
     seen = {}
 
-    def fake_get_all_with_vectors(client, project=None):
+    def fake_get_all_with_vectors(project=None):
         seen["project"] = project
         return []
 
-    monkeypatch.setattr(graph_cli.store, "get_all_with_vectors", fake_get_all_with_vectors)
+    runtime = SimpleNamespace(get_all_with_vectors=fake_get_all_with_vectors)
+    monkeypatch.setattr(graph_cli, "get_runtime", lambda: runtime)
     graph_cli.main([])
     assert seen["project"] == "env-project"
 
@@ -172,11 +169,12 @@ def test_main_with_all_flag_ignores_current_project(monkeypatch):
     monkeypatch.setenv("MNEMO_PROJECT", "env-project")
     seen = {}
 
-    def fake_get_all_with_vectors(client, project=None):
+    def fake_get_all_with_vectors(project=None):
         seen["project"] = project
         return []
 
-    monkeypatch.setattr(graph_cli.store, "get_all_with_vectors", fake_get_all_with_vectors)
+    runtime = SimpleNamespace(get_all_with_vectors=fake_get_all_with_vectors)
+    monkeypatch.setattr(graph_cli, "get_runtime", lambda: runtime)
     graph_cli.main(["--all"])
     assert seen["project"] is None
 
