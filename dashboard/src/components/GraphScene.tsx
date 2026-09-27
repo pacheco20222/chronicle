@@ -195,57 +195,55 @@ function ProjectLabel({ cluster }: { cluster: Cluster }) {
 }
 
 /* The scope-hierarchy signature element: a scope with children renders as
- * a quasar beacon — an intensely bright, pulsing core — rather than a dark
- * occluding body. A dark sphere against this scene's near-black ground has
- * almost no presence; everything else here reads by being luminous, so the
- * "this holds a lot" signal has to be luminous too. Children of any kind
- * (sub-scopes or leaf projects) orbit it via useScopeLayout and are joined
- * to it by a plain orbit line (see ScopeOrbitLine) — a real structural
- * connector, not a glow effect standing in for one. A leaf project scope
- * with no children renders no beacon here at all — it's still just its
- * existing star cluster. */
+ * a red giant — a big, soft, warm-colored star — rather than a dark
+ * occluding body or a hard-edged ring (an earlier pass added a bright
+ * equatorial ring, which read as "planet with rings," not "star"; dropped
+ * entirely). Built from layered spheres and glow sprites the way real
+ * astrophoto renderings of a red giant look: a hot small core, a large
+ * warm-orange visible disk, and a big, slowly-pulsing soft corona — no ring
+ * geometry anywhere. Children of any kind (sub-scopes or leaf projects)
+ * orbit it via useScopeLayout and are joined to it by a plain orbit line
+ * (see ScopeOrbitLine) that targets each child's own core-memory marker
+ * when it has one, not an empty point in space. A leaf project scope with
+ * no children renders no beacon here at all — it's still just its existing
+ * star cluster. */
 function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; onSelect: (scope: ScopeNode) => void }) {
-  const pulseRef = useRef<THREE.SpriteMaterial>(null);
+  const coronaRef = useRef<THREE.SpriteMaterial>(null);
   const seed = useMemo(() => (position.x + position.y + position.z) * 3.7, [position]);
+  const baseCoronaOpacity = scope.core_present ? 0.5 : 0.34;
 
   useFrame((state) => {
-    if (!pulseRef.current) return;
-    pulseRef.current.opacity = 0.72 + Math.sin(state.clock.elapsedTime * 1.6 + seed) * 0.22;
+    if (!coronaRef.current) return;
+    coronaRef.current.opacity = baseCoronaOpacity + Math.sin(state.clock.elapsedTime * 1.1 + seed) * 0.09;
   });
 
   if (!isBlackHole) return null;
 
   return (
     <group position={position} onPointerDown={(event) => { event.stopPropagation(); onSelect(scope); }}>
-      {/* soft outer halo */}
-      <sprite scale={[radius * 4.4, radius * 4.4, 1]}>
-        <spriteMaterial map={getGlowTexture()} color={BRASS} transparent opacity={0.34} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      {/* soft pulsing corona — a red giant's diffuse outer atmosphere */}
+      <sprite scale={[radius * 4.8, radius * 4.8, 1]}>
+        <spriteMaterial ref={coronaRef} map={getGlowTexture()} color="#ff8f57" transparent opacity={baseCoronaOpacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
-      {/* pulsing white-hot core */}
-      <sprite scale={[radius * 1.85, radius * 1.85, 1]}>
-        <spriteMaterial ref={pulseRef} map={getGlowTexture()} color="#fff3d6" transparent opacity={0.88} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <sprite scale={[radius * 2.5, radius * 2.5, 1]}>
+        <spriteMaterial map={getGlowTexture()} color="#ffb27a" transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
+      {/* main visible disk — this is the star's actual body */}
       <mesh renderOrder={1}>
-        <sphereGeometry args={[radius * 0.36, 20, 14]} />
-        <meshBasicMaterial color="#fff8ea" toneMapped={false} />
+        <sphereGeometry args={[radius * 0.65, 24, 18]} />
+        <meshBasicMaterial color="#e8703a" toneMapped={false} />
       </mesh>
-      {/* bright energetic equatorial ring (never dark — glowing, additive) */}
-      <mesh rotation={[Math.PI / 2.15, 0, 0]}>
-        <torusGeometry args={[radius * 1.15, radius * 0.06, 10, 48]} />
-        <meshBasicMaterial color={BRASS_BRIGHT} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      {/* hot inner core, off-white, peeking through the disk's center */}
+      <mesh renderOrder={2}>
+        <sphereGeometry args={[radius * 0.32, 20, 14]} />
+        <meshBasicMaterial color="#fff3d6" toneMapped={false} />
       </mesh>
-      {scope.core_present && (
-        <sprite scale={[radius * 2.2, radius * 2.2, 1]}>
-          <spriteMaterial map={getGlowTexture()} color={BRASS} transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      {scope.linked_doc_count > 0 && (
+        <sprite position={[radius * 1.4, radius * 0.75, radius * 0.3]} scale={[radius * 0.55, radius * 0.55, 1]}>
+          <spriteMaterial map={getGlowTexture()} color={SEMANTIC} transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </sprite>
       )}
-      {scope.linked_doc_count > 0 && (
-        <mesh rotation={[Math.PI / 2.15 + Math.PI / 5, Math.PI / 7, 0]}>
-          <torusGeometry args={[radius * 1.45, radius * 0.026, 8, 40]} />
-          <meshBasicMaterial color={SEMANTIC} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-        </mesh>
-      )}
-      <Html position={[0, radius * 1.15 + 0.5, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
+      <Html position={[0, radius * 1.5, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
         {scope.name}
       </Html>
     </group>
@@ -278,7 +276,7 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
   const shape = getNodeSphere();
   const statusOpacity = STATUS_OPACITY[node.status] || STATUS_OPACITY.active;
   const significance = 0.68 + Math.min(degree, 8) * 0.04;
-  const roleScale = node.role === "core" ? 2.1 : node.role === "latest" ? 1.12 : 1;
+  const roleScale = node.role === "core" ? 3.2 : node.role === "latest" ? 1.12 : 1;
   const scale = significance * roleScale * (node.status === "superseded" ? 0.82 : node.status === "resolved" ? 0.92 : 1);
   const color = colorForType(node.type);
   const label = useMemo(() => roleLabel(node), [node]);
@@ -298,19 +296,12 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
       <mesh geometry={shape} scale={scale}>
         <meshBasicMaterial ref={materialRef} color={color} transparent opacity={statusOpacity} toneMapped={false} />
       </mesh>
-      {node.role === "core" && <>
-        <mesh rotation={[Math.PI / 2, 0, 0]} scale={1.35 * scale}>
-          <torusGeometry args={[0.13, 0.018, 8, 24]} />
-          <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} toneMapped={false} />
-        </mesh>
-        {/* wider outer halo ring, exclusive to the project's own core, so it
-         * reads as distinctly bigger than the single-ring "latest" marker
-         * rather than a slightly-larger version of the same signature. */}
-        <mesh rotation={[Math.PI / 2, 0, Math.PI / 6]} scale={1.85 * scale}>
-          <torusGeometry args={[0.13, 0.01, 8, 24]} />
-          <meshBasicMaterial color={BRASS_BRIGHT} transparent opacity={0.5} toneMapped={false} />
-        </mesh>
-      </>}
+      {/* Distinctiveness comes from scale (roleScale 3.2x vs. latest's
+       * 1.12x) and a thicker single ring, not from stacking more rings. */}
+      {node.role === "core" && <mesh rotation={[Math.PI / 2, 0, 0]} scale={1.35 * scale}>
+        <torusGeometry args={[0.13, 0.024, 8, 24]} />
+        <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} toneMapped={false} />
+      </mesh>}
       {node.role === "latest" && <mesh rotation={[Math.PI / 2.3, 0, Math.PI / 4]} scale={1.35 * scale}>
         <torusGeometry args={[0.13, 0.01, 8, 24]} />
         <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.85} toneMapped={false} />
@@ -395,6 +386,15 @@ function RelationArrow({ source, target, highlighted, focusActive }: { source: T
 
 function GraphObjects({ layout, clusters, edges, scopePositions, selectedId, onSelect, onSelectScope }: { layout: LayoutNode[]; clusters: Cluster[]; edges: GraphEdge[]; scopePositions: Map<string, ScopePosition>; selectedId: string | null; onSelect: (node: GraphNode) => void; onSelectScope: (scope: ScopeNode) => void }) {
   const positionById = useMemo(() => new Map(layout.map((node) => [node.id, node.position])), [layout]);
+  /* A project's core memory is stored keyed by its bare name (see the
+   * backend's own scope_graph_nodes fallback for why), same as scope.name
+   * for a reparented leaf project — so this is the same lookup key an
+   * orbit line needs to land on the actual core marker instead of the
+   * cluster's empty fibonacci-computed centroid. */
+  const coreNodeByProjectName = useMemo(
+    () => new Map(layout.filter((node) => node.role === "core").map((node) => [node.project, node.position])),
+    [layout],
+  );
   const connectedIds = useMemo(() => {
     if (!selectedId) return new Set<string>();
     const ids = new Set([selectedId]);
@@ -411,9 +411,10 @@ function GraphObjects({ layout, clusters, edges, scopePositions, selectedId, onS
     {[...scopePositions.entries()].map(([path, scopePosition]) => {
       const parentPath = scopePosition.scope.parent_path;
       const parentPosition = parentPath ? scopePositions.get(parentPath)?.position : undefined;
+      const lineTarget = coreNodeByProjectName.get(scopePosition.scope.name) ?? scopePosition.position;
       return (
         <group key={`scope-${path}`}>
-          {parentPosition && <ScopeOrbitLine from={parentPosition} to={scopePosition.position} />}
+          {parentPosition && <ScopeOrbitLine from={parentPosition} to={lineTarget} />}
           <ScopeBody scope={scopePosition.scope} position={scopePosition.position} radius={scopePosition.radius} isBlackHole={scopePosition.isBlackHole} onSelect={onSelectScope} />
         </group>
       );
