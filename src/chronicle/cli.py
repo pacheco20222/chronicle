@@ -26,6 +26,12 @@ def main() -> None:
         register_main(sys.argv[2:])
         return
 
+    if len(sys.argv) > 1 and sys.argv[1] == "scope":
+        from chronicle.scope_cli import main as scope_main
+
+        scope_main(sys.argv[2:])
+        return
+
     if len(sys.argv) > 1 and sys.argv[1] == "dashboard":
         from chronicle.dashboard_cli import main as dashboard_main
 

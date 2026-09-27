@@ -76,7 +76,7 @@ installs a plugin's code once, machine-wide. Use
 on for an already-installed plugin.
 
 This covers the Claude Code side only; Codex still needs the one-time
-server setup in [§5](#5-codex) below, since Codex has no
+server setup in [§6](#6-codex) below, since Codex has no
 plugin/marketplace system of its own. Codex still needs each folder
 registered too, same as Claude Code — but it reads the same shared
 registry, so if you already registered a folder via
@@ -192,7 +192,36 @@ If a `.claude/settings.json` already exists in that repo, add the
 `"hooks"` key alongside whatever's already there rather than replacing
 the file.
 
-### 4. Cursor
+### 4. Claude Desktop
+
+Claude Desktop uses the same `mcpServers` JSON shape, in its
+`claude_desktop_config.json` file (on macOS, usually
+`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "chronicle": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/chronicle", "run", "chronicle"],
+      "env": {
+        "CHRONICLE_PROJECT": "your-project-name"
+      }
+    }
+  }
+}
+```
+
+Claude Desktop chat has no working directory / registered folder concept at
+all. For one ongoing topic, you can pin one fixed `CHRONICLE_PROJECT` in
+this Desktop config entry. For a chat that ranges across several unrelated
+things (for example, reviewing docs or notes from different personal
+projects in one conversation), do not rely on `CHRONICLE_PROJECT`; tell
+Claude which `scope_path` to use per message instead. Every memory tool
+accepts that explicit scope override, so it works without any folder
+registration.
+
+### 5. Cursor
 
 Cursor's MCP config is the same `mcpServers` JSON shape as Claude
 Code's, just a different file: `.cursor/mcp.json` at the root of
@@ -234,7 +263,7 @@ checkpoint instead of the actual newest one. Wire up your own
 equivalent of Cursor's session-start behavior, if it has one in your
 version, to make this automatic instead of asked-for.
 
-### 5. Codex
+### 6. Codex
 
 Codex's MCP configuration is global (`~/.codex/config.toml`), not a
 per-repo file like Claude Code's `.mcp.json` — but Codex *does* launch
@@ -290,7 +319,7 @@ works automatically too, since resolution happens per-invocation from
 each session's own working directory — there's no shared state between
 them beyond the registry file both read from.
 
-### 6. Running `chronicle`'s other commands (import, graph)
+### 7. Running `chronicle`'s other commands (import, graph)
 
 `chronicle import` and `chronicle graph` aren't called by Claude Code or
 Codex — you run these yourself, directly. Like every `uv run chronicle`
@@ -327,7 +356,7 @@ anything, writes a self-contained HTML file (`--out path.html` to
 control where — defaults to your current directory), and opens it in
 your default browser automatically.
 
-### 7. Windows
+### 8. Windows
 
 Two real options, same as always — pick one, don't mix them for the
 same install:
@@ -360,10 +389,10 @@ except two things:
   `-ExecutionPolicy Bypass` is scoped to just this scheduled task —
   it doesn't change your system-wide PowerShell execution policy.
 
-`chronicle import` and `chronicle graph` (§5 above) need nothing extra on
+`chronicle import` and `chronicle graph` (§6 above) need nothing extra on
 Windows — both are plain, cross-platform Python: `chronicle graph`'s
 browser-opening and `chronicle import`'s file reading have no OS-specific
-code path to work around. The same `cd` / `--directory` rule from §5
+code path to work around. The same `cd` / `--directory` rule from §6
 applies exactly as written.
 
 #### MCP connects, but the first memory tool fails
@@ -389,7 +418,7 @@ memory tool. If the command above reports an error, fix that error and
 run it again; a failed initialization leaves the model uninitialized, so
 the next call retries it.
 
-### 8. Verify it worked
+### 9. Verify it worked
 
 This is just seeding one test memory so there's something to recall —
 on a fresh install the collection is empty, so say anything you like.

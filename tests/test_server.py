@@ -344,6 +344,10 @@ def test_server_instructions_cover_global_search_scope():
     assert "memory_search_global" in server.mcp.instructions
     assert "every project" in server.mcp.instructions
     assert "max_tokens" in server.mcp.instructions
+    assert "scope_path" in server.mcp.instructions
+    assert "few lines" in server.mcp.instructions
+    assert "memory_scope_reparent" in server.mcp.instructions
+    assert "explicitly asks" in server.mcp.instructions
 
 
 def test_search_tools_accept_optional_token_budget():
