@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "chronicle",
-      "description": "Adds memory_add/memory_search, checkpoint/resume, and named documents to Claude Code and Codex, backed by your own local Qdrant + fastembed.",
+      "description": "Adds memory_add/memory_search, checkpoint/resume, named documents, and a hierarchical scope tree to Claude Code and Codex, backed by your own local SQLite + Qdrant + fastembed.",
       "source": "./",
       "category": "productivity"
     }

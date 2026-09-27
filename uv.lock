@@ -351,6 +351,39 @@ wheels = [
 ]
 
 [[package]]
+name = "chronicle"
+version = "3.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "fastembed" },
+    { name = "fastmcp" },
+    { name = "qdrant-client" },
+    { name = "sqlalchemy" },
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = "==1.16.4" },
+    { name = "fastembed", specifier = ">=0.8.0" },
+    { name = "fastmcp", specifier = ">=3.4.7" },
+    { name = "qdrant-client", specifier = ">=1.19.0" },
+    { name = "sqlalchemy", specifier = "==2.0.43" },
+    { name = "starlette", specifier = ">=1.6.0" },
+    { name = "uvicorn", specifier = ">=0.52.4" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.1.1" }]
+
+[[package]]
 name = "click"
 version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1253,39 +1286,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/03/73/5f5d7a5c0bad6ae5568e3232d8b7bcee9639da0de45f8e664342f22bf682/mmh3-5.3.0-cp315-cp315t-win_amd64.whl", hash = "sha256:1617be1ce93f97513bbf23cafa28a6ab1d20b0928de760054a4c603a89bdab7c", size = 43152, upload-time = "2026-08-26T04:58:17.706Z" },
     { url = "https://files.pythonhosted.org/packages/a2/0a/033fef3d7a486aa369ec11cdf0455bbae6640df13491f6e7d35fd90aa000/mmh3-5.3.0-cp315-cp315t-win_arm64.whl", hash = "sha256:a8389010a2721e568fbe40ba94e7d8f931beabd59b95af2b2ab8238fd40a6b3e", size = 40275, upload-time = "2026-08-26T04:58:18.883Z" },
 ]
-
-[[package]]
-name = "chronicle"
-version = "3.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "fastembed" },
-    { name = "fastmcp" },
-    { name = "qdrant-client" },
-    { name = "sqlalchemy" },
-    { name = "starlette" },
-    { name = "uvicorn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = "==1.16.4" },
-    { name = "fastembed", specifier = ">=0.8.0" },
-    { name = "fastmcp", specifier = ">=3.4.7" },
-    { name = "qdrant-client", specifier = ">=1.19.0" },
-    { name = "sqlalchemy", specifier = "==2.0.43" },
-    { name = "starlette", specifier = ">=1.6.0" },
-    { name = "uvicorn", specifier = ">=0.52.4" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]
 
 [[package]]
 name = "more-itertools"

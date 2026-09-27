@@ -10,6 +10,14 @@ locally on CPU and installs the same way `uv sync` installs every
 other Python dependency here. The model itself (~500MB) downloads
 automatically, once, the first time you save a memory.
 
+**Where your data lives:** every registered project's memories live in
+one SQLite file, `~/.chronicle/chronicle.db` — that's the canonical
+store. Docker/Qdrant only holds a derived vector index used for
+semantic search; deleting and rebuilding it loses nothing durable, but
+`~/.chronicle/chronicle.db` itself is not something today's backup
+scripts cover (see [docs/ARCHITECTURE.md § Backups](ARCHITECTURE.md#backups))
+— copy that file directly if you want a real backup.
+
 ## Option A: Plugin install (recommended for Claude Code)
 
 Inside Claude Code, in whichever repo you want Chronicle available in:
@@ -319,10 +327,18 @@ works automatically too, since resolution happens per-invocation from
 each session's own working directory — there's no shared state between
 them beyond the registry file both read from.
 
-### 7. Running `chronicle`'s other commands (import, graph)
+### 7. Running `chronicle`'s other commands (import, graph, dashboard, scope)
 
-`chronicle import` and `chronicle graph` aren't called by Claude Code or
-Codex — you run these yourself, directly. Like every `uv run chronicle`
+`chronicle import`, `chronicle graph`, `chronicle dashboard`, and `chronicle
+scope` aren't called by Claude Code or Codex — you run these yourself,
+directly. `chronicle dashboard start` opens a persistent local 3D memory
+explorer (`--background` to keep it running, `stop` to stop it,
+`127.0.0.1:8765` by default). `chronicle scope create <path>` / `chronicle
+scope list [--prefix]` / `chronicle scope move <path> --to <parent>`
+manage the scope hierarchy from a terminal — the same thing
+`memory_list_scopes`/`memory_scope_reparent` do from inside a session. See
+[docs/ARCHITECTURE.md](ARCHITECTURE.md) for what the hierarchy and
+dashboard actually do. Like every `uv run chronicle`
 invocation, `uv` needs to find chronicle's own code, either by cwd or by
 `--directory`:
 

@@ -13,11 +13,11 @@ another repo's memory by accident.
 - **`memory_add` / `memory_search`** — write and recall memories, hard-scoped to the current project.
 - **Checkpoint/resume** — say "checkpoint this" before a long session ends; it's recalled automatically the next time you start one.
 - **Named documents** — a project overview or running dev log that updates in place instead of piling up, also auto-loaded every session.
+- **Hierarchical scopes** — group related projects under a shared parent (e.g. `personal_projects/heliofi/heliofi_backend`) with `memory_list_scopes`/`memory_scope_reparent`, or `chronicle scope create/list/move` from a terminal. Reorganizing is always something you ask for, never automatic — a project's own memories stay keyed to it regardless of where it's filed in the tree.
 - **`memory_search_global`** — the one explicit, deliberate escape hatch for a genuinely cross-project question.
-- **`chronicle import`** — bulk-load an existing file into a project's memory. Run yourself, from a terminal — see [docs/INSTALL.md §6](docs/INSTALL.md#6-running-chronicles-other-commands-import-graph).
+- **`chronicle import`** — bulk-load an existing file (or a whole directory of `.md`/`.txt` files) into a project's memory, chunking large files instead of truncating them. Run yourself, from a terminal — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope).
 - **`chronicle graph`** — a real, embedding-similarity graph of your memories, rendered as a glowing 3D network you can orbit and zoom (core memory = gold ring, latest checkpoint = diamond; filter by project, search, or show only key memories), locally and opened in your browser. Scoped to the current project by default, same as everything else; `--all` graphs every project together, deliberately. Same terminal invocation as `import` above.
-
-- **`chronicle dashboard`** — a local React/Three.js memory dashboard served through FastMCP streamable HTTP. Run `uv run chronicle dashboard start` for foreground mode, `uv run chronicle dashboard start --background` for a persistent local process, and `uv run chronicle dashboard stop` to stop it. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port.
+- **`chronicle dashboard`** — a persistent, local React/Three.js memory explorer, themed as a navigable star chart: every project is its own constellation with its core memory anchoring the center (the way Sagittarius A* anchors the Milky Way), and a scope with children renders as its own sun/planet/moon body — depth in your taxonomy maps onto depth in the solar system, children always orbiting their parent. Run `uv run chronicle dashboard start` for foreground mode, `uv run chronicle dashboard start --background` for a persistent local process, and `uv run chronicle dashboard stop` to stop it. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port.
 
 ## Requirements
 
@@ -150,18 +150,30 @@ while FastEmbed loads or downloads the model, follow the
 
 ## How it works
 
-Qdrant (vector store) + fastembed (`nomic-embed-text-v1.5`, local
-CPU embeddings, no separate service) + FastMCP (the MCP server itself,
-stdio transport). See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and
-every tool's exact signature.
+SQLite (SQLAlchemy 2 + Alembic migrations) is the canonical store for
+every memory, source, and scope — one file at `~/.chronicle/chronicle.db`,
+shared by every registered project. Qdrant is reduced to a derived
+semantic-similarity index (deleting and rebuilding it loses nothing
+durable); lexical search is real SQLite FTS5; fastembed
+(`nomic-embed-text-v1.5`, local CPU embeddings, no separate service) does
+the embedding; FastMCP is the MCP server itself, stdio transport. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design, the
+scope hierarchy, and every tool's exact signature.
 
-## Upgrading from 1.x
+## Upgrading
 
-2.0.0 changes the embedding backend (Ollama → fastembed) — see
+**3.0.0** rearchitected storage: SQLite became canonical, Qdrant was
+reduced to a derived vector index. If you're upgrading from an install
+older than 3.0.0, back up `~/.chronicle` first — see
+[docs/ARCHITECTURE.md § Backups](docs/ARCHITECTURE.md#backups) for what
+today's backup scripts do and do not cover (notably: they snapshot
+Qdrant and export a JSON dump, but do not yet back up
+`~/.chronicle/chronicle.db` itself — copy that file directly too).
+
+**2.0.0** changed the embedding backend (Ollama → fastembed) — see
 [CHANGELOG.md](CHANGELOG.md). Old and new embeddings share the same 768
 dimensions but are **not** the same vector space, and Qdrant can't detect
-the difference. If you're upgrading an existing install, either start a
+the difference. If you're upgrading from before 2.0.0, either start a
 fresh `memories` collection, or expect old memories to rank essentially
 randomly against new ones in semantic search until you re-add them.
 

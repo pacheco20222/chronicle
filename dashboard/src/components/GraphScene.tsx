@@ -27,7 +27,7 @@ function projectColor(project: string) {
 }
 
 function localClusterRadius(count: number) {
-  return Math.max(0.75, 0.5 + Math.sqrt(count) * 0.42);
+  return Math.max(1.1, 0.6 + Math.sqrt(count) * 0.58);
 }
 
 function fibonacciPoint(index: number, total: number, radius: number) {
@@ -40,7 +40,7 @@ function fibonacciPoint(index: number, total: number, radius: number) {
   );
 }
 
-type ScopePosition = { position: THREE.Vector3; isBlackHole: boolean; radius: number; scope: ScopeNode };
+type ScopePosition = { position: THREE.Vector3; isBlackHole: boolean; radius: number; scope: ScopeNode; depth: number };
 
 function computeProjectRadii(nodes: GraphNode[]) {
   const counts = new Map<string, number>();
@@ -65,32 +65,94 @@ function scopeExtent(scope: ScopeNode, projectRadii: Map<string, number>) {
  * been reparented (the common case: every project is still a top-level
  * scope), this produces the same flat ring the dashboard always rendered;
  * nesting only appears once the user actually organizes their taxonomy. */
+/* A registered project keeps a second, bare-name scope row pinned at the
+ * true root (parent_path null) purely to anchor its memories — separate
+ * from wherever the user has actually organized it in the taxonomy (e.g.
+ * "chronicle" the anchor vs. "personal_projects/chronicle" the placement).
+ * Left in, it fights the real root scope for a spot in the root-level
+ * orbit ring, which is why a single organized hierarchy still rendered as
+ * two competing "suns." Any root-level scope whose name is shadowed by a
+ * nested scope elsewhere in the tree is a stale anchor, not a real
+ * hierarchy member, so it's dropped from placement entirely; the project's
+ * cluster position resolves through its nested placement instead (see the
+ * name-based fallback in useLayout). */
+/* Margin added on top of a leaf's own node-cluster radius when it's used
+ * to plan a parent's orbit spacing — covers the nebula halo sprite
+ * (rendered well past the raw node radius, see ProjectNebula) that a tight
+ * ring would otherwise let a neighboring cluster visibly bleed into. */
+const NEBULA_HALO_MARGIN = 0.7;
+const ORBIT_SPACING_MULT = 2.15;
+const ORBIT_SPACING_SQRT = 1.1;
+const ORBIT_SPACING_MIN = 4.5;
+
+/* fibonacciPoint's two-point case isn't a clean antipodal split (it lands
+ * them at 60°/120° latitude, not 0°/180°), so a pair of orbiting children
+ * reads closer together than the same spacing formula intends for larger
+ * rings — a small dedicated boost for exactly two children corrects just
+ * that case without changing anything else's spacing. */
+function orbitRadiusFor(childCount: number, maxExtent: number) {
+  if (childCount <= 1) return 0;
+  const base = Math.max(ORBIT_SPACING_MIN, maxExtent * ORBIT_SPACING_MULT + Math.sqrt(childCount) * ORBIT_SPACING_SQRT);
+  return childCount === 2 ? base * 1.3 : base;
+}
+
 function useScopeLayout(scopes: ScopeNode[], projectRadii: Map<string, number>) {
   return useMemo(() => {
+    const nestedNames = new Set(scopes.filter((scope) => scope.parent_path !== null).map((scope) => scope.name));
     const byParent = new Map<string | null, ScopeNode[]>();
+    const byPath = new Map<string, ScopeNode>();
     scopes.forEach((scope) => {
+      if (scope.parent_path === null && scope.child_count === 0 && nestedNames.has(scope.name)) return;
+      byPath.set(scope.path, scope);
       const list = byParent.get(scope.parent_path);
       if (list) list.push(scope);
       else byParent.set(scope.parent_path, [scope]);
     });
 
+    /* A scope's own visual size (scopeExtent) only reflects its own node
+     * cluster, not the ring of children orbiting it — so spacing a parent's
+     * ring off that alone lets a densely-populated sub-scope's own children
+     * spill into a neighboring sibling's territory (this was the actual
+     * cause of heliofi_frontend nearly touching ragforge: heliofi's own
+     * extent looked small, but its two orbiting children reached well past
+     * it). Computed bottom-up once, then reused both as parent-spacing
+     * input and cached so the recursive placement pass below doesn't
+     * redo the work. */
+    const subtreeExtent = new Map<string, number>();
+    function extentOf(scope: ScopeNode): number {
+      const cached = subtreeExtent.get(scope.path);
+      if (cached !== undefined) return cached;
+      const ownExtent = scopeExtent(scope, projectRadii) + NEBULA_HALO_MARGIN;
+      const children = byParent.get(scope.path) || [];
+      let total = ownExtent;
+      if (children.length > 0) {
+        const childExtents = children.map(extentOf);
+        const maxChildExtent = Math.max(0.75, ...childExtents);
+        const orbitRadius = children.length <= 1 ? maxChildExtent * 1.4 : orbitRadiusFor(children.length, maxChildExtent);
+        total = Math.max(ownExtent, orbitRadius + maxChildExtent);
+      }
+      subtreeExtent.set(scope.path, total);
+      return total;
+    }
+    byPath.forEach(extentOf);
+
     const positions = new Map<string, ScopePosition>();
 
-    function place(parentPath: string | null, center: THREE.Vector3) {
+    function place(parentPath: string | null, center: THREE.Vector3, depth: number) {
       const children = [...(byParent.get(parentPath) || [])].sort((a, b) => a.path.localeCompare(b.path));
       if (children.length === 0) return;
-      const extents = children.map((child) => scopeExtent(child, projectRadii));
+      const extents = children.map((child) => subtreeExtent.get(child.path)!);
       const maxExtent = Math.max(0.75, ...extents);
-      const orbitRadius = children.length <= 1 ? 0 : Math.max(4, maxExtent * 2.4 + Math.sqrt(children.length) * 1.1);
+      const orbitRadius = orbitRadiusFor(children.length, maxExtent);
       children.forEach((child, index) => {
         const local = children.length === 1 ? new THREE.Vector3() : fibonacciPoint(index, children.length, orbitRadius);
         const position = center.clone().add(local);
-        positions.set(child.path, { position, isBlackHole: child.child_count > 0, radius: extents[index], scope: child });
-        place(child.path, position);
+        positions.set(child.path, { position, isBlackHole: child.child_count > 0, radius: scopeExtent(child, projectRadii), scope: child, depth });
+        place(child.path, position, depth + 1);
       });
     }
 
-    place(null, new THREE.Vector3(0, 0, 0));
+    place(null, new THREE.Vector3(0, 0, 0), 0);
     return positions;
   }, [scopes, projectRadii]);
 }
@@ -101,6 +163,17 @@ function useLayout(nodes: GraphNode[], edges: GraphEdge[], scopePositions: Map<s
     edges.forEach((edge) => {
       degree.set(edge.source, (degree.get(edge.source) || 0) + 1);
       degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
+    });
+
+    /* A project's memories are grouped by its bare name, but its position
+     * lives in scopePositions keyed by full path — which only matches
+     * directly for a top-level project. A reparented project's cluster
+     * has to fall back to a name match against its (nested) scope entry;
+     * prefer the most deeply nested match if a name somehow collides. */
+    const positionByName = new Map<string, ScopePosition>();
+    scopePositions.forEach((scopePosition) => {
+      const existing = positionByName.get(scopePosition.scope.name);
+      if (!existing || scopePosition.depth > existing.depth) positionByName.set(scopePosition.scope.name, scopePosition);
     });
 
     const byProject = new Map<string, GraphNode[]>();
@@ -120,13 +193,22 @@ function useLayout(nodes: GraphNode[], edges: GraphEdge[], scopePositions: Map<s
     const layout: LayoutNode[] = [];
     const clusterCenters: THREE.Vector3[] = [];
     projects.forEach((project, clusterIndex) => {
-      const center = scopePositions.get(project)?.position ?? fallbackCenter(clusterIndex);
+      const center = (scopePositions.get(project) ?? positionByName.get(project))?.position ?? fallbackCenter(clusterIndex);
       clusterCenters.push(center);
       const projectNodes = byProject.get(project)!;
       const total = Math.max(projectNodes.length, 1);
       const radius = localClusterRadius(total);
+      /* The project's core memory anchors its constellation exactly the
+       * way Sagittarius A* anchors the Milky Way — sitting dead center
+       * with everything else in orbit around it, not just another point
+       * on the fibonacci sphere. When a core node exists, it alone takes
+       * the center; every other node in the cluster is distributed across
+       * one fewer fibonacci slot to make room for it. */
+      const coreIndex = projectNodes.findIndex((node) => node.role === "core");
+      const orbitCount = Math.max(coreIndex === -1 ? total : total - 1, 1);
+      let orbitIndex = 0;
       projectNodes.forEach((node, index) => {
-        const local = total === 1 ? new THREE.Vector3() : fibonacciPoint(index, total, radius);
+        const local = index === coreIndex ? new THREE.Vector3() : fibonacciPoint(orbitIndex++, orbitCount, radius);
         layout.push({
           ...node,
           degree: degree.get(node.id) || 0,
@@ -170,42 +252,6 @@ function getGlowTexture() {
   return glowTexture;
 }
 
-/* Procedural granulation texture for a scope beacon's surface — mottled
- * light/dark blotches over a warm base gradient, the way a real sun's
- * photosphere looks grainy up close rather than a flat color. This is what
- * gives the beacon actual surface character instead of reading as a glow
- * effect with nothing solid underneath it. */
-let sunSurfaceTexture: THREE.Texture | null = null;
-function getSunSurfaceTexture() {
-  if (sunSurfaceTexture) return sunSurfaceTexture;
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const base = ctx.createRadialGradient(size * 0.42, size * 0.38, size * 0.04, size * 0.5, size * 0.5, size * 0.72);
-  base.addColorStop(0, "#fff3d6");
-  base.addColorStop(0.32, "#ffb562");
-  base.addColorStop(0.68, "#e8703a");
-  base.addColorStop(1, "#a83e1c");
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 520; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const r = 1.5 + Math.random() * 6;
-    ctx.globalAlpha = 0.08 + Math.random() * 0.14;
-    ctx.fillStyle = Math.random() > 0.5 ? "#fff3d6" : "#7a2e14";
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  sunSurfaceTexture = new THREE.CanvasTexture(canvas);
-  sunSurfaceTexture.wrapS = sunSurfaceTexture.wrapT = THREE.RepeatWrapping;
-  return sunSurfaceTexture;
-}
-
 function roleLabel(node: GraphNode) {
   if (node.role === "core") return `${node.project} · CORE`;
   if (node.role === "latest") return `${node.project} · latest checkpoint${node.created_at ? ` ${node.created_at.slice(0, 10)}` : ""}`;
@@ -231,25 +277,36 @@ function ProjectLabel({ cluster }: { cluster: Cluster }) {
 }
 
 /* The scope-hierarchy signature element: a scope with children renders as
- * a red giant — a big, soft, warm-colored star — rather than a dark
- * occluding body or a hard-edged ring (an earlier pass added a bright
- * equatorial ring, which read as "planet with rings," not "star"; dropped
- * entirely). Built from layered spheres and glow sprites the way real
- * astrophoto renderings of a red giant look: a hot small core, a large
- * warm-orange visible disk, and a big, slowly-pulsing soft corona — no ring
- * geometry anywhere. Children of any kind (sub-scopes or leaf projects)
- * orbit it via useScopeLayout and are joined to it by a plain orbit line
- * (see ScopeOrbitLine) that targets each child's own core-memory marker
- * when it has one, not an empty point in space. A leaf project scope with
- * no children renders no beacon here at all — it's still just its existing
- * star cluster. */
-function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; onSelect: (scope: ScopeNode) => void }) {
+ * a plain, flat-shaded ball with a thin, dim corona — deliberately not a
+ * granulated/textured surface (that read as too busy at render scale and
+ * ate into the corona's "radiating heat" read) and not a bright,
+ * near-white highlight (which spiked the bloom pass and made every body
+ * look like it was shining rather than lit). Children of any kind
+ * (sub-scopes or leaf projects) orbit it via useScopeLayout and are joined
+ * to it by a plain orbit line (see ScopeOrbitLine) that targets each
+ * child's own core-memory marker when it has one, not an empty point in
+ * space. A leaf project scope with no children renders no beacon here at
+ * all — it's still just its existing star cluster. */
+/* Depth in the scope tree maps onto the solar-system role: depth 0 is the
+ * sun (the single trunk everything else orbits), depth 1 reads as a
+ * planet (a sub-core orbiting the sun), depth 2+ as a moon (orbiting a
+ * planet). Only color/size/corona intensity change per role — same body
+ * construction throughout — so the family still reads as one system
+ * rather than three unrelated shapes. */
+const SCOPE_ROLE_STYLE = [
+  { label: "sun", bodyColor: "#b84530", coronaColor: "#ff8f57", coronaScale: 1.9, coronaOpacity: 0.14, bodyScale: 0.78 },
+  { label: "planet", bodyColor: "#5c7aa8", coronaColor: "#8fb4ff", coronaScale: 1.5, coronaOpacity: 0.1, bodyScale: 0.68 },
+  { label: "moon", bodyColor: "#8892a3", coronaColor: "#c9d3e8", coronaScale: 1.15, coronaOpacity: 0.07, bodyScale: 0.58 },
+] as const;
+
+function ScopeBody({ scope, position, radius, isBlackHole, depth, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; depth: number; onSelect: (scope: ScopeNode) => void }) {
   const surfaceRef = useRef<THREE.Mesh>(null);
   const coronaRef = useRef<THREE.SpriteMaterial>(null);
-  const baseCoronaOpacity = scope.core_present ? 0.28 : 0.18;
+  const role = SCOPE_ROLE_STYLE[Math.min(depth, SCOPE_ROLE_STYLE.length - 1)];
+  const baseCoronaOpacity = role.coronaOpacity * (scope.core_present ? 1 : 0.75);
 
   useFrame((_, delta) => {
-    if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.06;
+    if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.04;
   });
 
   if (!isBlackHole) return null;
@@ -258,22 +315,23 @@ function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: 
     <group position={position} onPointerDown={(event) => { event.stopPropagation(); onSelect(scope); }}>
       {/* thin, dim corona — just enough to read as radiating heat, not a
        * glow effect standing in for the body itself. The body does that. */}
-      <sprite scale={[radius * 2.6, radius * 2.6, 1]}>
-        <spriteMaterial ref={coronaRef} map={getGlowTexture()} color="#ff8f57" transparent opacity={baseCoronaOpacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <sprite scale={[radius * role.coronaScale, radius * role.coronaScale, 1]}>
+        <spriteMaterial ref={coronaRef} map={getGlowTexture()} color={role.coronaColor} transparent opacity={baseCoronaOpacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
-      {/* the star's actual body — a slowly-rotating, granulated surface,
-       * not a flat-colored ball. Rotation is this element's one authored
-       * motion; the old pulsing corona is gone so it doesn't compete. */}
+      {/* the body itself — a plain flat-colored sphere, low-intensity so
+       * bloom doesn't turn it into a floodlight. Rotation is this
+       * element's one authored motion, kept subtle since there's no
+       * surface detail left for it to reveal. */}
       <mesh ref={surfaceRef} renderOrder={1}>
-        <sphereGeometry args={[radius * 0.78, 40, 28]} />
-        <meshBasicMaterial map={getSunSurfaceTexture()} toneMapped={false} />
+        <sphereGeometry args={[radius * role.bodyScale, 32, 24]} />
+        <meshBasicMaterial color={role.bodyColor} toneMapped={false} />
       </mesh>
       {scope.linked_doc_count > 0 && (
         <sprite position={[radius * 1.4, radius * 0.75, radius * 0.3]} scale={[radius * 0.55, radius * 0.55, 1]}>
           <spriteMaterial map={getGlowTexture()} color={SEMANTIC} transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </sprite>
       )}
-      <Html position={[0, radius * 0.78 + 0.4, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
+      <Html position={[0, radius * role.bodyScale + 0.4, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
         {scope.name}
       </Html>
     </group>
@@ -445,7 +503,7 @@ function GraphObjects({ layout, clusters, edges, scopePositions, selectedId, onS
       return (
         <group key={`scope-${path}`}>
           {parentPosition && <ScopeOrbitLine from={parentPosition} to={lineTarget} />}
-          <ScopeBody scope={scopePosition.scope} position={scopePosition.position} radius={scopePosition.radius} isBlackHole={scopePosition.isBlackHole} onSelect={onSelectScope} />
+          <ScopeBody scope={scopePosition.scope} position={scopePosition.position} radius={scopePosition.radius} isBlackHole={scopePosition.isBlackHole} depth={scopePosition.depth} onSelect={onSelectScope} />
         </group>
       );
     })}
@@ -530,8 +588,8 @@ export function GraphScene({ nodes, edges, scopes, selectedId, onSelect, onSelec
     <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: "low-power" }} frameloop="always">
       <PerspectiveCamera makeDefault position={[0, 0, cameraDistance]} fov={42} />
       <color attach="background" args={["#040509"]} />
-      <Stars radius={90} depth={60} count={9000} factor={2.1} saturation={0} fade speed={0.15} />
-      <Stars radius={40} depth={30} count={3200} factor={1.3} saturation={0} fade speed={0.35} />
+      <Stars radius={90} depth={60} count={4000} factor={2.1} saturation={0} fade speed={0.15} />
+      <Stars radius={40} depth={30} count={1400} factor={1.3} saturation={0} fade speed={0.35} />
       <group ref={chartRef}>
         <GraphObjects layout={layout} clusters={clusters} edges={renderedEdges} scopePositions={scopePositions} selectedId={selectedId} onSelect={onSelect} onSelectScope={onSelectScope} />
       </group>
