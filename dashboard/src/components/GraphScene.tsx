@@ -195,42 +195,90 @@ function ProjectLabel({ cluster }: { cluster: Cluster }) {
 }
 
 /* The scope-hierarchy signature element: a scope with children renders as
- * a black hole (a dark, light-occluding sphere — depthWrite true, unlike
- * every additive glow sprite elsewhere in this scene, so it actually reads
- * as a body blocking what's behind it) ringed by a brass accretion torus.
+ * a quasar beacon — an intensely bright, pulsing core with twin polar jets
+ * — rather than a dark occluding body. A dark sphere against this scene's
+ * near-black ground has almost no presence; everything else here reads by
+ * being luminous, so the "this holds a lot" signal has to be luminous too.
  * Children of any kind (sub-scopes or leaf projects) orbit it via
- * useScopeLayout; a leaf project scope with no children renders no body
- * here at all — it's still just its existing star cluster. */
+ * useScopeLayout; a leaf project scope with no children renders no beacon
+ * here at all — it's still just its existing star cluster. Built entirely
+ * from additive glow sprites (the same technique every other glow in this
+ * scene already uses) rather than shaded 3D geometry, so a jet reads as a
+ * soft beam from any camera angle instead of a hard-edged cone. */
+function JetSegment({ direction, distance, scale, opacity }: { direction: 1 | -1; distance: number; scale: number; opacity: number }) {
+  return (
+    <sprite position={[0, direction * distance, 0]} scale={[scale, scale, 1]}>
+      <spriteMaterial map={getGlowTexture()} color={BRASS_BRIGHT} transparent opacity={opacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+    </sprite>
+  );
+}
+
+function QuasarJet({ direction, radius }: { direction: 1 | -1; radius: number }) {
+  const jetLength = radius * 3.4;
+  const segments = 4;
+  return (
+    <group>
+      {Array.from({ length: segments }, (_, i) => {
+        const t = (i + 0.5) / segments;
+        return (
+          <JetSegment
+            key={i}
+            direction={direction}
+            distance={t * jetLength}
+            scale={radius * (1.15 - t * 0.7)}
+            opacity={0.5 * (1 - t * 0.75)}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
 function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; onSelect: (scope: ScopeNode) => void }) {
-  const coreGlowRef = useRef<THREE.SpriteMaterial>(null);
-  useFrame((_, delta) => {
-    if (!coreGlowRef.current) return;
-    const target = scope.core_present ? 0.4 : 0;
-    coreGlowRef.current.opacity = THREE.MathUtils.damp(coreGlowRef.current.opacity, target, 5, delta);
+  const pulseRef = useRef<THREE.SpriteMaterial>(null);
+  const seed = useMemo(() => (position.x + position.y + position.z) * 3.7, [position]);
+
+  useFrame((state) => {
+    if (!pulseRef.current) return;
+    pulseRef.current.opacity = 0.72 + Math.sin(state.clock.elapsedTime * 1.6 + seed) * 0.22;
   });
 
   if (!isBlackHole) return null;
 
   return (
     <group position={position} onPointerDown={(event) => { event.stopPropagation(); onSelect(scope); }}>
+      {/* soft outer halo */}
+      <sprite scale={[radius * 2.8, radius * 2.8, 1]}>
+        <spriteMaterial map={getGlowTexture()} color={BRASS} transparent opacity={0.32} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </sprite>
+      {/* pulsing white-hot core */}
+      <sprite scale={[radius * 1.15, radius * 1.15, 1]}>
+        <spriteMaterial ref={pulseRef} map={getGlowTexture()} color="#fff3d6" transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </sprite>
       <mesh renderOrder={1}>
-        <sphereGeometry args={[radius * 0.62, 24, 18]} />
-        <meshBasicMaterial color="#03040a" depthWrite toneMapped={false} />
+        <sphereGeometry args={[radius * 0.22, 16, 12]} />
+        <meshBasicMaterial color="#fff8ea" toneMapped={false} />
       </mesh>
-      <mesh rotation={[Math.PI / 2.4, 0, 0]}>
-        <torusGeometry args={[radius * 0.62, radius * 0.028, 10, 48]} />
-        <meshBasicMaterial color={BRASS} transparent opacity={0.85} toneMapped={false} />
+      {/* bright energetic equatorial ring (never dark — glowing, additive) */}
+      <mesh rotation={[Math.PI / 2.15, 0, 0]}>
+        <torusGeometry args={[radius * 0.9, radius * 0.045, 10, 48]} />
+        <meshBasicMaterial color={BRASS_BRIGHT} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
+      {/* twin polar jets */}
+      <QuasarJet direction={1} radius={radius} />
+      <QuasarJet direction={-1} radius={radius} />
+      {scope.core_present && (
+        <sprite scale={[radius * 1.7, radius * 1.7, 1]}>
+          <spriteMaterial map={getGlowTexture()} color={BRASS} transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        </sprite>
+      )}
       {scope.linked_doc_count > 0 && (
-        <mesh rotation={[Math.PI / 2.4 + Math.PI / 5, Math.PI / 7, 0]}>
-          <torusGeometry args={[radius * 0.86, radius * 0.016, 8, 40]} />
-          <meshBasicMaterial color={SEMANTIC} transparent opacity={0.45} toneMapped={false} />
+        <mesh rotation={[Math.PI / 2.15 + Math.PI / 5, Math.PI / 7, 0]}>
+          <torusGeometry args={[radius * 1.15, radius * 0.02, 8, 40]} />
+          <meshBasicMaterial color={SEMANTIC} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
-      <sprite scale={[radius * 1.5, radius * 1.5, 1]}>
-        <spriteMaterial ref={coreGlowRef} map={getGlowTexture()} color={BRASS} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </sprite>
-      <Html position={[0, radius * 0.62 + 0.4, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
+      <Html position={[0, radius * 0.9 + 0.45, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
         {scope.name}
       </Html>
     </group>
@@ -250,7 +298,7 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
   const shape = getNodeSphere();
   const statusOpacity = STATUS_OPACITY[node.status] || STATUS_OPACITY.active;
   const significance = 0.68 + Math.min(degree, 8) * 0.04;
-  const roleScale = node.role === "core" ? 1.3 : node.role === "latest" ? 1.12 : 1;
+  const roleScale = node.role === "core" ? 2.1 : node.role === "latest" ? 1.12 : 1;
   const scale = significance * roleScale * (node.status === "superseded" ? 0.82 : node.status === "resolved" ? 0.92 : 1);
   const color = colorForType(node.type);
   const label = useMemo(() => roleLabel(node), [node]);
@@ -270,10 +318,19 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
       <mesh geometry={shape} scale={scale}>
         <meshBasicMaterial ref={materialRef} color={color} transparent opacity={statusOpacity} toneMapped={false} />
       </mesh>
-      {node.role === "core" && <mesh rotation={[Math.PI / 2, 0, 0]} scale={1.35 * scale}>
-        <torusGeometry args={[0.13, 0.014, 8, 24]} />
-        <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} toneMapped={false} />
-      </mesh>}
+      {node.role === "core" && <>
+        <mesh rotation={[Math.PI / 2, 0, 0]} scale={1.35 * scale}>
+          <torusGeometry args={[0.13, 0.018, 8, 24]} />
+          <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} toneMapped={false} />
+        </mesh>
+        {/* wider outer halo ring, exclusive to the project's own core, so it
+         * reads as distinctly bigger than the single-ring "latest" marker
+         * rather than a slightly-larger version of the same signature. */}
+        <mesh rotation={[Math.PI / 2, 0, Math.PI / 6]} scale={1.85 * scale}>
+          <torusGeometry args={[0.13, 0.01, 8, 24]} />
+          <meshBasicMaterial color={BRASS_BRIGHT} transparent opacity={0.5} toneMapped={false} />
+        </mesh>
+      </>}
       {node.role === "latest" && <mesh rotation={[Math.PI / 2.3, 0, Math.PI / 4]} scale={1.35 * scale}>
         <torusGeometry args={[0.13, 0.01, 8, 24]} />
         <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.85} toneMapped={false} />
