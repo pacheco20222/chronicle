@@ -1,7 +1,32 @@
 # Changelog
 
-## Unreleased
+## 3.1.0 — 2026-09-27
 
+### Added
+- **Hierarchical scopes**: a materialized-path scope tree above the
+  existing project-only isolation (`memory_list_scopes`,
+  `memory_scope_reparent`, `chronicle scope create/list/move` CLI). Core
+  documents (`memory_set_document`/`memory_get_document`) can now target
+  any scope path, not just a registered project.
+- **Docs chunking**: large files in `chronicle import <directory>` are
+  now split into chunks sharing one Source, with neighbor-context
+  bundling on search hits instead of returning a chunk with no context.
+- **`relates_to_project` linking + `include_linked` search**: a doc
+  living outside a project's own scope can be explicitly linked to it
+  and pulled into that project's search results on request.
+- **`scope_path` override** on `memory_add`, `memory_search`,
+  `memory_get_latest`, and `memory_merge` (already existed on the
+  document tools) — lets a client with no filesystem/cwd concept at all
+  (e.g. Claude Desktop chat) target any scope explicitly.
+- **`memory_get_by_source`** tool to fetch every chunk of a source in
+  order.
+- Dashboard: the memory graph now visualizes the scope hierarchy
+  (scope nodes with children render as their own body in the 3D scene,
+  joined to their children by an explicit connector), with inline core
+  editing and reparenting from the graph itself.
+- Claude Desktop install instructions in `docs/INSTALL.md`.
+
+### Changed
 - Project renamed from `mnemo` to `chronicle`.
 
 ## 3.0.0 — 2026-09-26

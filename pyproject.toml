@@ -1,6 +1,6 @@
 [project]
 name = "chronicle"
-version = "3.0.0"
+version = "3.1.0"
 description = "Self-hosted, project-scoped memory MCP server for Claude Code and Codex"
 readme = "README.md"
 license = "MIT"
