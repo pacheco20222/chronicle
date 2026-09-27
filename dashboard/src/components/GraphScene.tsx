@@ -56,15 +56,32 @@ function computeProjectRadii(nodes: GraphNode[]) {
  * many children it holds instead — same shape as localClusterRadius, just
  * fed a different quantity. */
 function scopeExtent(scope: ScopeNode, projectRadii: Map<string, number>) {
-  return projectRadii.get(scope.path) ?? Math.max(0.9, 0.6 + Math.sqrt(Math.max(scope.child_count, 1)) * 0.5);
+  /* A registered project's memory count is keyed by its bare name (see
+   * scope_graph_nodes' own core-lookup fallback for the full reasoning) -
+   * scope.path is the taxonomy position, not the storage key. */
+  return projectRadii.get(scope.name) ?? Math.max(0.9, 0.6 + Math.sqrt(Math.max(scope.child_count, 1)) * 0.5);
 }
 
-/* Recursively places every scope node using the exact same fibonacci-orbit
- * technique the flat per-project layout already used for a single level —
+/* Places siblings close together on a limited arc instead of spreading them
+ * across a full sphere/circle — fibonacciPoint (used for placing unrelated
+ * top-level projects, where "evenly spread apart" is exactly right) puts 2
+ * points at opposite poles, which reads as "unrelated" for two children of
+ * the same parent, not as a family. The arc widens gently as sibling count
+ * grows, capped so a large family still reads as one grouped unit rather
+ * than wrapping all the way around its parent. */
+function siblingPoint(index: number, total: number, radius: number): THREE.Vector3 {
+  if (total === 1) return new THREE.Vector3(0, 0, radius);
+  const arc = Math.min(Math.PI * 0.9, 0.5 + total * 0.3);
+  const angle = -arc / 2 + (arc * index) / (total - 1);
+  return new THREE.Vector3(Math.sin(angle) * radius, Math.sin(angle * 0.5) * radius * 0.18, Math.cos(angle) * radius);
+}
+
+/* Recursively places every scope node, siblings grouped via siblingPoint,
  * applied once per tree depth instead of once total. When no scope has ever
  * been reparented (the common case: every project is still a top-level
- * scope), this produces the same flat ring the dashboard always rendered;
- * nesting only appears once the user actually organizes their taxonomy. */
+ * scope), a lone root's children still spread reasonably wide (single-parent
+ * case below); nesting only appears once the user actually organizes their
+ * taxonomy. */
 function useScopeLayout(scopes: ScopeNode[], projectRadii: Map<string, number>) {
   return useMemo(() => {
     const byParent = new Map<string | null, ScopeNode[]>();
@@ -76,21 +93,24 @@ function useScopeLayout(scopes: ScopeNode[], projectRadii: Map<string, number>) 
 
     const positions = new Map<string, ScopePosition>();
 
-    function place(parentPath: string | null, center: THREE.Vector3) {
+    function place(parentPath: string | null, center: THREE.Vector3, parentExtent: number) {
       const children = [...(byParent.get(parentPath) || [])].sort((a, b) => a.path.localeCompare(b.path));
       if (children.length === 0) return;
       const extents = children.map((child) => scopeExtent(child, projectRadii));
       const maxExtent = Math.max(0.75, ...extents);
-      const orbitRadius = children.length <= 1 ? 0 : Math.max(4, maxExtent * 2.4 + Math.sqrt(children.length) * 1.1);
+      // Always at least "both radii plus a real gap" apart, regardless of
+      // count, so a parent and its children never visually touch.
+      const minGap = parentExtent + maxExtent + 1.6;
+      const orbitRadius = children.length <= 1 ? minGap : Math.max(minGap, maxExtent * 1.15 + children.length * 0.35);
       children.forEach((child, index) => {
-        const local = children.length === 1 ? new THREE.Vector3() : fibonacciPoint(index, children.length, orbitRadius);
+        const local = siblingPoint(index, children.length, orbitRadius);
         const position = center.clone().add(local);
         positions.set(child.path, { position, isBlackHole: child.child_count > 0, radius: extents[index], scope: child });
-        place(child.path, position);
+        place(child.path, position, extents[index]);
       });
     }
 
-    place(null, new THREE.Vector3(0, 0, 0));
+    place(null, new THREE.Vector3(0, 0, 0), 0);
     return positions;
   }, [scopes, projectRadii]);
 }
@@ -117,10 +137,19 @@ function useLayout(nodes: GraphNode[], edges: GraphEdge[], scopePositions: Map<s
     const fallbackCenter = (clusterIndex: number) =>
       projectCount <= 1 ? new THREE.Vector3() : fibonacciPoint(clusterIndex, projectCount, clusterRadius);
 
+    /* scopePositions is keyed by full scope path; a registered project's
+     * memories are keyed by its bare name (unaffected by reparenting) - so
+     * resolving "which scope position is this project's cluster center"
+     * means finding the leaf scope whose *name* matches, not looking the
+     * bare name up as if it were a path. */
+    const scopeByProjectName = new Map(
+      [...scopePositions.values()].filter((sp) => !sp.isBlackHole).map((sp) => [sp.scope.name, sp.position]),
+    );
+
     const layout: LayoutNode[] = [];
     const clusterCenters: THREE.Vector3[] = [];
     projects.forEach((project, clusterIndex) => {
-      const center = scopePositions.get(project)?.position ?? fallbackCenter(clusterIndex);
+      const center = scopeByProjectName.get(project) ?? fallbackCenter(clusterIndex);
       clusterCenters.push(center);
       const projectNodes = byProject.get(project)!;
       const total = Math.max(projectNodes.length, 1);
@@ -170,42 +199,6 @@ function getGlowTexture() {
   return glowTexture;
 }
 
-/* Procedural granulation texture for a scope beacon's surface — mottled
- * light/dark blotches over a warm base gradient, the way a real sun's
- * photosphere looks grainy up close rather than a flat color. This is what
- * gives the beacon actual surface character instead of reading as a glow
- * effect with nothing solid underneath it. */
-let sunSurfaceTexture: THREE.Texture | null = null;
-function getSunSurfaceTexture() {
-  if (sunSurfaceTexture) return sunSurfaceTexture;
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const base = ctx.createRadialGradient(size * 0.42, size * 0.38, size * 0.04, size * 0.5, size * 0.5, size * 0.72);
-  base.addColorStop(0, "#fff3d6");
-  base.addColorStop(0.32, "#ffb562");
-  base.addColorStop(0.68, "#e8703a");
-  base.addColorStop(1, "#a83e1c");
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 520; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const r = 1.5 + Math.random() * 6;
-    ctx.globalAlpha = 0.08 + Math.random() * 0.14;
-    ctx.fillStyle = Math.random() > 0.5 ? "#fff3d6" : "#7a2e14";
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  sunSurfaceTexture = new THREE.CanvasTexture(canvas);
-  sunSurfaceTexture.wrapS = sunSurfaceTexture.wrapT = THREE.RepeatWrapping;
-  return sunSurfaceTexture;
-}
-
 function roleLabel(node: GraphNode) {
   if (node.role === "core") return `${node.project} · CORE`;
   if (node.role === "latest") return `${node.project} · latest checkpoint${node.created_at ? ` ${node.created_at.slice(0, 10)}` : ""}`;
@@ -231,26 +224,18 @@ function ProjectLabel({ cluster }: { cluster: Cluster }) {
 }
 
 /* The scope-hierarchy signature element: a scope with children renders as
- * a red giant — a big, soft, warm-colored star — rather than a dark
- * occluding body or a hard-edged ring (an earlier pass added a bright
- * equatorial ring, which read as "planet with rings," not "star"; dropped
- * entirely). Built from layered spheres and glow sprites the way real
- * astrophoto renderings of a red giant look: a hot small core, a large
- * warm-orange visible disk, and a big, slowly-pulsing soft corona — no ring
- * geometry anywhere. Children of any kind (sub-scopes or leaf projects)
- * orbit it via useScopeLayout and are joined to it by a plain orbit line
- * (see ScopeOrbitLine) that targets each child's own core-memory marker
- * when it has one, not an empty point in space. A leaf project scope with
- * no children renders no beacon here at all — it's still just its existing
- * star cluster. */
+ * a warm-colored star — a plain, solid body, not a dark occluding shape or
+ * a hard-edged ring (two earlier passes: a ring read as "planet with
+ * rings"; a procedural granulation texture wasn't perceptible at this
+ * render scale, so it was complexity without payoff). A thin, dim corona
+ * suggests radiated heat without standing in for the body itself. Children
+ * of any kind (sub-scopes or leaf projects) orbit it via useScopeLayout and
+ * are joined to it by a plain orbit line (see ScopeOrbitLine) that targets
+ * each child's own core-memory marker when it has one, not an empty point
+ * in space. A leaf project scope with no children renders no beacon here at
+ * all — it's still just its existing star cluster. */
 function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; onSelect: (scope: ScopeNode) => void }) {
-  const surfaceRef = useRef<THREE.Mesh>(null);
-  const coronaRef = useRef<THREE.SpriteMaterial>(null);
   const baseCoronaOpacity = scope.core_present ? 0.28 : 0.18;
-
-  useFrame((_, delta) => {
-    if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.06;
-  });
 
   if (!isBlackHole) return null;
 
@@ -259,14 +244,13 @@ function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: 
       {/* thin, dim corona — just enough to read as radiating heat, not a
        * glow effect standing in for the body itself. The body does that. */}
       <sprite scale={[radius * 2.6, radius * 2.6, 1]}>
-        <spriteMaterial ref={coronaRef} map={getGlowTexture()} color="#ff8f57" transparent opacity={baseCoronaOpacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <spriteMaterial map={getGlowTexture()} color="#ff8f57" transparent opacity={baseCoronaOpacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
-      {/* the star's actual body — a slowly-rotating, granulated surface,
-       * not a flat-colored ball. Rotation is this element's one authored
-       * motion; the old pulsing corona is gone so it doesn't compete. */}
-      <mesh ref={surfaceRef} renderOrder={1}>
-        <sphereGeometry args={[radius * 0.78, 40, 28]} />
-        <meshBasicMaterial map={getSunSurfaceTexture()} toneMapped={false} />
+      {/* the star's actual body — solid warm orange-red, no texture (not
+       * perceptible at this scale) and no rotation (nothing to show). */}
+      <mesh renderOrder={1}>
+        <sphereGeometry args={[radius * 0.78, 28, 20]} />
+        <meshBasicMaterial color="#e8703a" toneMapped={false} />
       </mesh>
       {scope.linked_doc_count > 0 && (
         <sprite position={[radius * 1.4, radius * 0.75, radius * 0.3]} scale={[radius * 0.55, radius * 0.55, 1]}>
@@ -303,6 +287,7 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const glowRef = useRef<THREE.SpriteMaterial>(null);
   const ringRef = useRef<THREE.MeshBasicMaterial>(null);
+  const coreHaloRef = useRef<THREE.SpriteMaterial>(null);
   const shape = getNodeSphere();
   const statusOpacity = STATUS_OPACITY[node.status] || STATUS_OPACITY.active;
   const significance = 0.68 + Math.min(degree, 8) * 0.04;
@@ -313,25 +298,31 @@ function NodeGlyph({ node, position, degree, highlighted, focusActive, onSelect 
 
   useFrame((_, delta) => {
     const target = focusActive ? (highlighted ? 1 : 0.28) : statusOpacity;
+    const roleTarget = node.role ? (highlighted || !focusActive ? 0.95 : 0.28) : 0;
     if (materialRef.current) materialRef.current.opacity = THREE.MathUtils.damp(materialRef.current.opacity, target, 5, delta);
     if (glowRef.current) glowRef.current.opacity = THREE.MathUtils.damp(glowRef.current.opacity, target * 0.56, 5, delta);
-    if (ringRef.current) ringRef.current.opacity = THREE.MathUtils.damp(ringRef.current.opacity, node.role ? (highlighted || !focusActive ? 0.95 : 0.28) : 0, 5, delta);
+    if (ringRef.current) ringRef.current.opacity = THREE.MathUtils.damp(ringRef.current.opacity, roleTarget, 5, delta);
+    if (coreHaloRef.current) coreHaloRef.current.opacity = THREE.MathUtils.damp(coreHaloRef.current.opacity, roleTarget * 0.6, 5, delta);
   });
 
   return (
     <group position={position} onPointerDown={(event) => { event.stopPropagation(); onSelect(node); }}>
+      {/* Project core: a warm sun-colored halo, matching the scope-beacon
+       * family at small scale, instead of a ring — distinctiveness comes
+       * from scale (roleScale 3.2x) plus this halo, not from geometry. The
+       * type-colored sphere underneath is untouched so taxonomy stays
+       * legible (see The Legible Taxonomy Rule). */}
+      {node.role === "core" && (
+        <sprite scale={[1.9 * scale, 1.9 * scale, 1]}>
+          <spriteMaterial ref={coreHaloRef} map={getGlowTexture()} color="#ff8f57" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        </sprite>
+      )}
       <sprite scale={[0.52 * scale, 0.52 * scale, 1]}>
         <spriteMaterial ref={glowRef} map={getGlowTexture()} color={color} transparent opacity={statusOpacity * 0.56} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
       <mesh geometry={shape} scale={scale}>
         <meshBasicMaterial ref={materialRef} color={color} transparent opacity={statusOpacity} toneMapped={false} />
       </mesh>
-      {/* Distinctiveness comes from scale (roleScale 3.2x vs. latest's
-       * 1.12x) and a thicker single ring, not from stacking more rings. */}
-      {node.role === "core" && <mesh rotation={[Math.PI / 2, 0, 0]} scale={1.35 * scale}>
-        <torusGeometry args={[0.13, 0.024, 8, 24]} />
-        <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.95} toneMapped={false} />
-      </mesh>}
       {node.role === "latest" && <mesh rotation={[Math.PI / 2.3, 0, Math.PI / 4]} scale={1.35 * scale}>
         <torusGeometry args={[0.13, 0.01, 8, 24]} />
         <meshBasicMaterial ref={ringRef} color={BRASS} transparent opacity={0.85} toneMapped={false} />
