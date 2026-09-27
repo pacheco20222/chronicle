@@ -105,8 +105,9 @@ Two build-time corrections are now load-bearing parts of the system, not inciden
 - Near-black indigo ground (~70%+ of visual weight), one warm brass accent, everything else desaturated cool grays
 - Flat 2px-radius "chart-plate" surfaces (frosted glass via backdrop-blur, not drop-shadow cards)
 - Monospace for every number, ID, timestamp, and label; sans-serif only for headings/prose/nav
-- Tiny geometric node glyphs (sphere/cone/octahedron/tetrahedron/box/dodecahedron) keyed to memory type, not uniform dots
+- Tiny glowing point-like node glyphs, colored per memory type, not uniform dots
 - Semantic edges off by default; explicit typed-relation edges (dashed brass, directional) always on
+- Scope hierarchy (a project nested under a shared parent) renders recursively: any scope with children is a luminous quasar beacon its children visibly orbit, never a dark or occluding body — presence in this chart comes from being lit, not from blocking light
 
 ## Colors
 
@@ -169,7 +170,7 @@ Flat by default — 2px corner radius everywhere, no shadow ramp. Depth comes fr
 
 ## Shapes
 
-Sharp, nearly-square corners throughout: 2px radius is the system's only radius value for buttons, inputs, badges, chips, and plates (the checkbox is the sole exception at 4px, inherited from its Radix primitive). Borders are 1px hairlines in `--line`/`--line-strong`, never heavier. In the 3D scene, node glyphs are small faceted solids (sphere, cone, octahedron, tetrahedron, box, dodecahedron) keyed one-per-memory-type at 0.09–0.14 scene-unit scale — deliberately tiny and point-like ("stars"), a corrected-in-build departure from an earlier, larger flat-shape pass. Selection/role markers are thin toruses and wireframe octahedra layered around a node, not solid overlays.
+Sharp, nearly-square corners throughout: 2px radius is the system's only radius value for buttons, inputs, badges, chips, and plates (the checkbox is the sole exception at 4px, inherited from its Radix primitive). Borders are 1px hairlines in `--line`/`--line-strong`, never heavier. In the 3D scene, memory nodes are small spheres (0.1 scene-unit radius) colored per type and scaled by degree/role/status — deliberately tiny and point-like ("stars"), a corrected-in-build departure from an earlier, larger flat-shape pass. Selection/role markers are thin brass toruses layered around a node, not solid overlays; a scope-hierarchy beacon (see Components → Star Chart) is the one signature element built from soft additive glow sprites rather than shaded solid geometry, so it stays luminous and reads correctly from any camera angle instead of presenting a flat silhouette.
 
 ## Components
 
@@ -199,7 +200,12 @@ Sharp, nearly-square corners throughout: 2px radius is the system's only radius 
 - **Style:** uppercase 12px bold tab labels in the topbar, dim-ink default, ink on hover, brass-bright + 2px brass underline when active. A trailing mono count badge (`span`) rides each tab label.
 
 ### Star Chart (signature component)
-The `GraphScene` — a `@react-three/fiber` Canvas over the indigo ground. Nodes are typed polyhedra sized by degree/role/status and glow via an additive-blended sprite plus subtle Bloom postprocessing. Core memories get a brass torus ring; the latest checkpoint gets a brass wireframe octahedron. Explicit typed-relation edges render as dashed brass lines with a directional cone arrowhead and are always visible; semantic-similarity edges render as thin, very-faint cool-gray lines (`#c5cee0` at ~0.055 opacity) and are hidden by default behind a legend checkbox — even when shown, each node retains only its top-2 nearest semantic neighbors by similarity to keep the field legible. Selecting a node dollies the camera toward it, brightens its direct connections, and dims everything else to ~30%; at rest the whole chart drifts in slow continuous rotation, interruptible by any drag/zoom and disabled under `prefers-reduced-motion`.
+The `GraphScene` — a `@react-three/fiber` Canvas over the indigo ground. Memory nodes are small spheres colored per type, sized by degree/role/status, and glow via an additive-blended sprite plus subtle Bloom postprocessing. A project's own core memory gets a double brass ring at 2.1x the base node scale (a wider brass-bright halo ring layered outside the standard brass ring) — sized and signatured to be unmistakably its own thing, not a slightly-larger variant of any other marker; the latest checkpoint gets a single, thinner brass ring at 1.12x scale. Explicit typed-relation edges render as dashed brass lines with a directional cone arrowhead and are always visible; semantic-similarity edges render as thin, very-faint cool-gray lines (`#c5cee0` at ~0.055 opacity) and are hidden by default behind a legend checkbox — even when shown, each node retains only its top-2 nearest semantic neighbors by similarity to keep the field legible. Selecting a node dollies the camera toward it, brightens its direct connections, and dims everything else to ~30%; at rest the whole chart drifts in slow continuous rotation, interruptible by any drag/zoom and disabled under `prefers-reduced-motion`.
+
+A scope (a project, or a named parent grouping several projects/sub-scopes) that has children renders recursively as a **quasar beacon**, positioned via the same fibonacci-orbit distribution the chart already uses for project clusters, applied once per tree depth instead of once total: a pulsing white-hot core (`#fff3d6`, ~1.6s breathing cycle), a soft brass outer halo, a bright additive-blended equatorial ring, and twin polar jets built from four tapering, fading glow-sprite segments per side (never a shaded 3D cone — a jet has to read as a soft beam from any camera angle). A present core document on that scope adds a wider, fainter brass glow; a linked doc adds a thin semantic-colored ring. Its children — sub-scopes or leaf projects — visibly orbit it at a radius derived from their own combined size, exactly like project clusters orbit each other today. This replaced an earlier dark, light-occluding sphere with a single thin ring: against this chart's near-black ground, a dark body has almost no presence, so the "this holds more" signal has to come from being brighter, not from a bigger dark silhouette.
+
+### Named Rules
+**The Luminous-Not-Occluding Rule.** Every signature 3D element reads by emitting light (additive glow sprites, bright rings, pulsing cores), never by blocking it. A dark or occluding shape against this chart's near-black ground has almost no visual weight — "more important" always means "brighter and bigger," never "darker."
 
 ## Do's and Don'ts
 
@@ -212,6 +218,7 @@ The `GraphScene` — a `@react-three/fiber` Canvas over the indigo ground. Nodes
 
 ### Don't:
 - **Don't** add drop-shadow "lift" on hover — state changes are color/opacity only (see The Flat-Plate Rule).
-- **Don't** render large flat node shapes in the graph — nodes are small point-like polyhedra by corrected design, not big geometric icons.
+- **Don't** render large flat node shapes in the graph — nodes are small point-like spheres by corrected design, not big geometric icons.
 - **Don't** stack multiple overlapping graph-tab panels — the legend was consolidated from three redundant panels into one during finish review; don't reintroduce that duplication.
 - **Don't** fabricate activity, metrics, or network status the underlying store doesn't have — every readout (Qdrant, Docker, process list, counts) must reflect real sampled data, inherited from PRODUCT.md's core no-cloud/no-fabrication commitment.
+- **Don't** render a scope-hierarchy body as a dark or occluding shape — see The Luminous-Not-Occluding Rule; presence in this chart always comes from emitted light, not from a bigger dark silhouette.

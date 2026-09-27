@@ -1,41 +1,283 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-22T00:00:00Z",
+  "generatedAt": "2026-09-27T05:28:11.232226+00:00",
   "title": "Design System: Chronicle Dashboard",
   "extensions": {
     "colorMeta": {
-      "brass": { "role": "primary", "displayName": "Brass", "canonical": "#d8a84e", "tonalRamp": ["#2b2010", "#4a3a1c", "#6e5828", "#957536", "#bd9548", "#d8a84e", "#e8bf72", "#f0ca76"] },
-      "brass-bright": { "role": "primary", "displayName": "Brass Bright", "canonical": "#f0ca76", "tonalRamp": ["#332818", "#55432a", "#7c6440", "#a4875a", "#c8a86e", "#e2c07c", "#f0ca76", "#f8e0ad"] },
-      "ground": { "role": "neutral", "displayName": "Chart Ground", "canonical": "#090d1d", "tonalRamp": ["#020306", "#060810", "#090d1d", "#10172b", "#1b2338", "#2b3450", "#454f6e", "#69738f"] },
-      "ground-raised": { "role": "neutral", "displayName": "Ground Raised", "canonical": "#10172b", "tonalRamp": ["#050710", "#0a0e1c", "#10172b", "#1b2338", "#28304a", "#3a4460", "#535d7a", "#727c96"] },
-      "plate": { "role": "neutral", "displayName": "Chart Plate", "canonical": "rgba(12, 18, 36, 0.88)", "tonalRamp": ["#04050a", "#080b16", "#0c1224", "#0d1428", "#151d34", "#202a44", "#333d58", "#4c5570"] },
-      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#e8edf8", "tonalRamp": ["#1a1d26", "#333947", "#4e5769", "#69748a", "#8d98b0", "#b3bdd0", "#d2d9e8", "#e8edf8"] },
-      "ink-dim": { "role": "neutral", "displayName": "Ink Dim", "canonical": "#8d98b0", "tonalRamp": ["#14171e", "#2a2f3a", "#434a5a", "#5f6a82", "#7b869e", "#8d98b0", "#a9b2c4", "#c6ccdb"] },
-      "ink-faint": { "role": "neutral", "displayName": "Ink Faint", "canonical": "#5f6a82", "tonalRamp": ["#0f1217", "#1f2430", "#333a4a", "#48516640", "#5f6a82", "#7b859c", "#9aa2b8", "#bcc2d2"] },
-      "line": { "role": "neutral", "displayName": "Hairline", "canonical": "rgba(176, 193, 224, 0.18)", "tonalRamp": ["rgba(176,193,224,0.04)", "rgba(176,193,224,0.08)", "rgba(176,193,224,0.12)", "rgba(176,193,224,0.18)", "rgba(176,193,224,0.24)", "rgba(176,193,224,0.32)", "rgba(176,193,224,0.42)", "rgba(176,193,224,0.55)"] },
-      "signal-good": { "role": "neutral", "displayName": "Signal Good", "canonical": "#a9ca9e", "tonalRamp": ["#16200f", "#243318", "#385224", "#4e7332", "#6c9748", "#8db968", "#a9ca9e", "#c7ddbf"] },
-      "signal-bad": { "role": "neutral", "displayName": "Signal Bad", "canonical": "#df897d", "tonalRamp": ["#2e120c", "#4b1f16", "#6f2f22", "#994334", "#c25e4a", "#d87464", "#df897d", "#ecaea5"] },
-      "status-active": { "role": "neutral", "displayName": "Status: Active", "canonical": "#f2d68f", "tonalRamp": ["#332a10", "#54461c", "#7d672c", "#a68a3e", "#caab56", "#e4c476", "#f2d68f", "#f9e6b8"] },
-      "status-resolved": { "role": "neutral", "displayName": "Status: Resolved", "canonical": "#9ba8bd", "tonalRamp": ["#171b22", "#2c323e", "#454e5f", "#5e6b81", "#7a869c", "#9ba8bd", "#b9c3d3", "#d6dce6"] },
-      "status-superseded": { "role": "neutral", "displayName": "Status: Superseded", "canonical": "#667187", "tonalRamp": ["#0f1116", "#20242e", "#343b48", "#4a5262", "#5e677a", "#667187", "#828da1", "#a3acbd"] },
-      "edge-semantic": { "role": "neutral", "displayName": "Semantic Edge", "canonical": "#c5cee0", "tonalRamp": ["#20242e", "#363c4a", "#4f5666", "#6b7384", "#8a91a2", "#aab0c1", "#c5cee0", "#dee3ee"] }
+      "brass": {
+        "role": "primary",
+        "displayName": "Brass",
+        "canonical": "#d8a84e",
+        "tonalRamp": [
+          "#2b2010",
+          "#4a3a1c",
+          "#6e5828",
+          "#957536",
+          "#bd9548",
+          "#d8a84e",
+          "#e8bf72",
+          "#f0ca76"
+        ]
+      },
+      "brass-bright": {
+        "role": "primary",
+        "displayName": "Brass Bright",
+        "canonical": "#f0ca76",
+        "tonalRamp": [
+          "#332818",
+          "#55432a",
+          "#7c6440",
+          "#a4875a",
+          "#c8a86e",
+          "#e2c07c",
+          "#f0ca76",
+          "#f8e0ad"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Chart Ground",
+        "canonical": "#090d1d",
+        "tonalRamp": [
+          "#020306",
+          "#060810",
+          "#090d1d",
+          "#10172b",
+          "#1b2338",
+          "#2b3450",
+          "#454f6e",
+          "#69738f"
+        ]
+      },
+      "ground-raised": {
+        "role": "neutral",
+        "displayName": "Ground Raised",
+        "canonical": "#10172b",
+        "tonalRamp": [
+          "#050710",
+          "#0a0e1c",
+          "#10172b",
+          "#1b2338",
+          "#28304a",
+          "#3a4460",
+          "#535d7a",
+          "#727c96"
+        ]
+      },
+      "plate": {
+        "role": "neutral",
+        "displayName": "Chart Plate",
+        "canonical": "rgba(12, 18, 36, 0.88)",
+        "tonalRamp": [
+          "#04050a",
+          "#080b16",
+          "#0c1224",
+          "#0d1428",
+          "#151d34",
+          "#202a44",
+          "#333d58",
+          "#4c5570"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#e8edf8",
+        "tonalRamp": [
+          "#1a1d26",
+          "#333947",
+          "#4e5769",
+          "#69748a",
+          "#8d98b0",
+          "#b3bdd0",
+          "#d2d9e8",
+          "#e8edf8"
+        ]
+      },
+      "ink-dim": {
+        "role": "neutral",
+        "displayName": "Ink Dim",
+        "canonical": "#8d98b0",
+        "tonalRamp": [
+          "#14171e",
+          "#2a2f3a",
+          "#434a5a",
+          "#5f6a82",
+          "#7b869e",
+          "#8d98b0",
+          "#a9b2c4",
+          "#c6ccdb"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Ink Faint",
+        "canonical": "#5f6a82",
+        "tonalRamp": [
+          "#0f1217",
+          "#1f2430",
+          "#333a4a",
+          "#48516640",
+          "#5f6a82",
+          "#7b859c",
+          "#9aa2b8",
+          "#bcc2d2"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(176, 193, 224, 0.18)",
+        "tonalRamp": [
+          "rgba(176,193,224,0.04)",
+          "rgba(176,193,224,0.08)",
+          "rgba(176,193,224,0.12)",
+          "rgba(176,193,224,0.18)",
+          "rgba(176,193,224,0.24)",
+          "rgba(176,193,224,0.32)",
+          "rgba(176,193,224,0.42)",
+          "rgba(176,193,224,0.55)"
+        ]
+      },
+      "signal-good": {
+        "role": "neutral",
+        "displayName": "Signal Good",
+        "canonical": "#a9ca9e",
+        "tonalRamp": [
+          "#16200f",
+          "#243318",
+          "#385224",
+          "#4e7332",
+          "#6c9748",
+          "#8db968",
+          "#a9ca9e",
+          "#c7ddbf"
+        ]
+      },
+      "signal-bad": {
+        "role": "neutral",
+        "displayName": "Signal Bad",
+        "canonical": "#df897d",
+        "tonalRamp": [
+          "#2e120c",
+          "#4b1f16",
+          "#6f2f22",
+          "#994334",
+          "#c25e4a",
+          "#d87464",
+          "#df897d",
+          "#ecaea5"
+        ]
+      },
+      "status-active": {
+        "role": "neutral",
+        "displayName": "Status: Active",
+        "canonical": "#f2d68f",
+        "tonalRamp": [
+          "#332a10",
+          "#54461c",
+          "#7d672c",
+          "#a68a3e",
+          "#caab56",
+          "#e4c476",
+          "#f2d68f",
+          "#f9e6b8"
+        ]
+      },
+      "status-resolved": {
+        "role": "neutral",
+        "displayName": "Status: Resolved",
+        "canonical": "#9ba8bd",
+        "tonalRamp": [
+          "#171b22",
+          "#2c323e",
+          "#454e5f",
+          "#5e6b81",
+          "#7a869c",
+          "#9ba8bd",
+          "#b9c3d3",
+          "#d6dce6"
+        ]
+      },
+      "status-superseded": {
+        "role": "neutral",
+        "displayName": "Status: Superseded",
+        "canonical": "#667187",
+        "tonalRamp": [
+          "#0f1116",
+          "#20242e",
+          "#343b48",
+          "#4a5262",
+          "#5e677a",
+          "#667187",
+          "#828da1",
+          "#a3acbd"
+        ]
+      },
+      "edge-semantic": {
+        "role": "neutral",
+        "displayName": "Semantic Edge",
+        "canonical": "#c5cee0",
+        "tonalRamp": [
+          "#20242e",
+          "#363c4a",
+          "#4f5666",
+          "#6b7384",
+          "#8a91a2",
+          "#aab0c1",
+          "#c5cee0",
+          "#dee3ee"
+        ]
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Page headings on Projects/Control tabs only (.page-heading h1)." },
-      "label": { "displayName": "Label / Mono Micro-label", "purpose": "Uppercase mono micro-labels: legend headings, readout labels, type/status keys, brand subtitle." },
-      "readout": { "displayName": "Readout", "purpose": "Large numeric values in Control-tab and project-stat grids." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page headings on Projects/Control tabs only (.page-heading h1)."
+      },
+      "label": {
+        "displayName": "Label / Mono Micro-label",
+        "purpose": "Uppercase mono micro-labels: legend headings, readout labels, type/status keys, brand subtitle."
+      },
+      "readout": {
+        "displayName": "Readout",
+        "purpose": "Large numeric values in Control-tab and project-stat grids."
+      }
     },
     "shadows": [
-      { "name": "plate-ambient", "value": "0 18px 60px rgba(0,0,0,.24), inset 0 1px rgba(235,240,255,.035)", "purpose": "Every .chart-plate (cards, legend, case panel) — floats over the star field without lifting on interaction." },
-      { "name": "topbar-overhead", "value": "0 8px 28px rgba(0,0,0,.22)", "purpose": "Fixed header plane above scrolling content; the system's one non-plate shadow." }
+      {
+        "name": "plate-ambient",
+        "value": "0 18px 60px rgba(0,0,0,.24), inset 0 1px rgba(235,240,255,.035)",
+        "purpose": "Every .chart-plate (cards, legend, case panel) — floats over the star field without lifting on interaction."
+      },
+      {
+        "name": "topbar-overhead",
+        "value": "0 8px 28px rgba(0,0,0,.22)",
+        "purpose": "Fixed header plane above scrolling content; the system's one non-plate shadow."
+      }
     ],
     "motion": [
-      { "name": "idle-drift", "value": "rotation.y += delta * 0.075 per frame after 1200ms of no interaction", "purpose": "Planetarium-dome idle rotation of the star field; cancelled immediately on drag/zoom and disabled under prefers-reduced-motion." },
-      { "name": "focus-dolly", "value": "camera/target lerp via 1 - exp(-delta * ~2.1-2.8)", "purpose": "Soft camera dolly toward a selected node on click; connected edges/nodes brighten, unrelated ones dim to ~30% opacity." },
-      { "name": "opacity-damp", "value": "THREE.MathUtils.damp(current, target, 5, delta)", "purpose": "Node/edge/ring opacity transitions for status, focus, and selection state changes." }
+      {
+        "name": "idle-drift",
+        "value": "rotation.y += delta * 0.075 per frame after 1200ms of no interaction",
+        "purpose": "Planetarium-dome idle rotation of the star field; cancelled immediately on drag/zoom and disabled under prefers-reduced-motion."
+      },
+      {
+        "name": "focus-dolly",
+        "value": "camera/target lerp via 1 - exp(-delta * ~2.1-2.8)",
+        "purpose": "Soft camera dolly toward a selected node on click; connected edges/nodes brighten, unrelated ones dim to ~30% opacity."
+      },
+      {
+        "name": "opacity-damp",
+        "value": "THREE.MathUtils.damp(current, target, 5, delta)",
+        "purpose": "Node/edge/ring opacity transitions for status, focus, and selection state changes."
+      }
     ],
     "breakpoints": [
-      { "name": "mobile", "value": "760px" }
+      {
+        "name": "mobile",
+        "value": "760px"
+      }
     ]
   },
   "components": [
@@ -106,19 +348,41 @@
   ],
   "narrative": {
     "northStar": "The Chart Room",
-    "overview": "The dashboard reads chronicle's memory store the way a navigator reads a star chart, not the way a SaaS product reads a graph. A near-black deep-indigo ground carries a faint star-field texture across nearly the whole viewport; memories plot onto it as small geometric points sized and lit by significance and status; relationships trace as lines, not force-directed spaghetti. A single warm brass/gold accent marks selection, active state, and the two things worth highlighting from chronicle's own CLI vocabulary (a ring for a core memory, a wireframe diamond for the latest checkpoint). Everything else — chrome, labels, plates, buttons — is flat, sharp-cornered (2px radius), and instrument-panel plain: this is Operate mode, not a marketing surface.\n\nTwo build-time corrections are now load-bearing parts of the system, not incidental fixes: node geometry is deliberately small (point-like polyhedra 0.09-0.14 scene units, not large flat shapes), and semantic-similarity edges are hidden by default behind an explicit legend toggle because at real data volume (87 nodes / 183 edges) they produce unreadable crosshatch density — only explicit, directional, typed-relation edges render by default. The chart must read as a chart first.",
+    "overview": "The dashboard reads chronicle's memory store the way a navigator reads a star chart, not the way a SaaS product reads a graph. A near-black deep-indigo ground carries a faint star-field texture across nearly the whole viewport; memories plot onto it as small geometric points sized and lit by significance and status; relationships trace as lines, not force-directed spaghetti. A single warm brass/gold accent marks selection, active state, and the two things worth highlighting from chronicle's own CLI vocabulary (a ring for a core memory, a wireframe diamond for the latest checkpoint). Everything else — chrome, labels, plates, buttons — is flat, sharp-cornered (2px radius), and instrument-panel plain: this is Operate mode, not a marketing surface.\n\nTwo build-time corrections are now load-bearing parts of the system, not incidental fixes: node geometry is deliberately small (point-like polyhedra 0.09–0.14 scene units, not large flat shapes), and semantic-similarity edges are hidden by default behind an explicit legend toggle because at real data volume (87 nodes / 183 edges) they produce unreadable crosshatch density — only explicit, directional, typed-relation edges render by default. The chart must read as a chart first.",
     "keyCharacteristics": [
       "Near-black indigo ground (~70%+ of visual weight), one warm brass accent, everything else desaturated cool grays",
       "Flat 2px-radius \"chart-plate\" surfaces (frosted glass via backdrop-blur, not drop-shadow cards)",
       "Monospace for every number, ID, timestamp, and label; sans-serif only for headings/prose/nav",
-      "Tiny geometric node glyphs (sphere/cone/octahedron/tetrahedron/box/dodecahedron) keyed to memory type, not uniform dots",
-      "Semantic edges off by default; explicit typed-relation edges (dashed brass, directional) always on"
+      "Tiny glowing point-like node glyphs, colored per memory type, not uniform dots",
+      "Semantic edges off by default; explicit typed-relation edges (dashed brass, directional) always on",
+      "Scope hierarchy (a project nested under a shared parent) renders recursively: any scope with children is a luminous quasar beacon its children visibly orbit, never a dark or occluding body — presence in this chart comes from being lit, not from blocking light"
     ],
     "rules": [
-      { "name": "The One Warm Color Rule", "body": "Brass is the only warm hue anywhere in the system. It marks selection, primary action, and the explicit-relation edge kind — never used decoratively or for a third purpose.", "section": "colors" },
-      { "name": "The Legible Taxonomy Rule", "body": "Memory-type colors and status colors are a closed, reused set — the same seven type colors and three status colors appear identically in the legend, the graph nodes, and the project-card type chips. No screen invents a new color for an existing type or status.", "section": "colors" },
-      { "name": "The Mono-For-Machine-Values Rule", "body": "Any value the operator would use to verify system state — counts, IDs, PIDs, timestamps, ports, percentages — renders in the mono stack. The sans stack never carries a number the operator needs to trust.", "section": "typography" },
-      { "name": "The Flat-Plate Rule", "body": "No component lifts on hover or interaction via shadow. State changes are communicated by color (brass) and opacity, never by adding elevation.", "section": "elevation" }
+      {
+        "name": "The One Warm Color Rule",
+        "body": "Brass is the only warm hue anywhere in the system. It marks selection, primary action, and the explicit-relation edge kind — never used decoratively or for a third purpose.",
+        "section": "colors"
+      },
+      {
+        "name": "The Legible Taxonomy Rule",
+        "body": "Memory-type colors (`type-decision` through `type-overview`) and status colors are a closed, reused set — the same seven type colors and three status colors appear identically in the legend, the graph nodes, and the project-card type chips. No screen invents a new color for an existing type or status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono-For-Machine-Values Rule",
+        "body": "Any value the operator would use to verify system state — counts, IDs, PIDs, timestamps, ports, percentages — renders in the mono stack. The sans stack never carries a number the operator needs to trust.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-Plate Rule",
+        "body": "No component lifts on hover or interaction via shadow. State changes are communicated by color (brass) and opacity, never by adding elevation.",
+        "section": "elevation-depth"
+      },
+      {
+        "name": "The Luminous-Not-Occluding Rule",
+        "body": "Every signature 3D element reads by emitting light (additive glow sprites, bright rings, pulsing cores), never by blocking it. A dark or occluding shape against this chart's near-black ground has almost no visual weight — \"more important\" always means \"brighter and bigger,\" never \"darker.\"",
+        "section": "components"
+      }
     ],
     "dos": [
       "Do keep brass as the only warm accent — reserve it for selection, primary action, and explicit-relation edges.",
@@ -129,9 +393,10 @@
     ],
     "donts": [
       "Don't add drop-shadow \"lift\" on hover — state changes are color/opacity only (see The Flat-Plate Rule).",
-      "Don't render large flat node shapes in the graph — nodes are small point-like polyhedra by corrected design, not big geometric icons.",
+      "Don't render large flat node shapes in the graph — nodes are small point-like spheres by corrected design, not big geometric icons.",
       "Don't stack multiple overlapping graph-tab panels — the legend was consolidated from three redundant panels into one during finish review; don't reintroduce that duplication.",
-      "Don't fabricate activity, metrics, or network status the underlying store doesn't have — every readout (Qdrant, Docker, process list, counts) must reflect real sampled data, inherited from PRODUCT.md's core no-cloud/no-fabrication commitment."
+      "Don't fabricate activity, metrics, or network status the underlying store doesn't have — every readout (Qdrant, Docker, process list, counts) must reflect real sampled data, inherited from PRODUCT.md's core no-cloud/no-fabrication commitment.",
+      "Don't render a scope-hierarchy body as a dark or occluding shape — see The Luminous-Not-Occluding Rule; presence in this chart always comes from emitted light, not from a bigger dark silhouette."
     ]
   }
 }
