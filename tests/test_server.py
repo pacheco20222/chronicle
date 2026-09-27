@@ -177,6 +177,16 @@ def test_memory_get_document_at_scope_path(service):
     assert result["content"] == "azure notes"
 
 
+def test_memory_get_document_at_scope_path_falls_back_to_bare_name_after_reparent(service):
+    server.memory_set_document(slug="chronicle-test", content="the real overview", type="overview")
+    service.repository.get_or_create_scope("personal_projects")
+    service.reparent_scope("chronicle-test", "personal_projects")
+
+    result = server.memory_get_document(slug="personal_projects/chronicle-test", scope_path="personal_projects/chronicle-test")
+    assert result is not None
+    assert result["content"] == "the real overview"
+
+
 def test_memory_get_document_at_missing_scope_path_returns_none():
     assert server.memory_get_document(slug="x", scope_path="never/created") is None
 

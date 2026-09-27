@@ -404,6 +404,18 @@ def test_service_list_scopes(service):
     assert work["child_count"] == 1
 
 
+def test_scope_graph_nodes_finds_core_by_bare_name_after_reparent(service):
+    v = [0.1] * 768
+    service.set_document(v, "chronicle overview", "chronicle", "chronicle", "overview")
+    service.repository.get_or_create_scope("personal_projects")
+
+    service.reparent_scope("chronicle", "personal_projects")
+
+    nodes = service.scope_graph_nodes()
+    moved = next(n for n in nodes if n["path"] == "personal_projects/chronicle")
+    assert moved["core_present"] is True
+
+
 def test_create_memory_with_chunk_index(service):
     repo = service.repository
     row = repo.create_memory(

@@ -306,7 +306,7 @@ class MemoryService:
         scopes = self.repository.list_scopes("")
         nodes = []
         for scope in scopes:
-            core = self.repository.get_document(scope.path, scope.path)
+            core = self.repository.get_document(scope.path, scope.path) or self.repository.get_document(scope.name, scope.name)
             linked_count = 0
             if core is not None:
                 linked_count = len(self.repository.find_relation_sources("relates_to_project", core.id))

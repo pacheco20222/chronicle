@@ -269,9 +269,15 @@ def memory_get_document(slug: str, scope_path: str | None = None) -> dict | None
         scope = _get_service().repository.get_scope_by_path(scope_path)
         if scope is None:
             return None
-        project = scope.path
-    else:
-        project = config.get_project()
+        doc = _get_service().get_document(scope.path, slug)
+        if doc is None and slug == scope_path:
+            # A registered project keeps its core keyed by its bare name
+            # regardless of where it's been reparented in the scope tree
+            # (config.get_project() always resolves to the bare name) —
+            # fall back to that convention when the full-path lookup misses.
+            doc = _get_service().get_document(scope.name, scope.name)
+        return doc
+    project = config.get_project()
     return _get_service().get_document(project, slug)
 
 
