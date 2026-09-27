@@ -95,8 +95,9 @@ def memory_add(
     supersedes: str | None = None,
     confidence: float | None = None,
     extraction_method: str | None = None,
+    scope_path: str | None = None,
 ) -> dict:
-    project = config.get_project()
+    project = scope_path if scope_path is not None else config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
     memory_id = _get_service().add_memory(
@@ -159,8 +160,10 @@ def memory_link(source_id: str, relation_type: str, target_id: str) -> dict:
 
 
 @mcp.tool
-def memory_merge(content: str, type: str, source_ids: list[str]) -> dict:
-    project = config.get_project()
+def memory_merge(
+    content: str, type: str, source_ids: list[str], scope_path: str | None = None
+) -> dict:
+    project = scope_path if scope_path is not None else config.get_project()
     config.validate_type(type)
     vector = embeddings.embed_text(content)
     memory_id = _get_service().merge_memories(vector, content, project, type, source_ids)
@@ -192,8 +195,9 @@ def memory_search(
     k: int = 5,
     max_tokens: int | None = None,
     include_linked: bool = False,
+    scope_path: str | None = None,
 ) -> list[dict]:
-    project = config.get_project()
+    project = scope_path if scope_path is not None else config.get_project()
     if type == "checkpoint":
         # Checkpoints are a timeline, not a topic: newest first, query ignored.
         return _get_service().get_recent(project, "checkpoint", k=k)
@@ -282,8 +286,8 @@ def memory_get_document(slug: str, scope_path: str | None = None) -> dict | None
 
 
 @mcp.tool
-def memory_get_latest(type: str) -> dict | None:
-    project = config.get_project()
+def memory_get_latest(type: str, scope_path: str | None = None) -> dict | None:
+    project = scope_path if scope_path is not None else config.get_project()
     config.validate_type(type)
     return _get_service().get_latest(project, type)
 

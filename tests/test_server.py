@@ -18,6 +18,14 @@ def test_memory_add_and_search_round_trip():
     assert any(r["id"] == added["id"] for r in results)
 
 
+def test_memory_add_at_scope_path_targets_explicit_project():
+    added = server.memory_add(
+        "chat-specific memory", "note", scope_path="personal/chat"
+    )
+
+    assert added["project"] == "personal/chat"
+
+
 def test_memory_add_provenance_round_trip():
     added = server.memory_add(
         "manual provenance via MCP tool",
@@ -52,6 +60,16 @@ def test_memory_search_filters_by_type():
     added = server.memory_add("a specific bug about vector size mismatch", "bug")
     bugs = server.memory_search("vector size mismatch", type="bug")
     assert any(r["id"] == added["id"] for r in bugs)
+
+
+def test_memory_search_at_scope_path_targets_explicit_project(service):
+    target_id = service.add_memory(
+        [0.1] * 768, "chat-specific search memory", "personal/search", "note"
+    )
+
+    results = server.memory_search("chat-specific search memory", scope_path="personal/search")
+
+    assert any(result["id"] == target_id for result in results)
 
 
 def test_mcp_protocol_round_trip():
@@ -253,6 +271,16 @@ def test_memory_get_latest_returns_newest_by_timestamp_not_relevance():
     assert latest["id"] == newest["id"]
 
 
+def test_memory_get_latest_at_scope_path_targets_explicit_project(service):
+    target_id = service.add_memory(
+        [0.1] * 768, "chat-specific latest checkpoint", "personal/latest", "checkpoint"
+    )
+
+    latest = server.memory_get_latest("checkpoint", scope_path="personal/latest")
+
+    assert latest["id"] == target_id
+
+
 def test_memory_get_latest_returns_none_when_nothing_saved():
     assert server.memory_get_latest("todo") is None
 
@@ -362,6 +390,18 @@ def test_memory_correction_tools_round_trip():
         [{"content": "split correction one", "type": "note"}, {"content": "split correction two", "type": "note"}],
     )
     assert len(split["ids"]) == 2
+
+
+def test_memory_merge_at_scope_path_targets_explicit_project(service):
+    source_a = service.add_memory([0.1] * 768, "merge source a", "personal/merge", "note")
+    source_b = service.add_memory([0.1] * 768, "merge source b", "personal/merge", "note")
+
+    merged = server.memory_merge(
+        "merged explicit scope", "note", [source_a, source_b], scope_path="personal/merge"
+    )
+
+    assert merged["project"] == "personal/merge"
+    assert service.repository.get(merged["id"]).project == "personal/merge"
 
 
 def test_server_instructions_cover_correction_workflow():
