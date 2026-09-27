@@ -289,6 +289,26 @@ This is two separate steps, not one command per project — easy to
 miss since the whole point is that step 1 never mentions a project at
 all.
 
+> **Common mistake: dropping the trailing `chronicle`.** Both commands
+> below have the shape `uv run --project /path/to/chronicle chronicle
+> <subcommand>` — that middle `--project /path/to/chronicle` tells `uv`
+> *where to find chronicle's code*; the second, separate `chronicle` is
+> the actual program being run. It's easy to type the path and stop,
+> since `--project /path/to/chronicle` already has the word "chronicle"
+> in it and looks complete. Drop it and `uv` tries to run your next
+> word (`register`, or nothing at all) as if it were its own program,
+> and fails with something like:
+> ```
+> error: Failed to spawn: `register`
+>   Caused by: No such file or directory (os error 2)
+> ```
+> If you see that error, check for a missing `chronicle` right after
+> `--project /path/to/chronicle` in the command you ran.
+
+Prefer copy-pasting the exact commands `uv run chronicle setup` prints for
+you (§2 above) over retyping them from memory or from this doc — that's
+exactly how the mistake below happens.
+
 **Step 1 — once, ever, on this machine.** Run the command `chronicle setup`
 printed:
 
