@@ -170,6 +170,42 @@ function getGlowTexture() {
   return glowTexture;
 }
 
+/* Procedural granulation texture for a scope beacon's surface — mottled
+ * light/dark blotches over a warm base gradient, the way a real sun's
+ * photosphere looks grainy up close rather than a flat color. This is what
+ * gives the beacon actual surface character instead of reading as a glow
+ * effect with nothing solid underneath it. */
+let sunSurfaceTexture: THREE.Texture | null = null;
+function getSunSurfaceTexture() {
+  if (sunSurfaceTexture) return sunSurfaceTexture;
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const base = ctx.createRadialGradient(size * 0.42, size * 0.38, size * 0.04, size * 0.5, size * 0.5, size * 0.72);
+  base.addColorStop(0, "#fff3d6");
+  base.addColorStop(0.32, "#ffb562");
+  base.addColorStop(0.68, "#e8703a");
+  base.addColorStop(1, "#a83e1c");
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 520; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 1.5 + Math.random() * 6;
+    ctx.globalAlpha = 0.08 + Math.random() * 0.14;
+    ctx.fillStyle = Math.random() > 0.5 ? "#fff3d6" : "#7a2e14";
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  sunSurfaceTexture = new THREE.CanvasTexture(canvas);
+  sunSurfaceTexture.wrapS = sunSurfaceTexture.wrapT = THREE.RepeatWrapping;
+  return sunSurfaceTexture;
+}
+
 function roleLabel(node: GraphNode) {
   if (node.role === "core") return `${node.project} · CORE`;
   if (node.role === "latest") return `${node.project} · latest checkpoint${node.created_at ? ` ${node.created_at.slice(0, 10)}` : ""}`;
@@ -208,42 +244,36 @@ function ProjectLabel({ cluster }: { cluster: Cluster }) {
  * no children renders no beacon here at all — it's still just its existing
  * star cluster. */
 function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; onSelect: (scope: ScopeNode) => void }) {
+  const surfaceRef = useRef<THREE.Mesh>(null);
   const coronaRef = useRef<THREE.SpriteMaterial>(null);
-  const seed = useMemo(() => (position.x + position.y + position.z) * 3.7, [position]);
-  const baseCoronaOpacity = scope.core_present ? 0.5 : 0.34;
+  const baseCoronaOpacity = scope.core_present ? 0.28 : 0.18;
 
-  useFrame((state) => {
-    if (!coronaRef.current) return;
-    coronaRef.current.opacity = baseCoronaOpacity + Math.sin(state.clock.elapsedTime * 1.1 + seed) * 0.09;
+  useFrame((_, delta) => {
+    if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.06;
   });
 
   if (!isBlackHole) return null;
 
   return (
     <group position={position} onPointerDown={(event) => { event.stopPropagation(); onSelect(scope); }}>
-      {/* soft pulsing corona — a red giant's diffuse outer atmosphere */}
-      <sprite scale={[radius * 4.8, radius * 4.8, 1]}>
+      {/* thin, dim corona — just enough to read as radiating heat, not a
+       * glow effect standing in for the body itself. The body does that. */}
+      <sprite scale={[radius * 2.6, radius * 2.6, 1]}>
         <spriteMaterial ref={coronaRef} map={getGlowTexture()} color="#ff8f57" transparent opacity={baseCoronaOpacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
-      <sprite scale={[radius * 2.5, radius * 2.5, 1]}>
-        <spriteMaterial map={getGlowTexture()} color="#ffb27a" transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </sprite>
-      {/* main visible disk — this is the star's actual body */}
-      <mesh renderOrder={1}>
-        <sphereGeometry args={[radius * 0.65, 24, 18]} />
-        <meshBasicMaterial color="#e8703a" toneMapped={false} />
-      </mesh>
-      {/* hot inner core, off-white, peeking through the disk's center */}
-      <mesh renderOrder={2}>
-        <sphereGeometry args={[radius * 0.32, 20, 14]} />
-        <meshBasicMaterial color="#fff3d6" toneMapped={false} />
+      {/* the star's actual body — a slowly-rotating, granulated surface,
+       * not a flat-colored ball. Rotation is this element's one authored
+       * motion; the old pulsing corona is gone so it doesn't compete. */}
+      <mesh ref={surfaceRef} renderOrder={1}>
+        <sphereGeometry args={[radius * 0.78, 40, 28]} />
+        <meshBasicMaterial map={getSunSurfaceTexture()} toneMapped={false} />
       </mesh>
       {scope.linked_doc_count > 0 && (
         <sprite position={[radius * 1.4, radius * 0.75, radius * 0.3]} scale={[radius * 0.55, radius * 0.55, 1]}>
           <spriteMaterial map={getGlowTexture()} color={SEMANTIC} transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </sprite>
       )}
-      <Html position={[0, radius * 1.5, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
+      <Html position={[0, radius * 0.78 + 0.4, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
         {scope.name}
       </Html>
     </group>

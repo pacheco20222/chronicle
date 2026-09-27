@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-27T05:39:32.342386+00:00",
+  "generatedAt": "2026-09-27T05:44:29.589575+00:00",
   "title": "Design System: Chronicle Dashboard",
   "extensions": {
     "colorMeta": {
@@ -403,7 +403,8 @@
       "Don't fabricate activity, metrics, or network status the underlying store doesn't have — every readout (Qdrant, Docker, process list, counts) must reflect real sampled data, inherited from PRODUCT.md's core no-cloud/no-fabrication commitment.",
       "Don't render a scope-hierarchy body as a dark or occluding shape — see The Luminous-Not-Occluding Rule; presence in this chart always comes from emitted light, not from a bigger dark silhouette.",
       "Don't reach for ring geometry as the default way to mark significance — a ring around a sphere reads as \"planet with rings,\" not \"star.\" Scale, brightness, and layered soft glow are the vocabulary for \"bigger/more important\" here; a ring is a specific, deliberate signature (core memory, latest checkpoint) reserved for those exact two markers, not a general-purpose emphasis device.",
-      "Don't draw a connector line to a computed centroid or any point with no glyph rendered there — see The Real Connections Rule; a line always terminates on the actual marker it represents a relationship to."
+      "Don't draw a connector line to a computed centroid or any point with no glyph rendered there — see The Real Connections Rule; a line always terminates on the actual marker it represents a relationship to.",
+      "Don't lean on a big glow sprite as a body's primary visual — glow reads as atmosphere around something, not as the something. A scope beacon's presence comes from its actual textured, sized surface; the corona is a thin accent on top of that, not a substitute for it."
     ]
   }
 }
