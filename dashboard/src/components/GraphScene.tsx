@@ -195,45 +195,15 @@ function ProjectLabel({ cluster }: { cluster: Cluster }) {
 }
 
 /* The scope-hierarchy signature element: a scope with children renders as
- * a quasar beacon — an intensely bright, pulsing core with twin polar jets
- * — rather than a dark occluding body. A dark sphere against this scene's
- * near-black ground has almost no presence; everything else here reads by
- * being luminous, so the "this holds a lot" signal has to be luminous too.
- * Children of any kind (sub-scopes or leaf projects) orbit it via
- * useScopeLayout; a leaf project scope with no children renders no beacon
- * here at all — it's still just its existing star cluster. Built entirely
- * from additive glow sprites (the same technique every other glow in this
- * scene already uses) rather than shaded 3D geometry, so a jet reads as a
- * soft beam from any camera angle instead of a hard-edged cone. */
-function JetSegment({ direction, distance, scale, opacity }: { direction: 1 | -1; distance: number; scale: number; opacity: number }) {
-  return (
-    <sprite position={[0, direction * distance, 0]} scale={[scale, scale, 1]}>
-      <spriteMaterial map={getGlowTexture()} color={BRASS_BRIGHT} transparent opacity={opacity} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-    </sprite>
-  );
-}
-
-function QuasarJet({ direction, radius }: { direction: 1 | -1; radius: number }) {
-  const jetLength = radius * 3.4;
-  const segments = 4;
-  return (
-    <group>
-      {Array.from({ length: segments }, (_, i) => {
-        const t = (i + 0.5) / segments;
-        return (
-          <JetSegment
-            key={i}
-            direction={direction}
-            distance={t * jetLength}
-            scale={radius * (1.15 - t * 0.7)}
-            opacity={0.5 * (1 - t * 0.75)}
-          />
-        );
-      })}
-    </group>
-  );
-}
-
+ * a quasar beacon — an intensely bright, pulsing core — rather than a dark
+ * occluding body. A dark sphere against this scene's near-black ground has
+ * almost no presence; everything else here reads by being luminous, so the
+ * "this holds a lot" signal has to be luminous too. Children of any kind
+ * (sub-scopes or leaf projects) orbit it via useScopeLayout and are joined
+ * to it by a plain orbit line (see ScopeOrbitLine) — a real structural
+ * connector, not a glow effect standing in for one. A leaf project scope
+ * with no children renders no beacon here at all — it's still just its
+ * existing star cluster. */
 function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: ScopeNode; position: THREE.Vector3; radius: number; isBlackHole: boolean; onSelect: (scope: ScopeNode) => void }) {
   const pulseRef = useRef<THREE.SpriteMaterial>(null);
   const seed = useMemo(() => (position.x + position.y + position.z) * 3.7, [position]);
@@ -248,40 +218,50 @@ function ScopeBody({ scope, position, radius, isBlackHole, onSelect }: { scope: 
   return (
     <group position={position} onPointerDown={(event) => { event.stopPropagation(); onSelect(scope); }}>
       {/* soft outer halo */}
-      <sprite scale={[radius * 2.8, radius * 2.8, 1]}>
-        <spriteMaterial map={getGlowTexture()} color={BRASS} transparent opacity={0.32} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <sprite scale={[radius * 4.4, radius * 4.4, 1]}>
+        <spriteMaterial map={getGlowTexture()} color={BRASS} transparent opacity={0.34} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
       {/* pulsing white-hot core */}
-      <sprite scale={[radius * 1.15, radius * 1.15, 1]}>
-        <spriteMaterial ref={pulseRef} map={getGlowTexture()} color="#fff3d6" transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <sprite scale={[radius * 1.85, radius * 1.85, 1]}>
+        <spriteMaterial ref={pulseRef} map={getGlowTexture()} color="#fff3d6" transparent opacity={0.88} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
       <mesh renderOrder={1}>
-        <sphereGeometry args={[radius * 0.22, 16, 12]} />
+        <sphereGeometry args={[radius * 0.36, 20, 14]} />
         <meshBasicMaterial color="#fff8ea" toneMapped={false} />
       </mesh>
       {/* bright energetic equatorial ring (never dark — glowing, additive) */}
       <mesh rotation={[Math.PI / 2.15, 0, 0]}>
-        <torusGeometry args={[radius * 0.9, radius * 0.045, 10, 48]} />
+        <torusGeometry args={[radius * 1.15, radius * 0.06, 10, 48]} />
         <meshBasicMaterial color={BRASS_BRIGHT} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
-      {/* twin polar jets */}
-      <QuasarJet direction={1} radius={radius} />
-      <QuasarJet direction={-1} radius={radius} />
       {scope.core_present && (
-        <sprite scale={[radius * 1.7, radius * 1.7, 1]}>
+        <sprite scale={[radius * 2.2, radius * 2.2, 1]}>
           <spriteMaterial map={getGlowTexture()} color={BRASS} transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </sprite>
       )}
       {scope.linked_doc_count > 0 && (
         <mesh rotation={[Math.PI / 2.15 + Math.PI / 5, Math.PI / 7, 0]}>
-          <torusGeometry args={[radius * 1.15, radius * 0.02, 8, 40]} />
+          <torusGeometry args={[radius * 1.45, radius * 0.026, 8, 40]} />
           <meshBasicMaterial color={SEMANTIC} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
-      <Html position={[0, radius * 0.9 + 0.45, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
+      <Html position={[0, radius * 1.15 + 0.5, 0]} center distanceFactor={11} zIndexRange={[5, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: BRASS_BRIGHT, textShadow: "0 0 8px rgba(2,3,7,0.95), 0 0 3px rgba(2,3,7,0.95)" }}>
         {scope.name}
       </Html>
     </group>
+  );
+}
+
+/* A plain structural line from a scope to its parent — never additive glow,
+ * never dashed (dashed brass is already spoken for by explicit memory
+ * relations, see ExplicitEdgeLine) — so the hierarchy itself reads as a
+ * real connection, not a coincidence of two beacons happening to line up. */
+function ScopeOrbitLine({ from, to }: { from: THREE.Vector3; to: THREE.Vector3 }) {
+  const geometry = useMemo(() => new THREE.BufferGeometry().setFromPoints([from, to]), [from, to]);
+  return (
+    <lineSegments geometry={geometry}>
+      <lineBasicMaterial color={BRASS} transparent opacity={0.22} toneMapped={false} />
+    </lineSegments>
   );
 }
 
@@ -428,9 +408,16 @@ function GraphObjects({ layout, clusters, edges, scopePositions, selectedId, onS
   return <group>
     {clusters.map((cluster) => <ProjectNebula key={`nebula-${cluster.project}`} cluster={cluster} />)}
     {clusters.map((cluster) => <ProjectLabel key={`label-${cluster.project}`} cluster={cluster} />)}
-    {[...scopePositions.entries()].map(([path, scopePosition]) => (
-      <ScopeBody key={`scope-${path}`} scope={scopePosition.scope} position={scopePosition.position} radius={scopePosition.radius} isBlackHole={scopePosition.isBlackHole} onSelect={onSelectScope} />
-    ))}
+    {[...scopePositions.entries()].map(([path, scopePosition]) => {
+      const parentPath = scopePosition.scope.parent_path;
+      const parentPosition = parentPath ? scopePositions.get(parentPath)?.position : undefined;
+      return (
+        <group key={`scope-${path}`}>
+          {parentPosition && <ScopeOrbitLine from={parentPosition} to={scopePosition.position} />}
+          <ScopeBody scope={scopePosition.scope} position={scopePosition.position} radius={scopePosition.radius} isBlackHole={scopePosition.isBlackHole} onSelect={onSelectScope} />
+        </group>
+      );
+    })}
     <SemanticEdgeField edges={semanticEdges} positionById={positionById} connectedIds={connectedIds} focusActive={focusActive} />
     {explicitEdges.map((edge, index) => {
       const source = positionById.get(edge.source);
