@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.1.1 — 2026-09-28
+
+### Fixed
+- Dashboard: a scope hierarchy where every level had exactly one child
+  (the common shape right after creating a first core/sub-core — one
+  core, one sub-core, one project) collapsed onto a single point
+  instead of rendering as separated bodies. Two independent zero-offset
+  paths in the layout code both needed fixing.
+- Dashboard: a lone root scope (the common single-core case) was
+  incorrectly offset away from world origin, inflating the computed
+  scene extent and pushing the initial camera so far out the whole
+  hierarchy was invisible on load.
+- Dashboard: scope bodies simplified to flat, low-shine per-depth
+  colors (sun/planet/moon) instead of a bright granulated texture that
+  spiked the bloom pass; background star density reduced; sibling/
+  child spacing tightened to prevent near-collisions, with extra room
+  for two-child rings specifically.
+- `scripts/backup.sh` and `scripts/backup.ps1` now back up the
+  canonical SQLite database (`~/.chronicle/chronicle.db`) before
+  snapshotting Qdrant — previously only the derived vector index and a
+  JSON export were covered, not the actual source of truth.
+
+### Documentation
+- README/INSTALL brought up to date with the 3.0/3.1 rearchitecture
+  (SQLite canonical store, hierarchical scopes, the dashboard's actual
+  rendering) — they still described the pre-3.0 Qdrant-only design.
+- Cursor's setup instructions given the same explicit treatment as
+  Claude Code and Codex (full JSON example, not "same as above").
+- Added a full "organizing projects into cores and sub-cores"
+  walkthrough: exact commands, recommended depth, what content
+  belongs in a core vs. a sub-core vs. a project's own overview, and
+  that writing any content at all is optional — an empty core used
+  purely for grouping costs nothing at every session start.
+- Added a Graphiti/Zep comparison and an honest note on the current
+  gap for cloud-hosted chat clients (claude.ai, ChatGPT) versus local
+  MCP clients (Claude Code, Cursor, Codex, Claude Desktop).
+
 ## 3.1.0 — 2026-09-27
 
 ### Added
