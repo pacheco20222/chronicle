@@ -112,9 +112,41 @@ printed `.mcp.json` block into that repo. The project is baked into
 the pasted file — nothing else to do, no separate registration.
 Repeat per repo, with that repo's own `--project` value.
 
-**Cursor:** identical to Claude Code above — same `chronicle setup
---project X`, same per-repo repeat — except paste the block into
-`.cursor/mcp.json` instead of `.mcp.json`.
+**Cursor:** same idea as Claude Code above, just a different filename.
+For each repo you want memory in, run:
+
+```bash
+uv run chronicle setup --project my-project-name
+```
+
+and paste the `.mcp.json` block it prints into a **`.cursor/mcp.json`**
+file (not `.mcp.json`) at that repo's root — it's the identical JSON
+shape either way:
+
+```json
+{
+  "mcpServers": {
+    "chronicle": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/chronicle", "run", "chronicle"],
+      "env": {
+        "CHRONICLE_PROJECT": "my-project-name"
+      }
+    }
+  }
+}
+```
+
+The project is baked into this file, so nothing else to do — no
+separate registration step, unlike Codex below. Restart (or reload the
+window in) Cursor after adding or editing this file to pick up the
+server. Repeat per repo, with that repo's own `--project` value.
+Cursor has no plugin/marketplace system and no session-start-hook
+equivalent, so there's no one-command install path the way Claude
+Code's plugin has, and no automatic checkpoint/document recall at the
+start of a session — see
+[docs/INSTALL.md §5](docs/INSTALL.md#5-cursor) for how to ask for that
+recall manually instead.
 
 **Codex is different: two separate steps, not one command per
 project.**
