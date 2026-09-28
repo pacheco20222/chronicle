@@ -149,7 +149,16 @@ function useScopeLayout(scopes: ScopeNode[], projectRadii: Map<string, number>) 
       if (children.length === 0) return;
       const extents = children.map((child) => subtreeExtent.get(child.path)!);
       const maxExtent = Math.max(0.75, ...extents);
-      const orbitRadius = orbitRadiusFor(children.length, maxExtent);
+      /* A single child still needs real separation from its parent at
+       * every nested level (that's the whole point of the fix above) —
+       * except at the true root, where "parent" is the empty (0,0,0)
+       * the camera's home framing is built around, not a real body.
+       * Offsetting a lone root scope away from it would just displace
+       * the entire tree off-center for no reason, and since offsetting
+       * a scope from an empty point isn't correlated with anything a
+       * viewer can see, there's nothing lost by anchoring it there
+       * instead. */
+      const orbitRadius = parentPath === null && children.length === 1 ? 0 : orbitRadiusFor(children.length, maxExtent);
       children.forEach((child, index) => {
         const local = fibonacciPoint(index, children.length, orbitRadius);
         const position = center.clone().add(local);
