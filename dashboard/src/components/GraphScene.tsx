@@ -85,13 +85,19 @@ const ORBIT_SPACING_MULT = 2.15;
 const ORBIT_SPACING_SQRT = 1.1;
 const ORBIT_SPACING_MIN = 4.5;
 
-/* fibonacciPoint's two-point case isn't a clean antipodal split (it lands
- * them at 60°/120° latitude, not 0°/180°), so a pair of orbiting children
- * reads closer together than the same spacing formula intends for larger
- * rings — a small dedicated boost for exactly two children corrects just
- * that case without changing anything else's spacing. */
+/* A single child is still a child, not the scope itself — it needs real
+ * separation from its parent or an unbroken chain of one-child scopes
+ * (a lone project under a lone sub-core under a lone core, the exact
+ * shape a hierarchy starts in before it has siblings to space against)
+ * collapses every level onto the same point, since each level's "ring"
+ * has nothing to spread across. fibonacciPoint's two-point case also
+ * isn't a clean antipodal split (it lands them at 60°/120° latitude,
+ * not 0°/180°), so a pair of orbiting children reads closer together
+ * than the same spacing formula intends for larger rings — a small
+ * dedicated boost for exactly two children corrects just that case
+ * without changing anything else's spacing. */
 function orbitRadiusFor(childCount: number, maxExtent: number) {
-  if (childCount <= 1) return 0;
+  if (childCount <= 1) return Math.max(ORBIT_SPACING_MIN, maxExtent * 1.4);
   const base = Math.max(ORBIT_SPACING_MIN, maxExtent * ORBIT_SPACING_MULT + Math.sqrt(childCount) * ORBIT_SPACING_SQRT);
   return childCount === 2 ? base * 1.3 : base;
 }
@@ -128,7 +134,7 @@ function useScopeLayout(scopes: ScopeNode[], projectRadii: Map<string, number>) 
       if (children.length > 0) {
         const childExtents = children.map(extentOf);
         const maxChildExtent = Math.max(0.75, ...childExtents);
-        const orbitRadius = children.length <= 1 ? maxChildExtent * 1.4 : orbitRadiusFor(children.length, maxChildExtent);
+        const orbitRadius = orbitRadiusFor(children.length, maxChildExtent);
         total = Math.max(ownExtent, orbitRadius + maxChildExtent);
       }
       subtreeExtent.set(scope.path, total);
@@ -145,7 +151,7 @@ function useScopeLayout(scopes: ScopeNode[], projectRadii: Map<string, number>) 
       const maxExtent = Math.max(0.75, ...extents);
       const orbitRadius = orbitRadiusFor(children.length, maxExtent);
       children.forEach((child, index) => {
-        const local = children.length === 1 ? new THREE.Vector3() : fibonacciPoint(index, children.length, orbitRadius);
+        const local = fibonacciPoint(index, children.length, orbitRadius);
         const position = center.clone().add(local);
         positions.set(child.path, { position, isBlackHole: child.child_count > 0, radius: scopeExtent(child, projectRadii), scope: child, depth });
         place(child.path, position, depth + 1);
