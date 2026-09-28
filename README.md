@@ -13,11 +13,18 @@ another repo's memory by accident.
 - **`memory_add` / `memory_search`** — write and recall memories, hard-scoped to the current project.
 - **Checkpoint/resume** — say "checkpoint this" before a long session ends; it's recalled automatically the next time you start one.
 - **Named documents** — a project overview or running dev log that updates in place instead of piling up, also auto-loaded every session.
-- **Hierarchical scopes** — group related projects under a shared parent (e.g. `personal_projects/heliofi/heliofi_backend`) with `memory_list_scopes`/`memory_scope_reparent`, or `chronicle scope create/list/move` from a terminal. Reorganizing is always something you ask for, never automatic — a project's own memories stay keyed to it regardless of where it's filed in the tree.
+- **Hierarchical scopes** — group related projects under a shared parent (e.g. `personal_projects/heliofi/heliofi_backend`) with `memory_list_scopes`/`memory_scope_reparent`, or `chronicle scope create/list/move` from a terminal — see [docs/INSTALL.md § Organizing projects](docs/INSTALL.md#organizing-projects-into-cores-and-sub-cores) for the exact commands to build one and connect existing projects to it. Reorganizing is always something you ask for, never automatic — a project's own memories stay keyed to it regardless of where it's filed in the tree.
 - **`memory_search_global`** — the one explicit, deliberate escape hatch for a genuinely cross-project question.
 - **`chronicle import`** — bulk-load an existing file (or a whole directory of `.md`/`.txt` files) into a project's memory, chunking large files instead of truncating them. Run yourself, from a terminal — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope).
 - **`chronicle graph`** — a real, embedding-similarity graph of your memories, rendered as a glowing 3D network you can orbit and zoom (core memory = gold ring, latest checkpoint = diamond; filter by project, search, or show only key memories), locally and opened in your browser. Scoped to the current project by default, same as everything else; `--all` graphs every project together, deliberately. Same terminal invocation as `import` above.
-- **`chronicle dashboard`** — a persistent, local React/Three.js memory explorer, themed as a navigable star chart: every project is its own constellation with its core memory anchoring the center (the way Sagittarius A* anchors the Milky Way), and a scope with children renders as its own sun/planet/moon body — depth in your taxonomy maps onto depth in the solar system, children always orbiting their parent. Run `uv run chronicle dashboard start` for foreground mode, `uv run chronicle dashboard start --background` for a persistent local process, and `uv run chronicle dashboard stop` to stop it. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port.
+- **`chronicle dashboard`** — a persistent, local React/Three.js memory explorer, themed as a navigable star chart: every project is its own constellation with its core memory anchoring the center (the way Sagittarius A* anchors the Milky Way), and a scope with children renders as its own sun/planet/moon body — depth in your taxonomy maps onto depth in the solar system, children always orbiting their parent. From inside your chronicle clone:
+  ```bash
+  cd /path/to/chronicle
+  uv run chronicle dashboard start              # foreground
+  uv run chronicle dashboard start --background  # persistent local process
+  uv run chronicle dashboard stop                # stop a backgrounded one
+  ```
+  or, from anywhere, `uv run --directory /path/to/chronicle chronicle dashboard start`. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port. It always serves every registered project at once, not just the one you're standing in — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope) for more.
 
 ## Requirements
 
@@ -138,9 +145,15 @@ shape either way:
 ```
 
 The project is baked into this file, so nothing else to do — no
-separate registration step, unlike Codex below. Restart (or reload the
-window in) Cursor after adding or editing this file to pick up the
-server. Repeat per repo, with that repo's own `--project` value.
+separate registration step, unlike Codex below. Then, in Cursor, open
+**Settings → Tools & MCP** and switch the `chronicle` server **on** —
+Cursor detects the new file but does not start a newly added project
+server by itself, so until you flip that toggle it shows as
+disconnected and the agent has no chronicle tools at all. Wait for a
+green/connected status (reload the window if it doesn't appear), and
+only then ask the agent to use it. The project itself is created the
+first time a memory is saved. Repeat per repo, with that repo's own
+`--project` value.
 Cursor has no plugin/marketplace system and no session-start-hook
 equivalent, so there's no one-command install path the way Claude
 Code's plugin has, and no automatic checkpoint/document recall at the

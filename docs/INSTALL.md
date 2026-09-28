@@ -255,8 +255,16 @@ Copy the exact same block `chronicle setup` printed for Claude Code into
 ```
 
 Same rule as Claude Code: give each repo its own `CHRONICLE_PROJECT` value.
-Restart Cursor (or reload the window) after adding or editing this
-file for it to pick up the server.
+Then open **Settings → Tools & MCP** in Cursor and switch the
+`chronicle` server **on**. Cursor detects a new or edited
+`.cursor/mcp.json` but does not start a newly added project server by
+itself: until you flip that toggle it shows as disconnected (its logs
+show the server going `none → disconnected` with no process ever
+spawned) and the agent has no chronicle tools at all — asking it to
+"use chronicle" then fails with a "namespace not found"-style error,
+which looks like a config problem but isn't. Wait for a connected
+status (reload the window if it doesn't appear) before asking the
+agent to use it. Do the same toggle again after editing the file.
 
 Cursor has no plugin/marketplace system and no `SessionStart`-hook
 equivalent, so there's no bundled-plugin install path and no automatic
@@ -351,27 +359,25 @@ them beyond the registry file both read from.
 
 `chronicle import`, `chronicle graph`, `chronicle dashboard`, and `chronicle
 scope` aren't called by Claude Code or Codex — you run these yourself,
-directly. `chronicle dashboard start` opens a persistent local 3D memory
-explorer (`--background` to keep it running, `stop` to stop it,
-`127.0.0.1:8765` by default). `chronicle scope create <path>` / `chronicle
-scope list [--prefix]` / `chronicle scope move <path> --to <parent>`
-manage the scope hierarchy from a terminal — the same thing
-`memory_list_scopes`/`memory_scope_reparent` do from inside a session. See
-[docs/ARCHITECTURE.md](ARCHITECTURE.md) for what the hierarchy and
-dashboard actually do. Like every `uv run chronicle`
-invocation, `uv` needs to find chronicle's own code, either by cwd or by
-`--directory`:
+directly. Every one of them is a plain `uv run` invocation, and `uv` needs
+to find chronicle's own code to run it, either by your current directory
+or by `--directory`:
 
 ```bash
 cd /path/to/chronicle   # wherever you cloned it
 uv run chronicle graph --project your-project-name
 uv run chronicle import notes.md --project your-project-name --type note
+uv run chronicle dashboard start
+uv run chronicle scope list
 ```
 
-or from anywhere else:
+or, from anywhere else, with the full path spelled out instead of relying
+on `cd`:
 
 ```bash
 uv run --directory /path/to/chronicle chronicle graph --project your-project-name
+uv run --directory /path/to/chronicle chronicle dashboard start
+uv run --directory /path/to/chronicle chronicle scope list
 ```
 
 Real gotcha with `--directory`: it changes the command's working
@@ -391,6 +397,62 @@ for it explicitly). It needs at least 2 memories in scope to draw
 anything, writes a self-contained HTML file (`--out path.html` to
 control where — defaults to your current directory), and opens it in
 your default browser automatically.
+
+`chronicle dashboard start` opens a persistent local 3D memory explorer at
+`127.0.0.1:8765` by default (`--port` or `CHRONICLE_DASHBOARD_PORT` to
+change it, `--background` to keep it running after the terminal closes,
+`chronicle dashboard stop` to stop a backgrounded one). Unlike `graph`, it
+isn't scoped to one project by your current directory — it always serves
+every registered project at once, and you switch between them inside the
+dashboard itself.
+
+#### Organizing projects into cores and sub-cores
+
+A **core** is just a scope with nothing above it, and a **sub-core** is a
+scope with a parent — there's no separate concept or command for either
+one, only `chronicle scope`. Say you want `personal_projects` as a core
+with a `heliofi` sub-core under it, holding both `heliofi_backend` and
+`heliofi_frontend`, which already exist as their own registered projects:
+
+```bash
+cd /path/to/chronicle
+
+# creates personal_projects and personal_projects/heliofi in one go —
+# creating a nested path creates any missing ancestor scopes too
+uv run chronicle scope create personal_projects/heliofi
+
+# move each existing project's scope under the new sub-core
+uv run chronicle scope move heliofi_backend --to personal_projects/heliofi
+uv run chronicle scope move heliofi_frontend --to personal_projects/heliofi
+
+# confirm the shape
+uv run chronicle scope list
+```
+```
+personal_projects
+  personal_projects/heliofi
+    personal_projects/heliofi/heliofi_backend
+    personal_projects/heliofi/heliofi_frontend
+```
+
+`scope move <path>` requires that `<path>` already exist as a scope —
+true automatically for any project that's had at least one memory or core
+saved to it; run `chronicle scope create <project-name>` first if it
+hasn't. Moving a project changes only where it's filed in the taxonomy:
+its memories stay keyed to its bare project name, so nothing in Cursor,
+Codex, or Claude Code needs reconfiguring afterward — the same tool
+config that pointed at `heliofi_backend` before the move still resolves
+to the same memories after it. `scope move <path>` with no `--to` puts a
+scope back at the root.
+
+None of this writes a core's actual text — a scope, including a brand
+new parent like `personal_projects`, has no content until you explicitly
+give it one. From an agent session (any of the three tools), ask it to
+save a core memory for that scope path, or do it from the dashboard:
+click the scope's body once it has children and use the "scope core"
+editor there. See
+[docs/ARCHITECTURE.md § Scope hierarchy](ARCHITECTURE.md#scope-hierarchy-and-project-isolation)
+for how scopes, cores, and project isolation actually fit together.
 
 ### 8. Windows
 
