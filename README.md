@@ -222,6 +222,45 @@ the difference. If you're upgrading from before 2.0.0, either start a
 fresh `memories` collection, or expect old memories to rank essentially
 randomly against new ones in semantic search until you re-add them.
 
+## How this compares to Graphiti/Zep
+
+[Graphiti](https://github.com/getzep/graphiti) (the open-source engine
+behind [Zep](https://www.getzep.com)) is a genuinely different kind of
+tool, not just a competing UI on the same idea, so "which is better" is
+the wrong question — they solve different problems:
+
+| | Chronicle | Graphiti |
+|---|---|---|
+| What gets remembered | Explicit — an agent/user decides to call `memory_add` | Automatic — an LLM extracts entities and facts from whatever data you feed it |
+| Storage | One SQLite file + local Qdrant, zero external deps beyond Docker | Requires a graph database (Neo4j, etc.) or Zep's hosted engine |
+| Isolation model | Per-repo/project scope tree — built for one developer, many codebases | Per-entity/user context graphs — built for one product, many end-users |
+| Change tracking | Whole-memory supersede/status (active/resolved/superseded/expired/wrong) | Sub-fact-level bi-temporal validity windows ("true from March to June") |
+| Setup cost | `docker compose up`, `uv run`, done | Graph DB provisioning, optional ontology design, an extraction pipeline |
+| Extraction cost | None — nothing runs unless you explicitly save something | An LLM call to extract structure from every ingested episode |
+
+Graphiti genuinely wins on fact-level temporal precision, not having to
+remember to save anything yourself, and production scale (built for
+"millions of context graphs"). Chronicle's actual pitch: it costs
+nothing to run beyond what a solo developer already has installed, and
+it never does anything you didn't explicitly ask it to.
+
+## Known gap: local clients only, not cloud chat
+
+Chronicle's MCP server runs as a local process a client spawns and
+talks to over stdio — that's what Claude Code, Cursor, Codex, and the
+**Claude Desktop app** all do (see
+[docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop) for the desktop
+app specifically). **claude.ai and ChatGPT's web/app chat interfaces
+are cloud-hosted and can't spawn a local process** — they'd need a
+remote, authenticated HTTP MCP endpoint instead. Chronicle's dashboard
+already serves the same tools over streamable HTTP at `/mcp`
+(`chronicle dashboard start`, see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)), but that endpoint binds
+to `127.0.0.1` only and has no authentication — appropriate for a
+trusted local dev tool, not for exposing to the public internet as-is.
+Bridging this (a tunnel plus real auth, at minimum) is a real, unbuilt
+feature, not a documentation gap.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

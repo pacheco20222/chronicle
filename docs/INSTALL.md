@@ -454,6 +454,23 @@ editor there. See
 [docs/ARCHITECTURE.md § Scope hierarchy](ARCHITECTURE.md#scope-hierarchy-and-project-isolation)
 for how scopes, cores, and project isolation actually fit together.
 
+**Writing core content is entirely optional — an empty core still has
+real value, and costs nothing.** You can create `personal_projects` and
+`personal_projects/heliofi` purely to group related repos together and
+never write a word in either one. Two things still work without any
+content: `chronicle scope list` (and `memory_list_scopes`) show the
+grouping, so you or an agent can always see which projects belong
+together; and an agent already knows to call `memory_list_scopes` to
+discover sibling projects under the same sub-core when that's useful,
+independent of whether either scope has a core document. And since the
+`SessionStart` hook that auto-loads context at the start of every
+session only ever reads a project's own overview and latest checkpoint
+— never a parent scope, with or without content — an empty core adds
+**zero** cost to every session under it, forever. If you're not sure
+whether a core is worth writing anything into yet, that's fine:
+organize first, decide later, or never decide at all. Plenty of people
+will get real value from Chronicle without ever creating one.
+
 **Recommended depth: one core, one optional layer of sub-cores under
 it.** Chronicle doesn't enforce a depth limit — you can nest as many
 levels as you want — but the dashboard's sun/planet/moon rendering and
