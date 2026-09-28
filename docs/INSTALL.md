@@ -454,6 +454,80 @@ editor there. See
 [docs/ARCHITECTURE.md § Scope hierarchy](ARCHITECTURE.md#scope-hierarchy-and-project-isolation)
 for how scopes, cores, and project isolation actually fit together.
 
+**Recommended depth: one core, one optional layer of sub-cores under
+it.** Chronicle doesn't enforce a depth limit — you can nest as many
+levels as you want — but the dashboard's sun/planet/moon rendering and
+your own ability to keep track of where things are both get harder to
+read past two levels. A core for a related group of projects
+(`personal_projects`), with a sub-core only where a subset of those
+projects genuinely belong together (`personal_projects/heliofi` for
+just the two heliofi repos), is the shape to reach for. Don't create a
+sub-core for every project — a project with no siblings that need
+grouping is fine sitting directly under the core, or even staying
+unorganized at the root if you don't need a core at all yet.
+
+**What to actually write in each one.** A core and a sub-core answer
+different questions, so their content shouldn't be the same kind of
+thing:
+
+- **The core** (`personal_projects`) is *how you work*, not what any
+  one project is — your general conventions and preferences across
+  this whole group: commit message style, how much to ask before
+  acting, testing habits, tone, whatever an agent should already know
+  before it's even looked at a specific repo. Every session under this
+  core reads it, so keep it to a handful of lines — a few genuine
+  preferences, not a policy document. The MCP server itself already
+  tells agents "core documents should stay a few lines, not an essay,"
+  precisely so a big one doesn't eat into every session's context
+  budget for no benefit.
+- **A sub-core** (`personal_projects/heliofi`) is *what this group of
+  projects is and why* — the shared context and objective that
+  `heliofi_backend` and `heliofi_frontend` both need but neither one's
+  own project overview should have to repeat: the product, the
+  business goal, how the sibling repos relate to each other, anything
+  a session in either repo benefits from knowing about the pair. Still
+  short — a few lines, same rule as the core — it's a shared precursor
+  to each project's own overview, not a replacement for it.
+- **A project's own overview** (`heliofi_backend`) stays the primary,
+  most detailed thing an agent reads — stack, architecture, gotchas,
+  the specific facts that only apply to this one repo. The core and
+  sub-core exist to avoid repeating the *shared* parts of that across
+  sibling projects, not to replace it.
+
+By default an agent reads only its own project's overview, and only
+checks a parent's core when that doesn't answer the question or you
+explicitly ask for bigger-picture context — it never walks the whole
+ancestor chain automatically. That's also why a bloated core is a real
+cost, not a theoretical one: every level you make an agent check is
+memory it has to load before it gets to the part that's actually
+specific to what it's working on.
+
+**Inspecting the hierarchy.** `chronicle scope list` prints the whole
+tree; narrow it with `--prefix`:
+
+```bash
+uv run chronicle scope list --prefix personal_projects/heliofi
+```
+```
+personal_projects/heliofi
+  personal_projects/heliofi/heliofi_backend
+  personal_projects/heliofi/heliofi_frontend
+```
+
+The same filter is available to an agent as
+`memory_list_scopes(prefix="personal_projects/heliofi")`, so you can ask
+"what's under the heliofi sub-core?" in a session instead of switching to
+a terminal.
+
+**What `chronicle scope` does not do:** create, list, and move are the
+complete set — there's no `delete` or `rename`. To get rid of an empty
+organizational scope that was created by mistake, move everything back
+out of it with `scope move`; an empty scope with nothing under it and no
+core of its own is otherwise harmless to leave in place. There's
+currently no way to remove it outright or rename it in place — moving a
+project to a differently-named parent (`scope create` the new name,
+`scope move` each project to it) is the only workaround for a rename.
+
 ### 8. Windows
 
 Two real options, same as always — pick one, don't mix them for the
