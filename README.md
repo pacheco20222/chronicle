@@ -161,6 +161,15 @@ start of a session — see
 [docs/INSTALL.md §5](docs/INSTALL.md#5-cursor) for how to ask for that
 recall manually instead.
 
+**Claude Desktop app (Chat tab):** different from Claude Code: no plugin,
+no auto-recall hook, and no folder to infer a project from. You edit
+`claude_desktop_config.json` by hand, with an **absolute path to `uv`**
+(the app does not see your shell `PATH`), then fully quit and reopen the
+app. Follow the numbered steps in
+[docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop-the-chat-tab).
+This does not cover claude.ai in a browser, see
+[Known gap](#known-gap-local-clients-only-not-cloud-chat).
+
 **Codex is different: two separate steps, not one command per
 project.**
 
@@ -249,7 +258,7 @@ it never does anything you didn't explicitly ask it to.
 Chronicle's MCP server runs as a local process a client spawns and
 talks to over stdio — that's what Claude Code, Cursor, Codex, and the
 **Claude Desktop app** all do (see
-[docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop) for the desktop
+[docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop-the-chat-tab) for the desktop
 app specifically). **claude.ai and ChatGPT's web/app chat interfaces
 are cloud-hosted and can't spawn a local process** — they'd need a
 remote, authenticated HTTP MCP endpoint instead. Chronicle's dashboard

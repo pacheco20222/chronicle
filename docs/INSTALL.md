@@ -200,34 +200,77 @@ If a `.claude/settings.json` already exists in that repo, add the
 `"hooks"` key alongside whatever's already there rather than replacing
 the file.
 
-### 4. Claude Desktop
+### 4. Claude Desktop (the Chat tab)
 
-Claude Desktop uses the same `mcpServers` JSON shape, in its
-`claude_desktop_config.json` file (on macOS, usually
-`~/Library/Application Support/Claude/claude_desktop_config.json`):
+The Claude Desktop app is not Claude Code, and setup differs in four ways:
 
-```json
-{
-  "mcpServers": {
-    "chronicle": {
-      "command": "uv",
-      "args": ["--directory", "/absolute/path/to/chronicle", "run", "chronicle"],
-      "env": {
-        "CHRONICLE_PROJECT": "your-project-name"
-      }
-    }
-  }
-}
-```
+- **No plugin, no `/chronicle:chronicle-register`.** You edit one JSON file by hand.
+- **No session-start hook.** Nothing recalls your latest checkpoint
+  automatically. You ask for it in the chat ("what's my latest chronicle
+  checkpoint?").
+- **Desktop has no working directory / registered folder concept at all**, so
+  Chronicle cannot work out the project from where you are. You either pin
+  one project in the config (step 3), or tell Claude which `scope_path` to
+  use in each message.
+- **It is a GUI app.** It does not read your shell profile, so a bare `uv`
+  is often not found. Use the absolute path to `uv`.
 
-Claude Desktop chat has no working directory / registered folder concept at
-all. For one ongoing topic, you can pin one fixed `CHRONICLE_PROJECT` in
-this Desktop config entry. For a chat that ranges across several unrelated
-things (for example, reviewing docs or notes from different personal
-projects in one conversation), do not rely on `CHRONICLE_PROJECT`; tell
-Claude which `scope_path` to use per message instead. Every memory tool
-accepts that explicit scope override, so it works without any folder
-registration.
+This works in the Desktop app's **Chat** tab. It does not make Chronicle
+work on claude.ai in a browser — see the
+[README's known gap](../README.md#known-gap-local-clients-only-not-cloud-chat).
+
+**Steps** (Docker/OrbStack running and the repo cloned with
+`docker compose up -d`, as in Option B steps 1–2):
+
+1. Find the absolute path to `uv`:
+   ```bash
+   which uv
+   ```
+   (for example `/opt/homebrew/bin/uv`). Your clone path is the one
+   `uv run chronicle setup` prints.
+2. Open the config file. In Claude Desktop: **Settings → Developer → Edit
+   Config**. Or open it directly; on macOS it is
+   `~/Library/Application Support/Claude/claude_desktop_config.json`, on
+   Windows `%APPDATA%\Claude\claude_desktop_config.json`. If the file
+   already has content, add `mcpServers` next to your existing keys; do
+   not replace the file.
+3. Add the server, with your two paths filled in:
+   ```json
+   {
+     "mcpServers": {
+       "chronicle": {
+         "command": "/absolute/path/to/uv",
+         "args": ["--directory", "/absolute/path/to/chronicle", "run", "chronicle"],
+         "env": {
+           "CHRONICLE_PROJECT": "your-project-name"
+         }
+       }
+     }
+   }
+   ```
+   `CHRONICLE_PROJECT` pins every chat to one project. Use it for one
+   ongoing topic. For a chat that ranges across several unrelated
+   projects, leave `env` out and pass an explicit `scope_path` per message
+   instead; every memory tool accepts one.
+4. **Fully quit Claude Desktop (Cmd+Q on macOS, or Quit from the tray on
+   Windows) and reopen it.** Closing the window is not enough; the config
+   is only read at launch.
+5. Open a **new chat**. `chronicle` should appear in the tools menu of the
+   message box with its memory tools listed. If it is missing or shows an
+   error, see the troubleshooting below.
+6. Check it works. Send: "Save a chronicle note: Desktop install test."
+   Then: "Search chronicle for Desktop install test." The first save
+   downloads the embedding model (~500MB, once), so it can take a while.
+
+**Troubleshooting**
+
+- Server missing or failed: read `~/Library/Logs/Claude/mcp-server-chronicle.log`
+  (Windows: `%APPDATA%\Claude\logs\`).
+- `spawn uv ENOENT`: `command` is not an absolute path to `uv`.
+- `CHRONICLE_PROJECT is not set and this folder isn't registered`: you left
+  `env` out and did not pass a `scope_path` in the message.
+- Invalid JSON: a trailing comma or missing bracket stops Desktop from
+  loading any server. Paste the file into a JSON validator.
 
 ### 5. Cursor
 
