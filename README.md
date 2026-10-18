@@ -20,6 +20,7 @@ another repo's memory by accident.
 - **`chronicle dashboard`** — a persistent, local React/Three.js memory explorer, themed as a navigable star chart: every project is its own constellation with its core memory anchoring the center (the way Sagittarius A* anchors the Milky Way), and a scope with children renders as its own sun/planet/moon body — depth in your taxonomy maps onto depth in the solar system, children always orbiting their parent. From inside your chronicle clone:
   ```bash
   cd /path/to/chronicle
+  (cd dashboard && npm ci && npm run build)     # once, needs Node.js
   uv run chronicle dashboard start              # foreground
   uv run chronicle dashboard start --background  # persistent local process
   uv run chronicle dashboard stop                # stop a backgrounded one

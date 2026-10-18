@@ -449,6 +449,20 @@ isn't scoped to one project by your current directory — it always serves
 every registered project at once, and you switch between them inside the
 dashboard itself.
 
+The dashboard's web frontend is not checked in (`dashboard/dist/` is
+gitignored), so build it once after cloning, and again after pulling
+changes to `dashboard/` — it needs [Node.js](https://nodejs.org/):
+
+```bash
+cd /path/to/chronicle/dashboard
+npm ci
+npm run build
+```
+
+Then (re)start `chronicle dashboard start`. Until it's built, the page
+at `127.0.0.1:8765` only shows these build instructions; the `/mcp`
+endpoint works either way.
+
 #### Organizing projects into cores and sub-cores
 
 A **core** is just a scope with nothing above it, and a **sub-core** is a
