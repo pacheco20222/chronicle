@@ -226,8 +226,12 @@ work on claude.ai in a browser — see the
    ```bash
    which uv
    ```
-   (for example `/opt/homebrew/bin/uv`). Your clone path is the one
-   `uv run chronicle setup` prints.
+   (for example `/opt/homebrew/bin/uv`). On Windows, in PowerShell run
+   `(Get-Command uv).Source`, or in cmd `where uv` (for example
+   `C:\Users\you\.local\bin\uv.exe`). Your clone path is the one
+   `uv run chronicle setup` prints. In the JSON below, write Windows paths
+   with forward slashes (`C:/Users/you/.local/bin/uv.exe`) or doubled
+   backslashes; a single backslash is invalid JSON.
 2. Open the config file. In Claude Desktop: **Settings → Developer → Edit
    Config**. Or open it directly; on macOS it is
    `~/Library/Application Support/Claude/claude_desktop_config.json`, on
@@ -248,6 +252,12 @@ work on claude.ai in a browser — see the
      }
    }
    ```
+   If you put `chronicle` on your PATH (§7, `uv tool install --editable .`),
+   you can instead point `command` straight at that executable, with no
+   `args`: e.g. `"command": "C:/Users/you/.local/bin/chronicle.exe"` on
+   Windows, or the output of `which chronicle` on macOS. Desktop launches
+   it with stdin piped, so plain `chronicle` runs the MCP server.
+
    `CHRONICLE_PROJECT` pins every chat to one project. Use it for one
    ongoing topic. For a chat that ranges across several unrelated
    projects, leave `env` out and pass an explicit `scope_path` per message
