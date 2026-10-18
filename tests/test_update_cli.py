@@ -43,9 +43,12 @@ def repos(tmp_path):
     upstream.mkdir()
     git(upstream, "init", "-q", "-b", "main")
     commit_file(upstream, "pyproject.toml", 'version = "1.0.0"\n', "v1")
-    commit_file(upstream, "dashboard/dist/index.html", "built", "dist")
+    commit_file(upstream, ".gitignore", "dashboard/dist/\n", "ignore build output")
     clone = tmp_path / "clone"
     git(tmp_path, "clone", "-q", str(upstream), str(clone))
+    # Built locally, never committed, like the real dashboard/dist.
+    (clone / "dashboard" / "dist").mkdir(parents=True)
+    (clone / "dashboard" / "dist" / "index.html").write_text("built", encoding="utf-8")
     return upstream, clone
 
 
@@ -63,7 +66,7 @@ def test_already_up_to_date(repos, side_effects, capsys):
     update_cli.update(clone)
 
     assert "already up to date (version 1.0.0)" in capsys.readouterr().out
-    assert side_effects == []
+    assert side_effects == ["deps"]
 
 
 def test_fast_forwards_main_and_reports_versions(repos, side_effects, capsys):
@@ -86,7 +89,7 @@ def test_switches_to_main_from_another_branch(repos, side_effects):
 
     assert git(clone, "rev-parse", "--abbrev-ref", "HEAD") == "main"
     assert git(clone, "rev-parse", "HEAD") == git(upstream, "rev-parse", "HEAD")
-    assert side_effects == []
+    assert side_effects == ["deps"]
 
 
 def test_rebuilds_dashboard_only_when_it_changed(repos, side_effects):
@@ -95,7 +98,40 @@ def test_rebuilds_dashboard_only_when_it_changed(repos, side_effects):
 
     update_cli.update(clone)
 
-    assert side_effects == ["dashboard"]
+    assert side_effects == ["deps", "dashboard"]
+
+
+def test_rerun_finishes_an_interrupted_update(repos, side_effects, capsys):
+    # A previous run pulled, then failed before building the dashboard.
+    _, clone = repos
+    (clone / "dashboard" / "dist" / "index.html").unlink()
+
+    update_cli.update(clone)
+
+    assert side_effects == ["deps", "dashboard"]
+    assert "already up to date" in capsys.readouterr().out
+
+
+def test_dependency_sync_never_reinstalls_chronicle_itself(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(update_cli.sys, "prefix", str(tmp_path / "tool-env"))
+    monkeypatch.setattr(
+        update_cli,
+        "_run",
+        lambda args, cwd, **kwargs: seen.append(args) or subprocess.CompletedProcess(args, 0),
+    )
+
+    update_cli._sync_dependencies(tmp_path)
+
+    assert "--no-install-project" in seen[0]
+    assert "--active" in seen[0]
+
+
+def test_dependency_sync_skipped_when_running_from_the_repo_venv(monkeypatch, tmp_path):
+    monkeypatch.setattr(update_cli.sys, "prefix", str(tmp_path / ".venv"))
+    monkeypatch.setattr(update_cli, "_run", lambda *a, **k: pytest.fail("uv must not run"))
+
+    update_cli._sync_dependencies(tmp_path)
 
 
 def test_refuses_with_uncommitted_changes(repos, side_effects):

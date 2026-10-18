@@ -20,6 +20,11 @@ class UpdateError(Exception):
     pass
 
 
+def _say(message: str, **kwargs) -> None:
+    # flush, so messages stay in order with the git/uv/npm output around them
+    print(message, flush=True, **kwargs)
+
+
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -68,10 +73,10 @@ def _update_git(repo: Path) -> tuple[str, str]:
 
     old = _git(repo, "rev-parse", "HEAD")
     branch = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
-    print(f"Fetching the latest {BRANCH} from {REMOTE}...")
+    _say(f"Fetching the latest {BRANCH} from {REMOTE}...")
     _git(repo, "fetch", REMOTE, BRANCH)
     if branch != BRANCH:
-        print(f"Switching from branch '{branch}' to '{BRANCH}'...")
+        _say(f"Switching from branch '{branch}' to '{BRANCH}'...")
         _git(repo, "switch", BRANCH)
     result = _run(["git", "merge", "--ff-only", f"{REMOTE}/{BRANCH}"], repo, capture_output=True)
     if result.returncode != 0:
@@ -87,10 +92,13 @@ def _sync_dependencies(repo: Path) -> None:
     if prefix == (repo / ".venv").resolve():
         # Running via `uv run`: uv re-syncs this env by itself on next run.
         return
-    print("Updating dependencies...")
+    _say("Checking dependencies...")
     env = dict(os.environ, VIRTUAL_ENV=str(prefix))
+    # --no-install-project: chronicle itself is an editable install, so it
+    # needs no reinstall; reinstalling would replace the chronicle.exe that is
+    # running this very command, which Windows refuses ("Access is denied").
     result = _run(
-        ["uv", "sync", "--active", "--project", str(repo), "--no-dev", "--inexact"],
+        ["uv", "sync", "--active", "--project", str(repo), "--no-dev", "--inexact", "--no-install-project", "--quiet"],
         repo,
         env=env,
     )
@@ -106,14 +114,14 @@ def _sync_dependencies(repo: Path) -> None:
 def _build_dashboard(repo: Path) -> None:
     npm = shutil.which("npm")
     if npm is None:
-        print(
+        _say(
             "Note: Node.js isn't installed, so the dashboard frontend wasn't "
             "rebuilt. Install Node.js and run `npm ci && npm run build` in the "
             "dashboard folder.",
             file=sys.stderr,
         )
         return
-    print("Rebuilding the dashboard...")
+    _say("Rebuilding the dashboard...")
     dashboard = repo / "dashboard"
     for step in (["ci"], ["run", "build"]):
         if _run([npm, *step], dashboard).returncode != 0:
@@ -123,17 +131,21 @@ def _build_dashboard(repo: Path) -> None:
 def update(repo: Path) -> None:
     old_version = _version(repo)
     old, new = _update_git(repo)
-    if old == new:
-        print(f"Chronicle is already up to date (version {old_version}).")
-        return
 
-    if _changed(repo, old, new, "pyproject.toml", "uv.lock"):
-        _sync_dependencies(repo)
-    if _changed(repo, old, new, "dashboard") or not (repo / "dashboard" / "dist" / "index.html").is_file():
+    # Both steps also run when git had nothing new, so a run that pulled but
+    # then failed (e.g. a locked file on Windows) is finished by the next one.
+    # The dependency sync is a fast no-op when nothing changed.
+    _sync_dependencies(repo)
+    if (old != new and _changed(repo, old, new, "dashboard")) or not (
+        repo / "dashboard" / "dist" / "index.html"
+    ).is_file():
         _build_dashboard(repo)
 
-    print(f"Updated Chronicle {old_version} -> {_version(repo)}.")
-    print(
+    if old == new:
+        _say(f"Chronicle is already up to date (version {old_version}).")
+        return
+    _say(f"Updated Chronicle {old_version} -> {_version(repo)}.")
+    _say(
         "Restart open Claude Code/Cursor/Codex sessions and any running "
         "dashboard (`chronicle stop`, then `chronicle start`) to use it."
     )
