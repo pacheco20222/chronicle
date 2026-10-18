@@ -25,7 +25,8 @@ another repo's memory by accident.
   uv run chronicle dashboard start --background  # persistent local process
   uv run chronicle dashboard stop                # stop a backgrounded one
   ```
-  or, from anywhere, `uv run --directory /path/to/chronicle chronicle dashboard start`. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port. It always serves every registered project at once, not just the one you're standing in — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope) for more.
+  or, with `chronicle` on your PATH (below), just `chronicle start` from anywhere — it also starts Qdrant if it isn't running. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port. It always serves every registered project at once, not just the one you're standing in — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope) for more.
+- **The `chronicle` command** — `uv tool install --editable .` from your clone puts `chronicle` on your PATH (bash, zsh, PowerShell, cmd). Then `chronicle --help` (or plain `chronicle` in a terminal) lists every command, and `chronicle start` / `chronicle stop` replace the long `uv run --directory …` lines. MCP configs are unaffected — see [docs/INSTALL.md §7](docs/INSTALL.md#recommended-put-chronicle-on-your-path).
 
 ## Requirements
 

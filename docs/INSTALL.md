@@ -400,6 +400,39 @@ them beyond the registry file both read from.
 
 ### 7. Running `chronicle`'s other commands (import, graph, dashboard, scope)
 
+#### Recommended: put `chronicle` on your PATH
+
+From inside your chronicle clone, once:
+
+```bash
+uv tool install --editable .
+```
+
+That installs `chronicle` (and `chronicle-recall`) as real executables in
+uv's tool bin directory (`~/.local/bin`, or `%USERPROFILE%\.local\bin` on
+Windows) — run `uv tool update-shell` once if that directory isn't on your
+PATH yet. They work the same from bash, zsh, PowerShell, and cmd, from any
+folder, and `--editable` means a `git pull` takes effect without
+reinstalling (re-run the install only if dependencies change). Then:
+
+```bash
+chronicle --help                 # every command, grouped
+chronicle start                  # start Qdrant if needed, then the dashboard
+chronicle start --background     # same, but keep running after the terminal closes
+chronicle stop                   # stop a backgrounded dashboard
+chronicle register --project your-project-name
+chronicle import notes.md --project your-project-name --type note
+```
+
+Typing plain `chronicle` in a terminal shows the same command list. MCP
+clients still launch plain `chronicle` (with stdin piped) to get the MCP
+server, so existing `.mcp.json` / Codex configs keep working unchanged;
+`chronicle serve` runs the server explicitly. Relative paths (like
+`notes.md` above) resolve against wherever you are, so the `--directory`
+gotcha below doesn't apply.
+
+#### Without installing: `uv run`
+
 `chronicle import`, `chronicle graph`, `chronicle dashboard`, and `chronicle
 scope` aren't called by Claude Code or Codex — you run these yourself,
 directly. Every one of them is a plain `uv run` invocation, and `uv` needs
