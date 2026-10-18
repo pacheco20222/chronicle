@@ -99,6 +99,9 @@ def _stdin_is_terminal() -> bool:
 
 
 def main() -> None:
+    from chronicle.console import use_utf8_output
+
+    use_utf8_output()
     args = sys.argv[1:]
 
     if not args:

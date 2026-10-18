@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from chronicle import config, registry
+from chronicle.console import use_utf8_output
 from chronicle.core.runtime import get_runtime
 
 
@@ -37,6 +38,7 @@ def overview_document(project: str) -> str | None:
 
 
 def main() -> None:
+    use_utf8_output()
     project = os.environ.get("CHRONICLE_PROJECT", "").strip()
     if not project:
         try:

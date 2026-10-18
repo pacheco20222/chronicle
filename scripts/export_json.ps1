@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 try {
     Invoke-RestMethod -Uri "$QdrantUrl/collections/$Collection" -Method Get | Out-Null
 } catch {
-    Write-Host "Collection '$Collection' doesn't exist yet — nothing to export."
+    Write-Host "Collection '$Collection' doesn't exist yet - nothing to export."
     exit 0
 }
 
@@ -35,7 +35,11 @@ while ($true) {
     if ($null -eq $offset) { break }
 }
 
-$points | ConvertTo-Json -Depth 10 -AsArray | Set-Content -Path $Dest -Encoding utf8
+# -InputObject (not a pipeline / -AsArray, which is PowerShell 7 only) keeps
+# 0 or 1 points a JSON array on Windows PowerShell 5.1 too; WriteAllText
+# writes UTF-8 without the BOM that 5.1's `Set-Content -Encoding utf8` adds.
+$json = ConvertTo-Json -InputObject @($points) -Depth 10
+[System.IO.File]::WriteAllText($Dest, $json, (New-Object System.Text.UTF8Encoding $false))
 
 Write-Host "Exported $($points.Count) memories to $Dest"
 

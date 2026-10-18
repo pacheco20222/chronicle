@@ -105,7 +105,7 @@ update once, not once per project:
 ./scripts/update.sh
 ```
 
-or by hand:
+(on native Windows: `.\scripts\update.ps1`), or by hand:
 
 ```
 /plugin marketplace update chronicle
@@ -653,8 +653,9 @@ except two things:
   command need either forward slashes or doubled backslashes — both
   `C:/Users/you/chronicle` and `C:\\Users\\you\\chronicle` are valid; a single
   backslash isn't, in JSON or TOML.
-- The backup scripts are PowerShell twins (`backup.ps1`,
-  `export_json.ps1`, `daily_backup.ps1` in `scripts/`) — same
+- The backup and update scripts are PowerShell twins (`backup.ps1`,
+  `export_json.ps1`, `daily_backup.ps1`, `update.ps1` in `scripts/`),
+  compatible with both Windows PowerShell 5.1 and PowerShell 7 — same
   behavior as the `.sh` versions, same env vars
   (`CHRONICLE_QDRANT_URL`, `CHRONICLE_COLLECTION`). Run them directly:
   ```powershell
