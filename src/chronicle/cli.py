@@ -94,10 +94,9 @@ COMMANDS = {
 
 
 def _stdin_is_terminal() -> bool:
-    try:
-        return sys.stdin is not None and sys.stdin.isatty()
-    except (AttributeError, ValueError):
-        return False
+    from chronicle.console import is_interactive
+
+    return is_interactive(sys.stdin)
 
 
 def main() -> None:

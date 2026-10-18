@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from threading import Lock
 
@@ -12,6 +13,10 @@ def embed_text(text: str) -> list[float]:
     if _model is None:
         with _model_lock:
             if _model is None:
+                # Windows without Developer Mode can't create symlinks, so the
+                # Hugging Face cache falls back to copies (a bit more disk) and
+                # warns about it; that's harmless, so don't alarm anyone.
+                os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
                 from fastembed import TextEmbedding
 
                 _model = TextEmbedding(

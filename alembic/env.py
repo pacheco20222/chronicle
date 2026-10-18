@@ -8,7 +8,11 @@ from chronicle import config
 from chronicle.storage.models import Base
 
 
-if context.config.config_file_name is not None:
+# Chronicle runs migrations itself on every start (storage/database.py) and
+# opts out here, so `chronicle scope list` etc. don't print alembic INFO lines
+# and the MCP server's own loggers aren't reconfigured. The `alembic` CLI
+# still gets the logging from alembic.ini.
+if context.config.config_file_name is not None and context.config.attributes.get("configure_logger", True):
     fileConfig(context.config.config_file_name)
 
 database_url = context.config.get_main_option("sqlalchemy.url") or os.environ.get(

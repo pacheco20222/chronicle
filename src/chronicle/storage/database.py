@@ -31,6 +31,7 @@ class Database:
         alembic_config.set_main_option("sqlalchemy.url", self.url)
         with self.engine.connect() as connection:
             alembic_config.attributes["connection"] = connection
+            alembic_config.attributes["configure_logger"] = False
             command.upgrade(alembic_config, "head")
 
     @staticmethod
