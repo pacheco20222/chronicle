@@ -64,7 +64,8 @@ def main(argv: list[str]) -> None:
     )
     html = _render_html(graph)
 
-    out_path = Path(args.out) if args.out else Path.cwd() / f"chronicle-graph-{int(time.time())}.html"
+    # resolve(): as_uri() below rejects a relative path like `--out g.html`.
+    out_path = (Path(args.out).expanduser() if args.out else Path.cwd() / f"chronicle-graph-{int(time.time())}.html").resolve()
     out_path.write_text(html, encoding="utf-8")
     print(f"Graph written to {out_path}")
     webbrowser.open(out_path.as_uri())
