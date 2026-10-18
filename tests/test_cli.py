@@ -21,6 +21,7 @@ def served(monkeypatch):
 
 def test_bare_chronicle_in_a_terminal_prints_help(monkeypatch, capsys, served):
     monkeypatch.setattr(cli, "_stdin_is_terminal", lambda: True)
+    monkeypatch.setattr(services, "status_lines", lambda: ["Status: ready"])
 
     _run(monkeypatch)
 
@@ -107,6 +108,7 @@ def test_ensure_qdrant_starts_bundled_compose_when_down(monkeypatch):
     reachable = iter([False, False, True])
     calls = []
     monkeypatch.setattr(services, "qdrant_is_reachable", lambda url=None, timeout=2: next(reachable))
+    monkeypatch.setattr(services, "docker_state", lambda: services.DOCKER_RUNNING)
     monkeypatch.setattr(services.time, "sleep", lambda seconds: None)
 
     def fake_run(args, **kwargs):
@@ -120,16 +122,82 @@ def test_ensure_qdrant_starts_bundled_compose_when_down(monkeypatch):
     assert calls == [["docker", "compose", "-f", str(services.compose_file()), "up", "-d"]]
 
 
-def test_ensure_qdrant_explains_missing_docker(monkeypatch):
+@pytest.mark.parametrize(
+    "state, expected",
+    [
+        (services.DOCKER_NOT_INSTALLED, "Docker is not installed"),
+        (services.DOCKER_NOT_RUNNING, "Open Docker Desktop"),
+    ],
+)
+def test_ensure_qdrant_tells_you_to_install_or_open_docker(monkeypatch, state, expected):
     monkeypatch.setattr(services, "qdrant_is_reachable", lambda url=None, timeout=2: False)
+    monkeypatch.setattr(services, "docker_state", lambda: state)
+    monkeypatch.setattr(services.subprocess, "run", lambda *a, **k: pytest.fail("compose must not run"))
 
-    def no_docker(*args, **kwargs):
-        raise FileNotFoundError("docker")
-
-    monkeypatch.setattr(services.subprocess, "run", no_docker)
-
-    with pytest.raises(SystemExit, match="Docker Desktop"):
+    with pytest.raises(SystemExit, match=expected):
         services.ensure_qdrant()
+
+
+def test_docker_state_not_installed_when_cli_missing(monkeypatch):
+    monkeypatch.setattr(services.shutil, "which", lambda name: None)
+
+    assert services.docker_state() == services.DOCKER_NOT_INSTALLED
+
+
+@pytest.mark.parametrize(
+    "returncode, expected",
+    [(0, services.DOCKER_RUNNING), (1, services.DOCKER_NOT_RUNNING)],
+)
+def test_docker_state_asks_the_daemon(monkeypatch, returncode, expected):
+    monkeypatch.setattr(services.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(
+        services.subprocess,
+        "run",
+        lambda args, **kwargs: subprocess.CompletedProcess(args, returncode, stdout="", stderr=""),
+    )
+
+    assert services.docker_state() == expected
+
+
+def test_docker_state_treats_a_hung_daemon_as_not_running(monkeypatch):
+    monkeypatch.setattr(services.shutil, "which", lambda name: "/usr/bin/docker")
+
+    def hang(args, **kwargs):
+        raise subprocess.TimeoutExpired(args, 15)
+
+    monkeypatch.setattr(services.subprocess, "run", hang)
+
+    assert services.docker_state() == services.DOCKER_NOT_RUNNING
+
+
+@pytest.mark.parametrize(
+    "state, expected",
+    [
+        (services.DOCKER_NOT_INSTALLED, "Docker is not installed"),
+        (services.DOCKER_NOT_RUNNING, "Open Docker Desktop"),
+        (services.DOCKER_RUNNING, "chronicle start"),
+    ],
+)
+def test_qdrant_down_message_points_at_the_actual_fix(monkeypatch, state, expected):
+    monkeypatch.setattr(services, "docker_state", lambda: state)
+
+    message = services.qdrant_down_message()
+
+    assert "can't reach Qdrant" in message
+    assert expected in message
+
+
+def test_bare_chronicle_in_a_terminal_reports_docker_status(monkeypatch, capsys, served):
+    monkeypatch.setattr(cli, "_stdin_is_terminal", lambda: True)
+    monkeypatch.setattr(services, "qdrant_is_reachable", lambda url=None, timeout=2: False)
+    monkeypatch.setattr(services, "docker_state", lambda: services.DOCKER_NOT_RUNNING)
+
+    _run(monkeypatch)
+
+    out = capsys.readouterr().out
+    assert "usage: chronicle <command>" in out
+    assert "Status: not ready" in out
+    assert "Open Docker Desktop" in out
 
 
 def test_ensure_qdrant_does_not_start_docker_for_a_remote_url(monkeypatch):

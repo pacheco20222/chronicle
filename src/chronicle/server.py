@@ -1,8 +1,10 @@
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import Middleware
 
-from chronicle import config, dashboard, embeddings, graph_cli, registry
+from chronicle import config, dashboard, embeddings, graph_cli, registry, services
 from chronicle.core.runtime import get_runtime
 
 mcp = FastMCP(
@@ -93,6 +95,37 @@ mcp = FastMCP(
         "for relationships without replacement."
     ),
 )
+
+
+def _is_connection_failure(error: BaseException) -> bool:
+    import httpx
+    from qdrant_client.http.exceptions import ResponseHandlingException
+
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, (ConnectionError, httpx.TransportError, ResponseHandlingException)):
+            return True
+        error = error.__cause__ or error.__context__
+    return False
+
+
+class QdrantUnavailableMiddleware(Middleware):
+    """Replace a raw connection error (e.g. WinError 10061) from a down Qdrant
+    with what to actually do about it: usually, open Docker."""
+
+    async def on_call_tool(self, context, call_next):
+        try:
+            return await call_next(context)
+        except Exception as error:
+            # Only when Qdrant really is down: a model download failing is
+            # also a connection error, and must keep its own message.
+            if _is_connection_failure(error) and not services.qdrant_is_reachable():
+                raise ToolError(services.qdrant_down_message()) from error
+            raise
+
+
+mcp.add_middleware(QdrantUnavailableMiddleware())
 
 _service = None
 

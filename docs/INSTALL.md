@@ -424,7 +424,12 @@ chronicle register --project your-project-name
 chronicle import notes.md --project your-project-name --type note
 ```
 
-Typing plain `chronicle` in a terminal shows the same command list. MCP
+Typing plain `chronicle` in a terminal shows the same command list plus a
+status line: whether Qdrant is up, and if not, whether Docker is missing
+(install it) or just not running (open Docker Desktop). `chronicle start`
+checks the same thing before starting anything, and memory tools called
+from an MCP client return that same guidance instead of a raw connection
+error. MCP
 clients still launch plain `chronicle` (with stdin piped) to get the MCP
 server, so existing `.mcp.json` / Codex configs keep working unchanged;
 `chronicle serve` runs the server explicitly. Relative paths (like

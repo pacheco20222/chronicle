@@ -109,7 +109,11 @@ def main() -> None:
         # bare `chronicle` with stdin piped, so that still starts the server;
         # a person typing it in a terminal gets the command list instead.
         if _stdin_is_terminal():
-            print(HELP, end="")
+            from chronicle import services
+
+            print(HELP)
+            for line in services.status_lines():
+                print(line)
             return
         print(
             "chronicle: starting the MCP server on stdio (waiting for a client). "
