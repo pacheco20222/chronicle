@@ -10,6 +10,7 @@ Everyday:
   stop                              stop a backgrounded dashboard
   register --project NAME           register the current folder as a project
   setup [--project NAME]            print MCP config for Claude Code, Cursor, Codex
+  update                            update this chronicle clone to the latest main
 
 Memories:
   import PATH --project NAME --type TYPE
@@ -88,6 +89,7 @@ COMMANDS = {
     "scope": _module_main("scope_cli"),
     "dashboard": _module_main("dashboard_cli"),
     "eval": _module_main("eval_cli"),
+    "update": _module_main("update_cli"),
 }
 
 
