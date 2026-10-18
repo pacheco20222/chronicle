@@ -420,9 +420,18 @@ chronicle --help                 # every command, grouped
 chronicle start                  # start Qdrant if needed, then the dashboard
 chronicle start --background     # same, but keep running after the terminal closes
 chronicle stop                   # stop a backgrounded dashboard
+chronicle update                 # pull the latest main, sync deps, rebuild the dashboard
 chronicle register --project your-project-name
 chronicle import notes.md --project your-project-name --type note
 ```
+
+`chronicle update` switches your clone to `main` and fast-forwards it to
+`origin/main` (it refuses if you have uncommitted changes, or local commits
+on `main` that aren't upstream), then syncs dependencies into the
+environment `chronicle` runs from and rebuilds the dashboard if it changed.
+Restart open MCP client sessions afterwards. It's for git clones; a Claude
+Code plugin install updates with `scripts/update.sh` / `scripts/update.ps1`
+instead.
 
 Typing plain `chronicle` in a terminal shows the same command list plus a
 status line: whether Qdrant is up, and if not, whether Docker is missing
