@@ -62,6 +62,7 @@ function GraphTab({ snapshot, project, selectedId, onSelect, onSelectScope }: { 
   }
 
   return <section className="graph-workspace" aria-label="Memory graph">
+    {snapshot.semantic === false && <div className="semantic-note mono" role="note">Keyword search only: memories show without similarity links. Run <b>chronicle semantic enable</b> to add them.</div>}
     <div className="graph-canvas"><GraphScene nodes={nodes} edges={edges} scopes={scopes} selectedId={selectedId} onSelect={onSelect} onSelectScope={onSelectScope} showSemanticEdges={showSemanticEdges} /></div>
     <GraphLegend query={query} onQueryChange={setQuery} onSearch={() => void search()} searching={searching} results={results} showSemanticEdges={showSemanticEdges} onSemanticToggle={setShowSemanticEdges} /><div className="graph-hint mono">drag / scroll to orbit · click node or core to focus</div>
   </section>;

@@ -199,6 +199,7 @@ def build_snapshot(service) -> dict:
         }
 
     return {
+        "semantic": config.semantic_enabled(),
         "graph": graph,
         "projects": projects,
         "control": {

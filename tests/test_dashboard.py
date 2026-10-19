@@ -220,3 +220,12 @@ def test_windows_pid_is_running_against_real_processes():
 
     assert dashboard_cli._pid_is_running(os.getpid())
     assert not dashboard_cli._pid_is_running(child.pid)
+
+
+def test_snapshot_reports_search_mode(service, monkeypatch):
+    from chronicle import dashboard
+
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "0")
+    assert dashboard.build_snapshot(service)["semantic"] is False
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "1")
+    assert dashboard.build_snapshot(service)["semantic"] is True

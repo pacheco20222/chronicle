@@ -70,6 +70,7 @@ export interface ProjectCard {
 }
 
 export interface DashboardSnapshot {
+  semantic?: boolean;
   graph: GraphData;
   projects: ProjectCard[];
   control: {
