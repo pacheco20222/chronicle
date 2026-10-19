@@ -108,3 +108,28 @@ def test_semantic_commands_toggle_the_setting(tmp_path, monkeypatch, capsys):
     assert "on" in capsys.readouterr().out
     semantic_cli.main(["disable"])
     assert config.semantic_enabled() is False
+
+
+def test_semantic_enable_explains_missing_extra(monkeypatch):
+    import importlib.util
+
+    import sys
+
+    monkeypatch.delitem(sys.modules, "fastembed", raising=False)
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: None if name == "fastembed" else real(name, *a))
+    with pytest.raises(SystemExit, match=r"\[semantic\]"):
+        semantic_cli.main(["enable"])
+
+
+def test_runtime_with_semantic_on_but_extra_missing_fails_clearly(tmp_path, monkeypatch):
+    import importlib.util
+
+    import sys
+
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "1")
+    monkeypatch.delitem(sys.modules, "qdrant_client", raising=False)
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: None if name == "qdrant_client" else real(name, *a))
+    with pytest.raises(RuntimeError, match="qdrant_client"):
+        runtime.create_runtime(database=Database(f"sqlite:///{tmp_path / 'x.db'}"))

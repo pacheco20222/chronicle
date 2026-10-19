@@ -34,8 +34,12 @@ def _reindex_main(argv: list[str]) -> None:
 
 
 def _enable() -> None:
-    from chronicle import services
+    from chronicle import embeddings, services
 
+    try:
+        embeddings.require_semantic_deps()
+    except RuntimeError as error:
+        raise SystemExit(f"chronicle semantic enable: {error}") from None
     services.ensure_qdrant()
     config.set_semantic(True)
     print("Semantic search: on. Indexing existing memories...", flush=True)

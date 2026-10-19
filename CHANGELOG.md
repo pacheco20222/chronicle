@@ -13,6 +13,9 @@
   and ranked by bm25, instead of requiring the exact phrase.
 
 ### Added
+- `fastembed` and `qdrant-client` moved to the optional `semantic` extra: the
+  base install is much smaller. `chronicle semantic enable` tells you to run
+  `uv tool install --editable ".[semantic]" --force` if they are missing.
 - `chronicle semantic enable|disable|status` and `chronicle reindex` (rebuild
   the similarity index from SQLite).
 - Native Windows support (PowerShell 7/5.1, cmd, Git Bash), a `chronicle`

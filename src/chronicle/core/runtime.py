@@ -13,6 +13,9 @@ def create_runtime(vector_index: VectorIndex | None = None, database: Database |
     database = database or Database(config.sqlite_url())
     if vector_index is None:
         if config.semantic_enabled():
+            from chronicle.embeddings import require_semantic_deps
+
+            require_semantic_deps()
             from chronicle.core.qdrant_index import QdrantVectorIndex
 
             vector_index = QdrantVectorIndex()

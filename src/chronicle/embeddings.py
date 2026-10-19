@@ -8,6 +8,31 @@ _model = None
 _model_lock = Lock()
 
 
+SEMANTIC_INSTALL_HINT = (
+    "Semantic search needs the optional dependencies. In a clone, run "
+    "`uv tool install --editable \".[semantic]\" --force` (or `uv sync --extra "
+    "semantic` for a dev checkout), then try again."
+)
+
+
+def require_semantic_deps() -> None:
+    """Fail with what to do, not an ImportError, when the extra isn't installed."""
+    import importlib.util
+    import sys
+
+    def available(name: str) -> bool:
+        if name in sys.modules:
+            return True
+        try:
+            return importlib.util.find_spec(name) is not None
+        except ValueError:
+            return True
+
+    missing = [m for m in ("fastembed", "qdrant_client") if not available(m)]
+    if missing:
+        raise RuntimeError(f"Missing {', '.join(missing)}. {SEMANTIC_INSTALL_HINT}")
+
+
 def embed_text(text: str) -> list[float]:
     global _model
     if _model is None:
@@ -17,6 +42,7 @@ def embed_text(text: str) -> list[float]:
                 # Hugging Face cache falls back to copies (a bit more disk) and
                 # warns about it; that's harmless, so don't alarm anyone.
                 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+                require_semantic_deps()
                 from fastembed import TextEmbedding
 
                 _model = TextEmbedding(

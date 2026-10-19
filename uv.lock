@@ -374,32 +374,43 @@ version = "3.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
-    { name = "fastembed" },
     { name = "fastmcp" },
-    { name = "qdrant-client" },
     { name = "sqlalchemy" },
     { name = "starlette" },
     { name = "uvicorn" },
 ]
 
+[package.optional-dependencies]
+semantic = [
+    { name = "fastembed" },
+    { name = "qdrant-client" },
+]
+
 [package.dev-dependencies]
 dev = [
+    { name = "fastembed" },
     { name = "pytest" },
+    { name = "qdrant-client" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = "==1.16.4" },
-    { name = "fastembed", specifier = ">=0.8.0" },
+    { name = "fastembed", marker = "extra == 'semantic'", specifier = ">=0.8.0" },
     { name = "fastmcp", specifier = ">=3.4.7" },
-    { name = "qdrant-client", specifier = ">=1.19.0" },
+    { name = "qdrant-client", marker = "extra == 'semantic'", specifier = ">=1.19.0" },
     { name = "sqlalchemy", specifier = "==2.0.43" },
     { name = "starlette", specifier = ">=1.6.0" },
     { name = "uvicorn", specifier = ">=0.52.4" },
 ]
+provides-extras = ["semantic"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]
+dev = [
+    { name = "fastembed", specifier = ">=0.8.0" },
+    { name = "pytest", specifier = ">=9.1.1" },
+    { name = "qdrant-client", specifier = ">=1.19.0" },
+]
 
 [[package]]
 name = "click"

@@ -44,9 +44,13 @@ immediately. To also find memories by meaning (paraphrases, synonyms) and get
 the similarity graph, turn on semantic search once:
 
 ```bash
+uv tool install --editable ".[semantic]" --force   # once, from your clone: adds fastembed + qdrant-client
 chronicle semantic enable    # starts Qdrant in Docker, downloads the ~500MB model once, indexes your memories
 chronicle semantic disable   # back to keyword-only; nothing is deleted
 ```
+
+The base install is small on purpose: `fastembed` and `qdrant-client` live in the
+optional `semantic` extra.
 
 No GPU and no separate embedding service: `fastembed` runs locally on CPU, and
 the model is only loaded when semantic search is on.

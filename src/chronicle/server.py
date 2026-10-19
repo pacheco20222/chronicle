@@ -99,7 +99,11 @@ mcp = FastMCP(
 
 def _is_connection_failure(error: BaseException) -> bool:
     import httpx
-    from qdrant_client.http.exceptions import ResponseHandlingException
+
+    try:
+        from qdrant_client.http.exceptions import ResponseHandlingException
+    except ImportError:  # lexical-only install: no Qdrant client, no Qdrant errors
+        ResponseHandlingException = ConnectionError
 
     seen = set()
     while error is not None and id(error) not in seen:

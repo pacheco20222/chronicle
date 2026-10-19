@@ -10,10 +10,12 @@ checkpoints, documents and keyword search (FTS5) work right away. To also find
 memories by meaning and get the similarity graph, run once:
 
 ```bash
+uv tool install --editable ".[semantic]" --force   # once, from your clone
 chronicle semantic enable
 ```
 
-That starts Qdrant in Docker, downloads the embedding model (~500MB, once) and
+The first line adds the optional `semantic` extra (`fastembed`, `qdrant-client`),
+which the small base install leaves out. `enable` starts Qdrant in Docker, downloads the embedding model (~500MB, once) and
 indexes your existing memories. `chronicle semantic disable` goes back to
 keyword-only without deleting anything, and `chronicle reindex` rebuilds the
 similarity index from your memories if it is ever lost. No GPU and no separate
