@@ -66,20 +66,27 @@ def _write_json_atomic(path: Path, data: dict) -> None:
         raise
 
 
+def _read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        config = json.loads(path.read_text(encoding="utf-8") or "{}")
+    except json.JSONDecodeError as error:
+        raise SystemExit(
+            f"chronicle setup: {path} is not valid JSON ({error}). Fix it "
+            "first; nothing was changed."
+        ) from None
+    if not isinstance(config, dict):
+        raise SystemExit(f"chronicle setup: {path} has an unexpected shape; nothing was changed.")
+    return config
+
+
 def _merge_server(path: Path, key: str, entry: dict, dry_run: bool) -> str:
     """Add `entry` under mcpServers[key] without touching anything else."""
     existed = path.exists()
-    config: dict = {}
-    if existed:
-        try:
-            config = json.loads(path.read_text(encoding="utf-8") or "{}")
-        except json.JSONDecodeError as error:
-            raise SystemExit(
-                f"chronicle setup: {path} is not valid JSON ({error}). Fix it "
-                "first; nothing was changed."
-            ) from None
-        if not isinstance(config, dict) or not isinstance(config.get("mcpServers", {}), dict):
-            raise SystemExit(f"chronicle setup: {path} has an unexpected shape; nothing was changed.")
+    config = _read_json(path)
+    if not isinstance(config.get("mcpServers", {}), dict):
+        raise SystemExit(f"chronicle setup: {path} has an unexpected shape; nothing was changed.")
     servers = config.setdefault("mcpServers", {})
     if servers.get(key) == entry:
         return f"Already set up: '{key}' in {path} is unchanged."
@@ -94,7 +101,54 @@ def _merge_server(path: Path, key: str, entry: dict, dry_run: bool) -> str:
     return f"{verb} '{key}' in {path}{backup}."
 
 
-def _setup_agent(agent: str, project: str | None, dry_run: bool) -> None:
+def _recall_hook_command(project: str, install_dir: Path) -> str:
+    """SessionStart command that prints the latest checkpoint and overview."""
+    exe = _chronicle_exe()
+    recall = None
+    if exe:
+        sibling = Path(exe).with_name("chronicle-recall" + (".exe" if sys.platform == "win32" else ""))
+        recall = sibling.as_posix() if sibling.exists() else None
+    if sys.platform == "win32":
+        run = f"& {_powershell_quote(recall)}" if recall else f"uv run --directory {_powershell_quote(install_dir.as_posix())} chronicle-recall"
+        script = f"$env:CHRONICLE_PROJECT={_powershell_quote(project)}; {run}"
+        encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+        return f"powershell.exe -NoProfile -EncodedCommand {encoded}"
+    run = shlex.quote(recall) if recall else f"uv run --directory {shlex.quote(str(install_dir))} chronicle-recall"
+    return f"CHRONICLE_PROJECT={shlex.quote(project)} {run}"
+
+
+def _merge_hook(path: Path, command: str, dry_run: bool) -> str:
+    """Add the recall hook to a Claude Code settings file, replacing any
+    earlier chronicle-recall hook instead of duplicating it."""
+    config = _read_json(path)
+    groups = config.setdefault("hooks", {}).setdefault("SessionStart", [])
+    for group in groups:
+        group["hooks"] = [h for h in group.get("hooks", []) if not _is_recall_hook(h)]
+    groups[:] = [g for g in groups if g.get("hooks")]
+    groups.append({"matcher": "startup|resume|clear", "hooks": [{"type": "command", "command": command}]})
+    if dry_run:
+        return f"Would add this SessionStart hook to {path}:\n{command}"
+    if path.exists():
+        shutil.copy2(path, path.with_name(path.name + ".bak"))
+    _write_json_atomic(path, config)
+    return f"Set the session-start recall hook in {path}."
+
+
+def _is_recall_hook(hook: dict) -> bool:
+    command = hook.get("command", "")
+    if "chronicle-recall" in command:
+        return True
+    # Windows hooks are base64 PowerShell: decode to look for the script name
+    if "-EncodedCommand " in command:
+        try:
+            decoded = base64.b64decode(command.split("-EncodedCommand ", 1)[1]).decode("utf-16le")
+        except Exception:
+            return False
+        return "chronicle-recall" in decoded
+    return False
+
+
+def _setup_agent(agent: str, project: str | None, dry_run: bool, hook: bool = True) -> None:
     if not project:
         raise SystemExit(f"chronicle setup {agent}: --project NAME is required.")
     install_dir = Path(__file__).resolve().parents[2]
@@ -112,6 +166,9 @@ def _setup_agent(agent: str, project: str | None, dry_run: bool) -> None:
     if agent in ("claude-code", "cursor"):
         path = Path.cwd() / (".mcp.json" if agent == "claude-code" else ".cursor/mcp.json")
         print(_merge_server(path, "chronicle", entry, dry_run))
+        if agent == "claude-code" and hook:
+            command = _recall_hook_command(project, install_dir)
+            print(_merge_hook(Path.cwd() / ".claude" / "settings.json", command, dry_run))
         return
 
     # codex: one server entry for every project, then register this folder
@@ -140,11 +197,12 @@ def main(argv: list[str]) -> None:
         help="write the MCP config for this agent (omit to just print every option)",
     )
     parser.add_argument("--project", default=None)
+    parser.add_argument("--no-hook", dest="hook", action="store_false", help="claude-code: skip the session-start recall hook")
     parser.add_argument("--print", dest="dry_run", action="store_true", help="show what would be written; change nothing")
     args = parser.parse_args(argv)
 
     if args.agent:
-        _setup_agent(args.agent, args.project, args.dry_run)
+        _setup_agent(args.agent, args.project, args.dry_run, args.hook)
         return
 
     install_dir = Path(__file__).resolve().parents[2]

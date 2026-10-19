@@ -233,7 +233,7 @@ isn't valid JSON. Re-running it is harmless. Add `--print` to see what it
 would write without changing anything. Run it once per project (each gets
 its own entry), then do step 4 below: fully quit and reopen Desktop.
 The same command exists for the other agents, run from the repo folder:
-`chronicle setup claude-code|cursor|codex --project NAME`.
+`chronicle setup claude-code|cursor|codex --project NAME`. For `claude-code` it also sets the session-start recall hook in `.claude/settings.json` (skip with `--no-hook`; not needed if you use the plugin).
 
 The manual steps below do the same thing by hand.
 

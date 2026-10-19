@@ -235,3 +235,43 @@ def test_codex_registers_current_folder(tmp_path, monkeypatch, capsys):
     setup_cli.main(["codex", "--project", "p"])
     assert registry.lookup(tmp_path) == "p"
     assert "codex mcp add chronicle --" in capsys.readouterr().out
+
+
+def test_claude_code_also_sets_session_start_hook(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    setup_cli.main(["claude-code", "--project", "p"])
+    settings = json.loads((tmp_path / ".claude" / "settings.json").read_text())
+    group = settings["hooks"]["SessionStart"][0]
+    assert group["matcher"] == "startup|resume|clear"
+    assert "chronicle-recall" in _decoded(group["hooks"][0]["command"])
+    assert "CHRONICLE_PROJECT" in _decoded(group["hooks"][0]["command"])
+
+
+def _decoded(command: str) -> str:
+    if "-EncodedCommand " in command:
+        return base64.b64decode(command.split("-EncodedCommand ", 1)[1]).decode("utf-16le")
+    return command
+
+
+def test_hook_keeps_other_hooks_and_does_not_duplicate(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    settings_path = tmp_path / ".claude" / "settings.json"
+    settings_path.parent.mkdir()
+    settings_path.write_text(json.dumps({
+        "permissions": {"allow": ["Bash(ls)"]},
+        "hooks": {"SessionStart": [{"matcher": "startup", "hooks": [{"type": "command", "command": "echo hi"}]}]},
+    }))
+    setup_cli.main(["claude-code", "--project", "p"])
+    setup_cli.main(["claude-code", "--project", "p2"])
+    settings = json.loads(settings_path.read_text())
+    assert settings["permissions"] == {"allow": ["Bash(ls)"]}
+    commands = [h["command"] for g in settings["hooks"]["SessionStart"] for h in g["hooks"]]
+    assert "echo hi" in commands
+    recall = [c for c in commands if "chronicle-recall" in _decoded(c)]
+    assert len(recall) == 1 and "p2" in _decoded(recall[0])
+
+
+def test_no_hook_flag_skips_settings(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    setup_cli.main(["claude-code", "--project", "p", "--no-hook"])
+    assert not (tmp_path / ".claude" / "settings.json").exists()
