@@ -76,7 +76,7 @@ def _import_directory(path: str, project: str, type_: str) -> None:
         )
         pieces = _chunk_text(content, max_chars=_DOCS_CHUNK_MAX_CHARS)
         for index, piece in enumerate(pieces):
-            vector = embeddings.embed_text(piece)
+            vector = embeddings.embed_or_empty(piece)
             service.add_memory(
                 vector,
                 piece,
@@ -110,7 +110,7 @@ def main(argv: list[str]) -> None:
     service = get_runtime()
 
     for i, chunk in enumerate(chunks, start=1):
-        vector = embeddings.embed_text(chunk)
+        vector = embeddings.embed_or_empty(chunk)
         source = f"{args.file} (chunk {i}/{len(chunks)})" if len(chunks) > 1 else args.file
         service.add_memory(vector, chunk, args.project, args.type_, source=source)
 

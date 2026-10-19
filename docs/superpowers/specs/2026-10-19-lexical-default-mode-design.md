@@ -1,6 +1,11 @@
 # Lexical-by-default mode: Qdrant and the embedding model become opt-in
 
-Status: proposed, not implemented. Needs the decisions in "Open decisions".
+Status: implemented in 3.2.0 with the recommended decisions: default `lexical`;
+setting in `~/.chronicle/config.json` with `CHRONICLE_SEMANTIC` override;
+Porter-stemming migration deferred; shipped as 3.2.0 with a CHANGELOG notice.
+Steps 1-3 and 5 below are done. Still open: a dedicated dashboard empty state
+for the similarity graph (nodes render without edges today), the optional
+`chronicle[semantic]` extra, and the tokenizer migration.
 
 ## Problem
 

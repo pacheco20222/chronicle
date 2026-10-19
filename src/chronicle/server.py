@@ -148,7 +148,7 @@ def memory_add(
 ) -> dict:
     project = scope_path if scope_path is not None else config.get_project()
     config.validate_type(type)
-    vector = embeddings.embed_text(content)
+    vector = embeddings.embed_or_empty(content)
     memory_id = _get_service().add_memory(
         vector,
         content,
@@ -184,7 +184,7 @@ def memory_confirm(memory_id: str, confidence: float = 1.0) -> dict:
 
 @mcp.tool
 def memory_edit(memory_id: str, content: str) -> dict:
-    vector = embeddings.embed_text(content)
+    vector = embeddings.embed_or_empty(content)
     _get_service().edit_memory(memory_id, content, vector)
     return {"id": memory_id, "content": content}
 
@@ -214,7 +214,7 @@ def memory_merge(
 ) -> dict:
     project = scope_path if scope_path is not None else config.get_project()
     config.validate_type(type)
-    vector = embeddings.embed_text(content)
+    vector = embeddings.embed_or_empty(content)
     memory_id = _get_service().merge_memories(vector, content, project, type, source_ids)
     return {
         "id": memory_id,
@@ -232,7 +232,7 @@ def memory_split(source_id: str, new_memories: list[dict]) -> dict:
         content = memory["content"]
         type_ = memory["type"]
         config.validate_type(type_)
-        contents.append((embeddings.embed_text(content), content, type_))
+        contents.append((embeddings.embed_or_empty(content), content, type_))
     memory_ids = _get_service().split_memory(source_id, contents)
     return {"source_id": source_id, "ids": memory_ids}
 
@@ -250,7 +250,7 @@ def memory_search(
     if type == "checkpoint":
         # Checkpoints are a timeline, not a topic: newest first, query ignored.
         return _get_service().get_recent(project, "checkpoint", k=k)
-    vector = embeddings.embed_text(query)
+    vector = embeddings.embed_or_empty(query)
     return _get_service().search(
         vector,
         project,
@@ -270,7 +270,7 @@ def memory_search_global(
     max_tokens: int | None = None,
     include_linked: bool = False,
 ) -> list[dict]:
-    vector = embeddings.embed_text(query)
+    vector = embeddings.embed_or_empty(query)
     return _get_service().search_global(
         vector,
         query_text=query,
@@ -295,7 +295,7 @@ def memory_set_document(
     else:
         project = config.get_project()
     config.validate_type(type)
-    vector = embeddings.embed_text(content)
+    vector = embeddings.embed_or_empty(content)
     doc_id = _get_service().set_document(
         vector,
         content,

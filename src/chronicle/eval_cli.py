@@ -5,7 +5,7 @@ import time
 
 from chronicle.core.budget import estimate_tokens
 from chronicle.core.runtime import get_runtime
-from chronicle.embeddings import embed_text
+from chronicle.embeddings import embed_or_empty as embed_text
 
 
 SAMPLE_LIMIT = 50

@@ -2,13 +2,22 @@
 
 ## Prerequisites
 
-1. **Docker or OrbStack** running locally.
-2. **uv** installed ([docs.astral.sh/uv](https://docs.astral.sh/uv/)).
+1. **uv** installed ([docs.astral.sh/uv](https://docs.astral.sh/uv/)).
+2. *Optional:* **Docker or OrbStack**, only for semantic (similarity) search.
 
-No GPU and no separate embedding service needed — `fastembed` runs
-locally on CPU and installs the same way `uv sync` installs every
-other Python dependency here. The model itself (~500MB) downloads
-automatically, once, the first time you save a memory.
+By default Chronicle uses SQLite only: no Docker and no model download. Saving,
+checkpoints, documents and keyword search (FTS5) work right away. To also find
+memories by meaning and get the similarity graph, run once:
+
+```bash
+chronicle semantic enable
+```
+
+That starts Qdrant in Docker, downloads the embedding model (~500MB, once) and
+indexes your existing memories. `chronicle semantic disable` goes back to
+keyword-only without deleting anything, and `chronicle reindex` rebuilds the
+similarity index from your memories if it is ever lost. No GPU and no separate
+embedding service needed: `fastembed` runs locally on CPU.
 
 **Where your data lives:** every registered project's memories live in
 one SQLite file, `~/.chronicle/chronicle.db` — that's the canonical
@@ -117,16 +126,15 @@ new version.
 
 ## Option B: Manual install
 
-### 1. Clone and start the services
+### 1. Clone
 
 ```bash
 git clone git@github.com:pacheco20222/chronicle.git
 cd chronicle
-docker compose up -d
 ```
 
-This starts one Qdrant container — the only always-on process Chronicle
-needs. Verify it's up:
+Nothing else needs to run. If you want semantic search, `chronicle semantic enable`
+(see Prerequisites) starts the one Qdrant container for you; you can verify it with:
 
 ```bash
 curl -s http://localhost:6333/collections
@@ -237,8 +245,7 @@ The same command exists for the other agents, run from the repo folder:
 
 The manual steps below do the same thing by hand.
 
-**Steps** (Docker/OrbStack running and the repo cloned with
-`docker compose up -d`, as in Option B steps 1–2):
+**Steps** (repo cloned as in Option B step 1; Docker is not needed):
 
 1. Find the absolute path to `uv`:
    ```bash

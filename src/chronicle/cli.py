@@ -6,7 +6,7 @@ usage: chronicle <command> [options]
 Self-hosted, project-scoped memory for Claude Code, Cursor, and Codex.
 
 Everyday:
-  start [--port N] [--background]   start Qdrant (if needed) and the dashboard
+  start [--port N] [--background]   start the dashboard (and Qdrant if semantic search is on)
   stop                              stop a backgrounded dashboard
   register NAME [--force]           register the current folder as a project
   setup AGENT --project NAME [--print]
@@ -14,6 +14,10 @@ Everyday:
                                     claude-desktop, claude-code, cursor, codex
   setup [--project NAME]            print the config for every agent instead
   update                            update this chronicle clone to the latest main
+
+Search:
+  semantic enable|disable|status    turn similarity search (Qdrant + model) on or off
+  reindex [--project NAME]          rebuild the similarity index from your memories
 
 Memories:
   import PATH --project NAME --type TYPE
@@ -60,9 +64,10 @@ def _serve(argv: list[str]) -> None:
 
 
 def _start(argv: list[str]) -> None:
-    from chronicle import dashboard_cli, services
+    from chronicle import config, dashboard_cli, services
 
-    services.ensure_qdrant()
+    if config.semantic_enabled():
+        services.ensure_qdrant()
     dashboard_cli.main(["start", *argv])
 
 
@@ -72,11 +77,11 @@ def _stop(argv: list[str]) -> None:
     dashboard_cli.main(["stop", *argv])
 
 
-def _module_main(module_name: str):
+def _module_main(module_name: str, function: str = "main"):
     def run(argv: list[str]) -> None:
         import importlib
 
-        importlib.import_module(f"chronicle.{module_name}").main(argv)
+        getattr(importlib.import_module(f"chronicle.{module_name}"), function)(argv)
 
     return run
 
@@ -93,6 +98,8 @@ COMMANDS = {
     "dashboard": _module_main("dashboard_cli"),
     "eval": _module_main("eval_cli"),
     "update": _module_main("update_cli"),
+    "semantic": _module_main("semantic_cli"),
+    "reindex": _module_main("semantic_cli", "reindex_main"),
 }
 
 

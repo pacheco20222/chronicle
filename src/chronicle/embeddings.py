@@ -27,3 +27,9 @@ def embed_text(text: str) -> list[float]:
 
     embedding = next(iter(_model.embed([text])))
     return embedding.tolist()
+
+
+def embed_or_empty(text: str) -> list[float]:
+    """embed_text, but [] (no model download, no work) when semantic search is
+    off; the NullVectorIndex ignores the empty vector."""
+    return embed_text(text) if config.semantic_enabled() else []

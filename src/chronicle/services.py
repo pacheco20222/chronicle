@@ -82,8 +82,13 @@ def qdrant_down_message() -> str:
 
 def status_lines() -> list[str]:
     """One-glance health for a person who typed plain `chronicle`."""
+    if not config.semantic_enabled():
+        return [
+            "Status: ready. Search: keyword only (no Docker or model needed). "
+            "Run `chronicle semantic enable` for similarity search."
+        ]
     if qdrant_is_reachable():
-        return [f"Status: ready (Qdrant is running at {config.QDRANT_URL})."]
+        return [f"Status: ready (semantic search on, Qdrant running at {config.QDRANT_URL})."]
     return [f"Status: not ready. {qdrant_down_message()}"]
 
 

@@ -1,8 +1,20 @@
 # Changelog
 
-## Unreleased
+## 3.2.0 — 2026-10-19
+
+### Changed (read this if you upgrade)
+- **Search is keyword-only by default; Docker and the embedding model are now
+  optional.** A fresh install needs only `uv`: no Qdrant, no ~500MB download.
+  Existing installs that used similarity search should run
+  `chronicle semantic enable` once (it starts Qdrant, downloads the model if
+  needed, and indexes your memories). `chronicle semantic disable` goes back
+  to keyword-only without deleting anything.
+- Keyword search matches free-text questions: words are prefix-matched, OR-ed
+  and ranked by bm25, instead of requiring the exact phrase.
 
 ### Added
+- `chronicle semantic enable|disable|status` and `chronicle reindex` (rebuild
+  the similarity index from SQLite).
 - Native Windows support (PowerShell 7/5.1, cmd, Git Bash), a `chronicle`
   command on PATH (`start`, `stop`, `serve`, `update`, ...), Docker/Qdrant
   guidance when the vector store is down, `chronicle update`.
@@ -13,7 +25,7 @@
 - Full test suite CI on Linux and macOS, plus a `pip-audit` job.
 - `SECURITY.md`.
 
-### Changed
+### Also changed
 - `chronicle register` and `memory_register_project` refuse to re-point a
   folder that is registered to another project unless forced.
 - Session-start recall output now fences saved text and labels it as

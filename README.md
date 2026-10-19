@@ -34,14 +34,22 @@ another repo's memory by accident.
   PowerShell 5.1, cmd, or Git Bash, or under WSL2 (anything Linux-based in
   this repo works unmodified there). Windows users: see
   [Windows](#windows) for the full setup.
-- [Docker](https://www.docker.com/) or [OrbStack](https://orbstack.dev/) (Qdrant runs in a container)
 - [uv](https://docs.astral.sh/uv/)
+- *Optional:* [Docker](https://www.docker.com/) or [OrbStack](https://orbstack.dev/), only for similarity (semantic) search; see below
 - [Node.js](https://nodejs.org/), only to build the dashboard frontend
 
-No GPU, no separate embedding service — `fastembed` runs locally on CPU
-and installs like any other Python dependency. Chronicle initializes it only
-when the first memory tool is called, so loading or downloading the model
-does not delay the MCP startup handshake on Windows, macOS, or Linux.
+**Out of the box, Chronicle needs no Docker and downloads no model.** Saving,
+checkpoints, project documents and keyword search (SQLite FTS5) work
+immediately. To also find memories by meaning (paraphrases, synonyms) and get
+the similarity graph, turn on semantic search once:
+
+```bash
+chronicle semantic enable    # starts Qdrant in Docker, downloads the ~500MB model once, indexes your memories
+chronicle semantic disable   # back to keyword-only; nothing is deleted
+```
+
+No GPU and no separate embedding service: `fastembed` runs locally on CPU, and
+the model is only loaded when semantic search is on.
 
 ## Quick start (Claude Code plugin)
 
@@ -112,8 +120,10 @@ First, once, regardless of which of these you use:
 ```bash
 git clone git@github.com:pacheco20222/chronicle.git
 cd chronicle
-docker compose up -d
 ```
+
+(Docker is only needed if you later turn on semantic search with
+`chronicle semantic enable`.)
 
 These three work differently from each other — read the one that
 applies to you, not all three in sequence.

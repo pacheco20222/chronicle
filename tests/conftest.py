@@ -19,6 +19,7 @@ def isolate_server_runtime(service, monkeypatch):
     from chronicle.core import runtime
 
     monkeypatch.setenv("CHRONICLE_PROJECT", "chronicle-test")
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "1")
     monkeypatch.setattr(server, "_service", service, raising=False)
     monkeypatch.setattr(runtime, "_runtime", service)
     monkeypatch.setattr(config, "SQLITE_PATH", service.repository.database.path)

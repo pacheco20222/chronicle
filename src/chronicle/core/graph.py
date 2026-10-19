@@ -5,7 +5,9 @@ K_NEIGHBORS = 3
 MIN_SIMILARITY = 0.3
 
 
-def cosine(a: list[float], b: list[float]) -> float:
+def cosine(a: list[float] | None, b: list[float] | None) -> float:
+    if not a or not b:
+        return 0.0
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
     nb = math.sqrt(sum(x * x for x in b))

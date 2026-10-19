@@ -291,6 +291,9 @@ class MemoryService:
         return row.id
 
     def get_all_with_vectors(self, project: str | None = None) -> list[dict]:
+        if not getattr(self.vector_index, "stores_vectors", True):
+            # lexical-only mode: list everything from SQLite, without vectors
+            return [{**self._serialize(row), "vector": None} for row in self.repository.all(project)]
         indexed = self.vector_index.all(project)
         rows = self.repository.get_by_ids(record["id"] for record in indexed)
         return [
