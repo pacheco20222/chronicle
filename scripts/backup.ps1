@@ -8,7 +8,7 @@ $Timestamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
 
 New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 
-# SQLite is the canonical store (since the 3.0.0 rearchitecture) — every
+# SQLite is the canonical store (since the 3.0.0 rearchitecture) - every
 # memory, source, and scope lives here first. The Qdrant snapshot below is
 # a derived vector index only; back this up first since it's the one that
 # actually matters if something is lost.
@@ -31,13 +31,13 @@ if (Test-Path $SqlitePath) {
         Select-Object -Skip 14
     if ($oldDb) { $oldDb | Remove-Item -Force }
 } else {
-    Write-Host "No SQLite database found at $SqlitePath — nothing to back up there yet."
+    Write-Host "No SQLite database found at $SqlitePath - nothing to back up there yet."
 }
 
 try {
     Invoke-RestMethod -Uri "$QdrantUrl/collections/$Collection" -Method Get | Out-Null
 } catch {
-    Write-Host "Collection '$Collection' doesn't exist yet — nothing to snapshot."
+    Write-Host "Collection '$Collection' doesn't exist yet - nothing to snapshot."
     exit 0
 }
 

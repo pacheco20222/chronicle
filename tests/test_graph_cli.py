@@ -189,6 +189,20 @@ def test_main_writes_html_file_and_opens_browser(tmp_path, monkeypatch, service)
     assert len(opened) == 1
 
 
+def test_main_accepts_a_relative_out_path(tmp_path, monkeypatch, service):
+    service.add_memory([1.0, 0.0], "graph cli test alpha", "chronicle-test", "note")
+    service.add_memory([0.9, 0.1], "graph cli test beta", "chronicle-test", "note")
+    opened = []
+    monkeypatch.setattr(graph_cli.webbrowser, "open", lambda uri: opened.append(uri))
+    monkeypatch.setattr(graph_cli, "get_runtime", lambda: service)
+    monkeypatch.chdir(tmp_path)
+
+    graph_cli.main(["--project", "chronicle-test", "--out", "g.html"])
+
+    assert (tmp_path / "g.html").exists()
+    assert opened == [(tmp_path / "g.html").resolve().as_uri()]
+
+
 def test_main_handles_fewer_than_two_records(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(graph_cli.webbrowser, "open", lambda uri: (_ for _ in ()).throw(AssertionError("should not open browser")))
     out_path = tmp_path / "graph.html"

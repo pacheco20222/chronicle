@@ -433,3 +433,40 @@ def test_memory_search_checkpoint_type_is_newest_first_ignoring_query():
     assert results[0]["id"] == newest["id"]
     stamps = [r["created_at"] for r in results]
     assert stamps == sorted(stamps, reverse=True)
+
+
+def _call_memory_search_with_failing_service(monkeypatch, error):
+    def broken_service():
+        raise error
+
+    monkeypatch.setattr(server, "_get_service", broken_service)
+    monkeypatch.setattr(server.embeddings, "embed_text", lambda text: [0.0] * 768)
+
+    async def run():
+        async with Client(server.mcp) as client:
+            return await client.call_tool("memory_search", {"query": "anything"}, raise_on_error=False)
+
+    return anyio.run(run)
+
+
+def test_tool_errors_explain_how_to_start_qdrant_when_it_is_down(monkeypatch):
+    monkeypatch.setattr(server.services, "qdrant_is_reachable", lambda url=None, timeout=2: False)
+    monkeypatch.setattr(server.services, "docker_state", lambda: server.services.DOCKER_NOT_RUNNING)
+
+    result = _call_memory_search_with_failing_service(monkeypatch, ConnectionRefusedError(10061, "refused"))
+
+    assert result.is_error
+    text = result.content[0].text
+    assert "can't reach Qdrant" in text
+    assert "Open Docker Desktop" in text
+
+
+def test_tool_errors_keep_their_message_when_qdrant_is_up(monkeypatch):
+    # e.g. the embedding model download failing: also a connection error,
+    # but not Qdrant's fault, so it must not be relabeled.
+    monkeypatch.setattr(server.services, "qdrant_is_reachable", lambda url=None, timeout=2: True)
+
+    result = _call_memory_search_with_failing_service(monkeypatch, ConnectionError("huggingface.co unreachable"))
+
+    assert result.is_error
+    assert "huggingface.co unreachable" in result.content[0].text

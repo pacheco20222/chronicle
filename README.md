@@ -20,18 +20,23 @@ another repo's memory by accident.
 - **`chronicle dashboard`** — a persistent, local React/Three.js memory explorer, themed as a navigable star chart: every project is its own constellation with its core memory anchoring the center (the way Sagittarius A* anchors the Milky Way), and a scope with children renders as its own sun/planet/moon body — depth in your taxonomy maps onto depth in the solar system, children always orbiting their parent. From inside your chronicle clone:
   ```bash
   cd /path/to/chronicle
+  (cd dashboard && npm ci && npm run build)     # once, needs Node.js
   uv run chronicle dashboard start              # foreground
   uv run chronicle dashboard start --background  # persistent local process
   uv run chronicle dashboard stop                # stop a backgrounded one
   ```
-  or, from anywhere, `uv run --directory /path/to/chronicle chronicle dashboard start`. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port. It always serves every registered project at once, not just the one you're standing in — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope) for more.
+  or, with `chronicle` on your PATH (below), just `chronicle start` from anywhere — it also starts Qdrant if it isn't running. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port. It always serves every registered project at once, not just the one you're standing in — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope) for more.
+- **The `chronicle` command** — `uv tool install --editable .` from your clone puts `chronicle` on your PATH (bash, zsh, PowerShell, cmd). Then `chronicle --help` (or plain `chronicle` in a terminal) lists every command, `chronicle start` / `chronicle stop` replace the long `uv run --directory …` lines, and `chronicle update` pulls the latest version. MCP configs are unaffected — see [docs/INSTALL.md §7](docs/INSTALL.md#recommended-put-chronicle-on-your-path).
 
 ## Requirements
 
-- macOS, Linux, or Windows (PowerShell 5.1+/pwsh, or WSL2 — anything
-  Linux-based in this repo just works unmodified under WSL2)
+- macOS, Linux, or Windows 10/11 — natively from PowerShell 7, Windows
+  PowerShell 5.1, cmd, or Git Bash, or under WSL2 (anything Linux-based in
+  this repo works unmodified there). Windows users: see
+  [Windows](#windows) for the full setup.
 - [Docker](https://www.docker.com/) or [OrbStack](https://orbstack.dev/) (Qdrant runs in a container)
 - [uv](https://docs.astral.sh/uv/)
+- [Node.js](https://nodejs.org/), only to build the dashboard frontend
 
 No GPU, no separate embedding service — `fastembed` runs locally on CPU
 and installs like any other Python dependency. Chronicle initializes it only
@@ -201,6 +206,104 @@ See [docs/INSTALL.md](docs/INSTALL.md) for the full walkthrough. If
 the MCP connects but the first `memory_add` or `memory_search` fails
 while FastEmbed loads or downloads the model, follow the
 [first-tool troubleshooting steps](docs/INSTALL.md#mcp-connects-but-the-first-memory-tool-fails).
+
+## Windows
+
+Chronicle runs natively on Windows 10/11; no WSL needed. Every command
+below works the same in PowerShell 7, Windows PowerShell 5.1, cmd, and
+Git Bash (including the older mintty window).
+
+### One-time setup
+
+1. **Install the prerequisites.** In PowerShell (or download each installer):
+   ```powershell
+   winget install Docker.DockerDesktop
+   winget install astral-sh.uv
+   winget install Git.Git
+   winget install OpenJS.NodeJS.LTS   # only needed for the dashboard
+   ```
+   Then open **Docker Desktop** once and let it finish starting.
+2. **Clone Chronicle and put the `chronicle` command on your PATH:**
+   ```powershell
+   git clone https://github.com/pacheco20222/chronicle.git
+   cd chronicle
+   uv tool install --editable .
+   ```
+   This installs `chronicle.exe` into `%USERPROFILE%\.local\bin`. If a new
+   terminal says `chronicle` isn't recognized, run `uv tool update-shell`
+   once and open a new terminal.
+3. **Build the dashboard** (optional, needs Node.js):
+   ```powershell
+   cd dashboard; npm ci; npm run build; cd ..
+   ```
+4. **Start everything and check it's healthy:**
+   ```powershell
+   chronicle start
+   ```
+   This starts Qdrant in Docker if it isn't running, then the dashboard at
+   http://127.0.0.1:8765. Typing plain `chronicle` at any time shows every
+   command plus a status line telling you whether Qdrant and Docker are up.
+5. **Connect a project.** Either install the Claude Code plugin from
+   [Quick start (Claude Code plugin)](#quick-start-claude-code-plugin) (it
+   works the same on Windows), or, for a manual setup, run this from your
+   project folder and paste what it prints:
+   ```powershell
+   chronicle setup --project my-project
+   ```
+   On Windows it prints forward-slash paths and a PowerShell-safe
+   session-start hook, so the output can be pasted as-is.
+
+### Everyday commands
+
+| Command | What it does |
+|---|---|
+| `chronicle` | Command list + Docker/Qdrant status |
+| `chronicle start` | Start Qdrant (if needed) and the dashboard; add `--port N` or `--background` |
+| `chronicle stop` | Stop a `--background` dashboard |
+| `chronicle register --project NAME` | Register the current folder as a project |
+| `chronicle update` | Switch the clone to `main`, pull the latest, sync dependencies, rebuild the dashboard |
+| `chronicle <command> --help` | Every option for one command |
+
+You never have to start the MCP server yourself: Claude Code, Cursor,
+Codex and Claude Desktop launch it on their own. Only Docker Desktop has
+to be running.
+
+### Good to know on Windows
+
+- **Docker Desktop must be running.** If it isn't, `chronicle`,
+  `chronicle start`, and memory tools in Claude all say so ("Docker is
+  installed but not running. Open Docker Desktop…") instead of showing a
+  raw `WinError 10061`.
+- **Paths in JSON/TOML configs** (`.mcp.json`, `.cursor/mcp.json`,
+  `claude_desktop_config.json`, Codex `config.toml`) need forward slashes
+  (`C:/Users/you/chronicle`) or doubled backslashes. A single backslash is
+  invalid.
+- **Your data** lives in `%USERPROFILE%\.chronicle`: the SQLite database,
+  the project registry, and the embedding model (~500MB, downloaded on the
+  first memory you save).
+- **Background dashboard:** `chronicle start --background` keeps running
+  after you close the terminal; stop it with `chronicle stop`.
+- **Claude Desktop app:** use an absolute path in `command`, e.g.
+  `C:/Users/you/.local/bin/chronicle.exe` with no `args`; see
+  [docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop-the-chat-tab).
+- **Backups:** `scripts\daily_backup.ps1` works in both Windows PowerShell
+  5.1 and PowerShell 7; schedule it with `schtasks` as shown in
+  [docs/INSTALL.md §8](docs/INSTALL.md#8-windows).
+- **Updating a plugin install** (not a git clone): `.\scripts\update.ps1`.
+
+### Troubleshooting
+
+| You see | Do this |
+|---|---|
+| `Docker is installed but not running` | Open Docker Desktop, wait until it's running, retry |
+| `Docker is not installed` | Install Docker Desktop (step 1) |
+| `chronicle` is not recognized | `uv tool update-shell`, then open a new terminal |
+| Dashboard page says "not built" | `cd dashboard; npm ci; npm run build`, then restart `chronicle start` |
+| `chronicle update` says dependencies failed | `chronicle stop`, close Claude Code/Cursor sessions, run it again |
+| `chronicle update` says you have uncommitted changes | Commit or stash your changes in the chronicle folder first |
+| Claude Desktop shows `spawn uv ENOENT` | Use the absolute path to `uv.exe` or `chronicle.exe` in `command` |
+
+More detail, including WSL2, is in [docs/INSTALL.md §8](docs/INSTALL.md#8-windows).
 
 ## How it works
 

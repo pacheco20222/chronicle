@@ -1,12 +1,28 @@
 import argparse
 import hashlib
 import os
+import sys
 
 from chronicle import config, embeddings
 from chronicle.core.runtime import get_runtime
 
 
 _DOCS_CHUNK_MAX_CHARS = 6000  # ~1500 tokens at ~4 chars/token
+
+
+def _read_text(path: str) -> str:
+    # utf-8-sig drops the BOM some Windows editors write, so it doesn't end
+    # up as an invisible first character of the memory. Files saved in the
+    # legacy Windows "ANSI" encoding aren't valid UTF-8; read those as
+    # cp1252 rather than failing the whole import.
+    try:
+        with open(path, "r", encoding="utf-8-sig") as f:
+            return f.read()
+    except UnicodeDecodeError:
+        with open(path, "r", encoding="cp1252", errors="replace") as f:
+            text = f.read()
+        print(f"Note: {path} is not UTF-8; read it as Windows-1252 (ANSI).", file=sys.stderr)
+        return text
 
 
 def _chunk_text(text: str, max_chars: int = 24000) -> list[str]:
@@ -42,8 +58,7 @@ def _import_directory(path: str, project: str, type_: str) -> None:
     ingested = 0
     unchanged = 0
     for file_path in file_paths:
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        content = _read_text(file_path)
         content_hash = hashlib.sha256(content.encode()).hexdigest()
         episode_title = f"{os.path.basename(file_path)} sha256:{content_hash[:16]}"
         active_chunks = service.repository.get_active_by_source_locator_all(project, file_path)
@@ -89,8 +104,7 @@ def main(argv: list[str]) -> None:
         _import_directory(args.file, args.project, args.type_)
         return
 
-    with open(args.file, "r", encoding="utf-8") as f:
-        text = f.read()
+    text = _read_text(args.file)
 
     chunks = _chunk_text(text)
     service = get_runtime()

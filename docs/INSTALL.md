@@ -105,7 +105,7 @@ update once, not once per project:
 ./scripts/update.sh
 ```
 
-or by hand:
+(on native Windows: `.\scripts\update.ps1`), or by hand:
 
 ```
 /plugin marketplace update chronicle
@@ -226,8 +226,12 @@ work on claude.ai in a browser — see the
    ```bash
    which uv
    ```
-   (for example `/opt/homebrew/bin/uv`). Your clone path is the one
-   `uv run chronicle setup` prints.
+   (for example `/opt/homebrew/bin/uv`). On Windows, in PowerShell run
+   `(Get-Command uv).Source`, or in cmd `where uv` (for example
+   `C:\Users\you\.local\bin\uv.exe`). Your clone path is the one
+   `uv run chronicle setup` prints. In the JSON below, write Windows paths
+   with forward slashes (`C:/Users/you/.local/bin/uv.exe`) or doubled
+   backslashes; a single backslash is invalid JSON.
 2. Open the config file. In Claude Desktop: **Settings → Developer → Edit
    Config**. Or open it directly; on macOS it is
    `~/Library/Application Support/Claude/claude_desktop_config.json`, on
@@ -248,6 +252,12 @@ work on claude.ai in a browser — see the
      }
    }
    ```
+   If you put `chronicle` on your PATH (§7, `uv tool install --editable .`),
+   you can instead point `command` straight at that executable, with no
+   `args`: e.g. `"command": "C:/Users/you/.local/bin/chronicle.exe"` on
+   Windows, or the output of `which chronicle` on macOS. Desktop launches
+   it with stdin piped, so plain `chronicle` runs the MCP server.
+
    `CHRONICLE_PROJECT` pins every chat to one project. Use it for one
    ongoing topic. For a chat that ranges across several unrelated
    projects, leave `env` out and pass an explicit `scope_path` per message
@@ -400,6 +410,53 @@ them beyond the registry file both read from.
 
 ### 7. Running `chronicle`'s other commands (import, graph, dashboard, scope)
 
+#### Recommended: put `chronicle` on your PATH
+
+From inside your chronicle clone, once:
+
+```bash
+uv tool install --editable .
+```
+
+That installs `chronicle` (and `chronicle-recall`) as real executables in
+uv's tool bin directory (`~/.local/bin`, or `%USERPROFILE%\.local\bin` on
+Windows) — run `uv tool update-shell` once if that directory isn't on your
+PATH yet. They work the same from bash, zsh, PowerShell, and cmd, from any
+folder, and `--editable` means a `git pull` takes effect without
+reinstalling (re-run the install only if dependencies change). Then:
+
+```bash
+chronicle --help                 # every command, grouped
+chronicle start                  # start Qdrant if needed, then the dashboard
+chronicle start --background     # same, but keep running after the terminal closes
+chronicle stop                   # stop a backgrounded dashboard
+chronicle update                 # pull the latest main, sync deps, rebuild the dashboard
+chronicle register --project your-project-name
+chronicle import notes.md --project your-project-name --type note
+```
+
+`chronicle update` switches your clone to `main` and fast-forwards it to
+`origin/main` (it refuses if you have uncommitted changes, or local commits
+on `main` that aren't upstream), then syncs dependencies into the
+environment `chronicle` runs from and rebuilds the dashboard if it changed.
+Restart open MCP client sessions afterwards. It's for git clones; a Claude
+Code plugin install updates with `scripts/update.sh` / `scripts/update.ps1`
+instead.
+
+Typing plain `chronicle` in a terminal shows the same command list plus a
+status line: whether Qdrant is up, and if not, whether Docker is missing
+(install it) or just not running (open Docker Desktop). `chronicle start`
+checks the same thing before starting anything, and memory tools called
+from an MCP client return that same guidance instead of a raw connection
+error. MCP
+clients still launch plain `chronicle` (with stdin piped) to get the MCP
+server, so existing `.mcp.json` / Codex configs keep working unchanged;
+`chronicle serve` runs the server explicitly. Relative paths (like
+`notes.md` above) resolve against wherever you are, so the `--directory`
+gotcha below doesn't apply.
+
+#### Without installing: `uv run`
+
 `chronicle import`, `chronicle graph`, `chronicle dashboard`, and `chronicle
 scope` aren't called by Claude Code or Codex — you run these yourself,
 directly. Every one of them is a plain `uv run` invocation, and `uv` needs
@@ -448,6 +505,20 @@ change it, `--background` to keep it running after the terminal closes,
 isn't scoped to one project by your current directory — it always serves
 every registered project at once, and you switch between them inside the
 dashboard itself.
+
+The dashboard's web frontend is not checked in (`dashboard/dist/` is
+gitignored), so build it once after cloning, and again after pulling
+changes to `dashboard/` — it needs [Node.js](https://nodejs.org/):
+
+```bash
+cd /path/to/chronicle/dashboard
+npm ci
+npm run build
+```
+
+Then (re)start `chronicle dashboard start`. Until it's built, the page
+at `127.0.0.1:8765` only shows these build instructions; the `/mcp`
+endpoint works either way.
 
 #### Organizing projects into cores and sub-cores
 
@@ -606,8 +677,9 @@ except two things:
   command need either forward slashes or doubled backslashes — both
   `C:/Users/you/chronicle` and `C:\\Users\\you\\chronicle` are valid; a single
   backslash isn't, in JSON or TOML.
-- The backup scripts are PowerShell twins (`backup.ps1`,
-  `export_json.ps1`, `daily_backup.ps1` in `scripts/`) — same
+- The backup and update scripts are PowerShell twins (`backup.ps1`,
+  `export_json.ps1`, `daily_backup.ps1`, `update.ps1` in `scripts/`),
+  compatible with both Windows PowerShell 5.1 and PowerShell 7 — same
   behavior as the `.sh` versions, same env vars
   (`CHRONICLE_QDRANT_URL`, `CHRONICLE_COLLECTION`). Run them directly:
   ```powershell
