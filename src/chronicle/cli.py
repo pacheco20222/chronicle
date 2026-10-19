@@ -52,7 +52,7 @@ def _version() -> str:
     from importlib.metadata import PackageNotFoundError, version
 
     try:
-        return version("chronicle")
+        return version("chronicle-memory")
     except PackageNotFoundError:
         return "unknown"
 

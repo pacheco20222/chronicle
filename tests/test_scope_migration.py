@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, text
 def _alembic_config(url: str) -> Config:
     repo_root = Path(__file__).resolve().parents[1]
     cfg = Config(str(repo_root / "alembic.ini"))
-    cfg.set_main_option("script_location", str(repo_root / "alembic"))
+    cfg.set_main_option("script_location", str(repo_root / "src" / "chronicle" / "migrations"))
     cfg.set_main_option("sqlalchemy.url", url)
     return cfg
 

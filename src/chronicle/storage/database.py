@@ -25,9 +25,10 @@ class Database:
         self.session_factory = sessionmaker(self.engine, expire_on_commit=False)
 
     def _run_migrations(self) -> None:
-        repository_root = Path(__file__).resolve().parents[3]
-        alembic_config = Config(str(repository_root / "alembic.ini"))
-        alembic_config.set_main_option("script_location", str(repository_root / "alembic"))
+        # Migrations ship inside the package, so this works from a wheel too
+        # (no alembic.ini needed: the `alembic` CLI uses the repo's ini).
+        alembic_config = Config()
+        alembic_config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "migrations"))
         alembic_config.set_main_option("sqlalchemy.url", self.url)
         with self.engine.connect() as connection:
             alembic_config.attributes["connection"] = connection

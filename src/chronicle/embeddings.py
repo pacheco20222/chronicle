@@ -8,11 +8,14 @@ _model = None
 _model_lock = Lock()
 
 
-SEMANTIC_INSTALL_HINT = (
-    "Semantic search needs the optional dependencies. In a clone, run "
-    "`uv tool install --editable \".[semantic]\" --force` (or `uv sync --extra "
-    "semantic` for a dev checkout), then try again."
-)
+def _semantic_install_hint() -> str:
+    is_clone = (Path(__file__).resolve().parents[2] / "pyproject.toml").is_file()
+    command = (
+        '`uv tool install --editable ".[semantic]" --force` (run from your clone)'
+        if is_clone
+        else '`uv tool install "chronicle-memory[semantic]" --force`'
+    )
+    return f"Semantic search needs the optional dependencies. Run {command}, then try again."
 
 
 def require_semantic_deps() -> None:
@@ -30,7 +33,7 @@ def require_semantic_deps() -> None:
 
     missing = [m for m in ("fastembed", "qdrant_client") if not available(m)]
     if missing:
-        raise RuntimeError(f"Missing {', '.join(missing)}. {SEMANTIC_INSTALL_HINT}")
+        raise RuntimeError(f"Missing {', '.join(missing)}. {_semantic_install_hint()}")
 
 
 def embed_text(text: str) -> list[float]:

@@ -14,7 +14,8 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 def compose_file() -> Path:
-    return Path(__file__).resolve().parents[2] / "docker-compose.yml"
+    # a copy lives inside the package so it exists in a wheel too
+    return Path(__file__).resolve().parent / "docker-compose.yml"
 
 
 def qdrant_is_reachable(url: str | None = None, timeout: float = 2) -> bool:

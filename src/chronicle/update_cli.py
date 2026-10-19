@@ -45,7 +45,10 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _version(repo: Path) -> str:
-    for line in (repo / "pyproject.toml").read_text(encoding="utf-8").splitlines():
+    pyproject = repo / "pyproject.toml"
+    if not pyproject.is_file():
+        return "unknown"
+    for line in pyproject.read_text(encoding="utf-8").splitlines():
         if line.startswith("version"):
             return line.split("=", 1)[1].strip().strip("\"'")
     return "unknown"
@@ -59,8 +62,9 @@ def _update_git(repo: Path) -> tuple[str, str]:
     if not (repo / ".git").exists():
         raise UpdateError(
             f"{repo} is not a git clone, so there's nothing to pull. If you "
-            "installed Chronicle as a Claude Code plugin, update it with "
-            "scripts/update.ps1 (Windows) or scripts/update.sh, or "
+            "installed Chronicle with `uv tool install chronicle-memory`, update it with "
+            "`uv tool upgrade chronicle-memory`. If you installed it as a Claude Code "
+            "plugin, use scripts/update.ps1 (Windows) or scripts/update.sh, or "
             "`/plugin update chronicle` inside Claude Code."
         )
     if shutil.which("git") is None:

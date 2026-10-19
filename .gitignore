@@ -7,3 +7,4 @@ __pycache__/
 backups/
 mnemo-graph-*.html
 graphify-out/
+src/chronicle/dashboard_dist/

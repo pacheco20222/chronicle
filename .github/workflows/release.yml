@@ -1,0 +1,49 @@
+name: Release
+
+# Builds the wheel (with the dashboard bundled) and smoke-tests it on every run.
+# It only publishes to PyPI when a version tag (v*) is pushed, through PyPI
+# trusted publishing: configure the "pypi" environment and a trusted publisher
+# for this repository on pypi.org first. No token is stored in GitHub.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.12"
+      - name: Build the dashboard and bundle it into the package
+        run: |
+          (cd dashboard && npm ci && npm run build)
+          cp -R dashboard/dist src/chronicle/dashboard_dist
+      - run: uv build
+      - name: Smoke-test the wheel in a clean virtualenv
+        run: uv run python scripts/smoke_wheel.py dist/*.whl --expect-dashboard
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

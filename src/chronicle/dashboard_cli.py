@@ -28,6 +28,10 @@ def pid_path() -> Path:
 
 
 def _dashboard_dist() -> Path:
+    # a wheel carries the built frontend inside the package; a git clone builds it
+    packaged = Path(__file__).resolve().parent / "dashboard_dist"
+    if (packaged / "index.html").is_file():
+        return packaged
     return Path(__file__).resolve().parents[2] / "dashboard" / "dist"
 
 

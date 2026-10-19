@@ -12,6 +12,15 @@
 - Keyword search matches free-text questions: words are prefix-matched, OR-ed
   and ranked by bm25, instead of requiring the exact phrase.
 
+### Packaging
+- The distribution is now named `chronicle-memory` (the command is still
+  `chronicle`). Migrations, `docker-compose.yml` and the built dashboard ship
+  inside the package, so a wheel works without a git clone; see
+  `docs/RELEASING.md`. If you installed the old tool with
+  `uv tool install --editable .`, run `uv tool uninstall chronicle` once and
+  reinstall (`uv tool install --editable .`), otherwise uv reports that the
+  `chronicle` executable already exists.
+
 ### Added
 - `fastembed` and `qdrant-client` moved to the optional `semantic` extra: the
   base install is much smaller. `chronicle semantic enable` tells you to run

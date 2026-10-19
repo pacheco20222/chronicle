@@ -29,3 +29,14 @@ jobs:
           python-version: "3.12"
       - run: uv export --format requirements-txt --no-hashes --no-emit-project -o requirements-audit.txt
       - run: uvx pip-audit -r requirements-audit.txt --no-deps --disable-pip
+
+  wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.12"
+      - run: uv build --wheel
+      - run: uv run python scripts/smoke_wheel.py dist/*.whl
