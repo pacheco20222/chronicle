@@ -275,3 +275,27 @@ def test_no_hook_flag_skips_settings(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     setup_cli.main(["claude-code", "--project", "p", "--no-hook"])
     assert not (tmp_path / ".claude" / "settings.json").exists()
+
+
+def test_planted_bak_symlink_is_not_followed(tmp_path, monkeypatch):
+    victim = tmp_path / "victim.txt"
+    victim.write_text("keep me")
+    repo = tmp_path / "repo"
+    (repo / ".claude").mkdir(parents=True)
+    (repo / ".claude" / "settings.json").write_text("{}")
+    (repo / ".claude" / "settings.json.bak").symlink_to(victim)
+    monkeypatch.chdir(repo)
+    setup_cli.main(["claude-code", "--project", "p"])
+    assert victim.read_text() == "keep me"
+
+
+def test_repo_config_symlinked_outside_folder_is_refused(tmp_path, monkeypatch):
+    outside = tmp_path / "outside.json"
+    outside.write_text("{}")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".mcp.json").symlink_to(outside)
+    monkeypatch.chdir(repo)
+    with pytest.raises(SystemExit, match="resolves outside"):
+        setup_cli.main(["claude-code", "--project", "p"])
+    assert outside.read_text() == "{}"

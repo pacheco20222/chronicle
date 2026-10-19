@@ -66,6 +66,23 @@ def _write_json_atomic(path: Path, data: dict) -> None:
         raise
 
 
+def _backup(path: Path) -> None:
+    """Copy `path` to `<path>.bak` without following a pre-planted symlink."""
+    bak = path.with_name(path.name + ".bak")
+    bak.unlink(missing_ok=True)
+    shutil.copyfile(path, bak)
+
+
+def _inside_cwd(path: Path) -> Path:
+    """Refuse repo-scoped config paths that symlink outside the current folder."""
+    if not path.resolve().is_relative_to(Path.cwd().resolve()):
+        raise SystemExit(
+            f"chronicle setup: {path} resolves outside the current folder "
+            "(symlink?); nothing was changed."
+        )
+    return path
+
+
 def _read_json(path: Path) -> dict:
     if not path.exists():
         return {}
@@ -95,7 +112,7 @@ def _merge_server(path: Path, key: str, entry: dict, dry_run: bool) -> str:
     if dry_run:
         return f"Would write to {path}:\n{json.dumps({'mcpServers': {key: entry}}, indent=2)}"
     if existed:
-        shutil.copy2(path, path.with_name(path.name + ".bak"))
+        _backup(path)
     _write_json_atomic(path, config)
     backup = f" (previous file saved as {path.name}.bak)" if existed else ""
     return f"{verb} '{key}' in {path}{backup}."
@@ -129,7 +146,7 @@ def _merge_hook(path: Path, command: str, dry_run: bool) -> str:
     if dry_run:
         return f"Would add this SessionStart hook to {path}:\n{command}"
     if path.exists():
-        shutil.copy2(path, path.with_name(path.name + ".bak"))
+        _backup(path)
     _write_json_atomic(path, config)
     return f"Set the session-start recall hook in {path}."
 
@@ -164,11 +181,11 @@ def _setup_agent(agent: str, project: str | None, dry_run: bool, hook: bool = Tr
             print("Fully quit Claude Desktop (Cmd+Q / tray > Quit) and reopen it, then start a new chat.")
         return
     if agent in ("claude-code", "cursor"):
-        path = Path.cwd() / (".mcp.json" if agent == "claude-code" else ".cursor/mcp.json")
+        path = _inside_cwd(Path.cwd() / (".mcp.json" if agent == "claude-code" else ".cursor/mcp.json"))
         print(_merge_server(path, "chronicle", entry, dry_run))
         if agent == "claude-code" and hook:
             command = _recall_hook_command(project, install_dir)
-            print(_merge_hook(Path.cwd() / ".claude" / "settings.json", command, dry_run))
+            print(_merge_hook(_inside_cwd(Path.cwd() / ".claude" / "settings.json"), command, dry_run))
         return
 
     # codex: one server entry for every project, then register this folder
