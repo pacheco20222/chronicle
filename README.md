@@ -305,6 +305,55 @@ to be running.
 
 More detail, including WSL2, is in [docs/INSTALL.md §8](docs/INSTALL.md#8-windows).
 
+## macOS and Linux
+
+Same `chronicle` command as Windows; use it from zsh (the macOS default),
+bash, or fish.
+
+### One-time setup
+
+1. **Install the prerequisites.** On macOS with [Homebrew](https://brew.sh):
+   ```bash
+   brew install uv git node          # node: only for the dashboard
+   brew install --cask docker        # or: brew install orbstack
+   ```
+   Then open Docker Desktop (or OrbStack) once and let it finish starting.
+2. **Clone Chronicle and put the `chronicle` command on your PATH:**
+   ```bash
+   git clone https://github.com/pacheco20222/chronicle.git
+   cd chronicle
+   uv tool install --editable .
+   ```
+   This installs `chronicle` into `~/.local/bin`. If a new terminal says
+   `command not found: chronicle`, run `uv tool update-shell` once and open
+   a new terminal (it edits `~/.zshrc` or `~/.bashrc` for you).
+3. **Build the dashboard** (optional, needs Node.js):
+   ```bash
+   (cd dashboard && npm ci && npm run build)
+   ```
+4. **Start everything and check it's healthy:**
+   ```bash
+   chronicle start
+   ```
+5. **Connect a project:** the Claude Code plugin
+   ([Quick start](#quick-start-claude-code-plugin)), or
+   `chronicle setup --project my-project` and paste what it prints. For the
+   Claude Desktop app, see
+   [docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop-the-chat-tab).
+
+Everyday commands are the same as in the [Windows table](#everyday-commands).
+In config files (`.mcp.json`, `claude_desktop_config.json`) you can use
+`chronicle` in place of `uv --directory … run chronicle`; the app does not
+see your shell `PATH`, so give the absolute path from `which chronicle`
+(for example `/Users/you/.local/bin/chronicle`) as `command`, with no `args`.
+
+| You see | Do this |
+|---|---|
+| `command not found: chronicle` | `uv tool update-shell`, then open a new terminal |
+| `Docker is installed but not running` | Open Docker Desktop or OrbStack, wait, retry |
+| Dashboard page says "not built" | `(cd dashboard && npm ci && npm run build)`, restart `chronicle start` |
+| Claude Desktop shows `spawn chronicle ENOENT` | `command` must be the absolute path from `which chronicle` |
+
 ## How it works
 
 SQLite (SQLAlchemy 2 + Alembic migrations) is the canonical store for
