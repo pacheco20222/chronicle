@@ -185,6 +185,7 @@ def test_cli_commands_do_not_print_migration_logs(tmp_path):
         os.environ,
         CHRONICLE_SQLITE_PATH=str(tmp_path / "c.db"),
         CHRONICLE_REGISTRY_PATH=str(tmp_path / "projects.json"),
+        CHRONICLE_SEMANTIC="0",  # no Qdrant on CI runners; this test is about migration logs
     )
     code = "import sys; sys.argv = ['chronicle', 'scope', 'list']; from chronicle import cli; cli.main()"
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True)
