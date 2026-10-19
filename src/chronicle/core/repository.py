@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterable
 from datetime import datetime
 import uuid
@@ -12,9 +13,23 @@ HIDDEN_STATUSES = {"superseded", "deleted", "wrong"}
 memory_fts = table("memory_fts", column("memory_id", String), column("content", Text))
 
 
-def _fts_phrase(query_text: str) -> str:
-    escaped = query_text.replace('"', '""')
-    return f'"{escaped}"'
+_STOPWORDS = frozenset(
+    "a an and are as at be but by did do does for from had has have how i in is it its "
+    "of on or that the their this to was we were what when where which who why will with".split()
+)
+
+
+def _fts_query(query_text: str) -> str | None:
+    """Turn free text into a safe FTS5 query: every word is quoted (so user
+    text can never be read as an FTS5 operator) and prefix-matched, and words
+    are OR-ed so a natural-language question still finds a memory that holds
+    only some of them; bm25 ranks the ones that match more of them first."""
+    tokens = re.findall(r"\w+", query_text.lower())
+    kept = [t for t in tokens if t not in _STOPWORDS] or tokens
+    unique = list(dict.fromkeys(kept))
+    if not unique:
+        return None
+    return " OR ".join(f'"{token}"*' for token in unique)
 
 
 def _require_project(project: str) -> str:
@@ -266,10 +281,13 @@ class MemoryRepository:
     ) -> list[Memory]:
         if project is not None:
             project = _require_project(project)
+        fts_query = _fts_query(query_text)
+        if fts_query is None:
+            return []
         statement: Select[tuple[Memory]] = (
             select(Memory)
             .join(memory_fts, memory_fts.c.memory_id == Memory.id)
-            .where(memory_fts.c.content.match(_fts_phrase(query_text)))
+            .where(memory_fts.c.content.match(fts_query))
         )
         if project is not None:
             statement = statement.where(Memory.project == project)

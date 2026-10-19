@@ -147,18 +147,18 @@ def test_fts_updates_after_insert_and_document_overwrite(service):
             {"memory_id": memory_id},
         ) == "inserted lexical text"
 
-    document_id = service.set_document([1.0], "document version one", "p", "doc", "note")
-    service.set_document([1.0], "document version two", "p", "doc", "note")
+    document_id = service.set_document([1.0], "alpha document", "p", "doc", "note")
+    service.set_document([1.0], "beta document", "p", "doc", "note")
 
-    assert service.repository.lexical("p", "document version one", None, 5, False) == []
-    assert [row.id for row in service.repository.lexical("p", "document version two", None, 5, False)] == [
+    assert service.repository.lexical("p", "alpha", None, 5, False) == []
+    assert [row.id for row in service.repository.lexical("p", "beta", None, 5, False)] == [
         document_id
     ]
     with service.repository.session_factory() as session:
         assert session.scalar(
             text("SELECT content FROM memory_fts WHERE memory_id = :memory_id"),
             {"memory_id": document_id},
-        ) == "document version two"
+        ) == "beta document"
 
 
 def test_fts_query_special_characters_do_not_crash(service):
@@ -281,7 +281,7 @@ def test_edit_updates_existing_memory_fts_and_vector(service):
     assert service.vector_index.points[memory_id]["vector"] != old_vector
     assert service.search(new_vector, "p", query_text=None, k=1)[0]["id"] == memory_id
     assert service.repository.lexical("p", "new exact correction phrase", None, 5, False)[0].id == memory_id
-    assert service.repository.lexical("p", "old exact correction phrase", None, 5, False) == []
+    assert service.repository.lexical("p", "old", None, 5, False) == []
 
 
 def test_edit_rejects_missing_memory(service):
@@ -539,3 +539,40 @@ def test_reparent_scope_rejects_moving_under_own_descendant(service):
     repo.get_or_create_scope("work/azure")
     with pytest.raises(ValueError):
         repo.reparent_scope("work", "work/azure")
+
+
+def _lexical_ids(service, project, query):
+    return [row.id for row in service.repository.lexical(project, query, None, 10, False)]
+
+
+def test_natural_language_question_finds_memory_with_some_of_the_words(service):
+    memory_id = service.add_memory([1.0], "We decided to use JWT tokens for auth", "p", "decision")
+    assert _lexical_ids(service, "p", "what did we decide about auth?") == [memory_id]
+
+
+def test_lexical_prefix_matches_word_stems_loosely(service):
+    memory_id = service.add_memory([1.0], "Deployment pipeline runs on every merge", "p", "note")
+    assert _lexical_ids(service, "p", "deploy") == [memory_id]
+
+
+def test_lexical_ranks_memory_matching_more_words_first(service):
+    weak = service.add_memory([1.0], "database notes", "p", "note")
+    strong = service.add_memory([1.0], "database migration rollback plan", "p", "note")
+    assert _lexical_ids(service, "p", "database migration rollback")[0] == strong
+    assert weak in _lexical_ids(service, "p", "database migration rollback")
+
+
+def test_lexical_query_with_only_stopwords_still_searches(service):
+    memory_id = service.add_memory([1.0], "this is it", "p", "note")
+    assert _lexical_ids(service, "p", "this is it") == [memory_id]
+
+
+@pytest.mark.parametrize("query", ['NEAR(a b)', 'a AND', '"unterminated', "a*b", "-x", "col:val", "(", ""])
+def test_lexical_query_cannot_inject_fts_operators(service, query):
+    service.add_memory([1.0], "plain text a b x val col", "p", "note")
+    service.repository.lexical("p", query, None, 10, False)  # must not raise
+
+
+def test_lexical_search_stays_inside_the_project(service):
+    service.add_memory([1.0], "shared secret keyword", "other", "note")
+    assert _lexical_ids(service, "p", "shared secret keyword") == []
