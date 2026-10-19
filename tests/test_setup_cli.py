@@ -2,6 +2,7 @@ import base64
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -170,7 +171,7 @@ def test_claude_desktop_creates_config_with_chronicle_command(desktop_config, mo
 def test_claude_desktop_falls_back_to_uv_when_chronicle_not_on_path(desktop_config):
     setup_cli.main(["claude-desktop", "--project", "p"])
     entry = json.loads(desktop_config.read_text())["mcpServers"]["chronicle-p"]
-    assert entry["command"].endswith("uv")
+    assert Path(entry["command"]).stem == "uv"
     assert entry["args"][0] == "--directory"
     assert entry["args"][-2:] == ["run", "chronicle"]
 
