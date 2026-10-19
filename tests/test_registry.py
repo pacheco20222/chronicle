@@ -32,7 +32,7 @@ def test_register_creates_parent_directory(tmp_path, monkeypatch):
 def test_reregistering_same_path_overwrites(isolated_registry):
     folder = Path("/Users/test/myrepo")
     registry.register(folder, "first-name")
-    registry.register(folder, "second-name")
+    registry.register(folder, "second-name", force=True)
     assert registry.lookup(folder) == "second-name"
 
 
@@ -100,3 +100,18 @@ def test_register_refuses_home_directory(tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         registry.register(Path.home(), "oops")
     assert not (tmp_path / "projects.json").exists()
+
+
+def test_reregistering_under_different_name_requires_force(isolated_registry):
+    folder = Path("/Users/test/myrepo")
+    registry.register(folder, "first-name")
+    with pytest.raises(registry.AlreadyRegisteredError, match="first-name"):
+        registry.register(folder, "second-name")
+    assert registry.lookup(folder) == "first-name"
+
+
+def test_reregistering_under_same_name_is_fine(isolated_registry):
+    folder = Path("/Users/test/myrepo")
+    registry.register(folder, "same")
+    registry.register(folder, "same")
+    assert registry.lookup(folder) == "same"

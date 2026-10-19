@@ -5,7 +5,14 @@ import sys
 
 import pytest
 
-from chronicle import setup_cli
+from chronicle import registry, setup_cli
+
+
+@pytest.fixture(autouse=True)
+def no_chronicle_on_path(monkeypatch):
+    # the legacy printed blocks fall back to `uv --directory` when the
+    # `chronicle` command isn't installed; keep that deterministic here
+    monkeypatch.setattr(setup_cli, "_chronicle_exe", lambda: None)
 
 
 def _printed_json_documents(out: str) -> tuple[dict, dict]:
@@ -139,3 +146,92 @@ def test_windows_hook_and_codex_commands_encode_every_interpolated_value(
 
     assert script == expected_script
     assert _codex_command(out) == expected_codex
+
+
+@pytest.fixture
+def desktop_config(tmp_path, monkeypatch):
+    path = tmp_path / "Claude" / "claude_desktop_config.json"
+    monkeypatch.setattr(setup_cli, "_desktop_config_path", lambda: path)
+    return path
+
+
+def test_claude_desktop_creates_config_with_chronicle_command(desktop_config, monkeypatch, capsys):
+    monkeypatch.setattr(setup_cli, "_chronicle_exe", lambda: "/home/u/.local/bin/chronicle")
+    setup_cli.main(["claude-desktop", "--project", "AduanaPro"])
+    config = json.loads(desktop_config.read_text())
+    assert config["mcpServers"]["chronicle-AduanaPro"] == {
+        "command": "/home/u/.local/bin/chronicle",
+        "args": [],
+        "env": {"CHRONICLE_PROJECT": "AduanaPro"},
+    }
+    assert "Fully quit Claude Desktop" in capsys.readouterr().out
+
+
+def test_claude_desktop_falls_back_to_uv_when_chronicle_not_on_path(desktop_config):
+    setup_cli.main(["claude-desktop", "--project", "p"])
+    entry = json.loads(desktop_config.read_text())["mcpServers"]["chronicle-p"]
+    assert entry["command"].endswith("uv")
+    assert entry["args"][0] == "--directory"
+    assert entry["args"][-2:] == ["run", "chronicle"]
+
+
+def test_claude_desktop_keeps_existing_keys_and_backs_up(desktop_config):
+    desktop_config.parent.mkdir(parents=True)
+    original = {"preferences": {"x": 1}, "mcpServers": {"other": {"command": "foo"}}}
+    desktop_config.write_text(json.dumps(original))
+    setup_cli.main(["claude-desktop", "--project", "p"])
+    config = json.loads(desktop_config.read_text())
+    assert config["preferences"] == {"x": 1}
+    assert config["mcpServers"]["other"] == {"command": "foo"}
+    assert "chronicle-p" in config["mcpServers"]
+    assert json.loads(desktop_config.with_name(desktop_config.name + ".bak").read_text()) == original
+
+
+def test_claude_desktop_two_projects_get_separate_entries(desktop_config):
+    setup_cli.main(["claude-desktop", "--project", "a"])
+    setup_cli.main(["claude-desktop", "--project", "b"])
+    assert set(json.loads(desktop_config.read_text())["mcpServers"]) == {"chronicle-a", "chronicle-b"}
+
+
+def test_claude_desktop_rerun_is_idempotent(desktop_config, capsys):
+    setup_cli.main(["claude-desktop", "--project", "p"])
+    capsys.readouterr()
+    setup_cli.main(["claude-desktop", "--project", "p"])
+    assert "Already set up" in capsys.readouterr().out
+    assert not desktop_config.with_name(desktop_config.name + ".bak").exists()
+
+
+def test_claude_desktop_refuses_invalid_json_and_leaves_file(desktop_config):
+    desktop_config.parent.mkdir(parents=True)
+    desktop_config.write_text("{ not json")
+    with pytest.raises(SystemExit, match="not valid JSON"):
+        setup_cli.main(["claude-desktop", "--project", "p"])
+    assert desktop_config.read_text() == "{ not json"
+
+
+def test_print_flag_changes_nothing(desktop_config, capsys):
+    setup_cli.main(["claude-desktop", "--project", "p", "--print"])
+    assert not desktop_config.exists()
+    assert "Would write" in capsys.readouterr().out
+
+
+def test_agent_setup_requires_project():
+    with pytest.raises(SystemExit, match="--project"):
+        setup_cli.main(["claude-desktop"])
+
+
+@pytest.mark.parametrize(("agent", "relative"), [("claude-code", ".mcp.json"), ("cursor", ".cursor/mcp.json")])
+def test_repo_agents_write_into_current_folder(agent, relative, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    setup_cli.main([agent, "--project", "p"])
+    config = json.loads((tmp_path / relative).read_text())
+    assert config["mcpServers"]["chronicle"]["env"] == {"CHRONICLE_PROJECT": "p"}
+
+
+def test_codex_registers_current_folder(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    monkeypatch.setattr(setup_cli.shutil, "which", lambda name: None)
+    setup_cli.main(["codex", "--project", "p"])
+    assert registry.lookup(tmp_path) == "p"
+    assert "codex mcp add chronicle --" in capsys.readouterr().out

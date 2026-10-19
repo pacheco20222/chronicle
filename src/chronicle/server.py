@@ -342,12 +342,15 @@ def memory_get_latest(type: str, scope_path: str | None = None) -> dict | None:
 
 
 @mcp.tool
-def memory_register_project(name: str) -> dict:
+def memory_register_project(name: str, force: bool = False) -> dict:
+    """Register the current folder as project `name`. If the folder is
+    already registered under a different project this fails; pass
+    force=True only after the user confirms they want it re-registered."""
     name = name.strip()
     if not name:
         raise ValueError("project name must not be empty")
     cwd = Path.cwd()
-    registry.register(cwd, name)
+    registry.register(cwd, name, force=force)
     return {"registered": str(cwd.resolve()), "project": name}
 
 

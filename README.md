@@ -260,7 +260,8 @@ Git Bash (including the older mintty window).
 | `chronicle` | Command list + Docker/Qdrant status |
 | `chronicle start` | Start Qdrant (if needed) and the dashboard; add `--port N` or `--background` |
 | `chronicle stop` | Stop a `--background` dashboard |
-| `chronicle register --project NAME` | Register the current folder as a project |
+| `chronicle register NAME` | Register the current folder as a project (`--force` to re-register under a new name) |
+| `chronicle setup AGENT --project NAME` | Write the MCP config for `claude-desktop`, `claude-code`, `cursor` or `codex` (`--print` to preview) |
 | `chronicle update` | Switch the clone to `main`, pull the latest, sync dependencies, rebuild the dashboard |
 | `chronicle <command> --help` | Every option for one command |
 
@@ -335,10 +336,10 @@ bash, or fish.
    ```bash
    chronicle start
    ```
-5. **Connect a project:** the Claude Code plugin
+5. **Connect a project:** `chronicle setup claude-desktop --project my-project` writes the Claude Desktop config for you (also `claude-code`, `cursor`, `codex`, run from the repo folder; add `--print` to preview). Or use the Claude Code plugin
    ([Quick start](#quick-start-claude-code-plugin)), or
-   `chronicle setup --project my-project` and paste what it prints. For the
-   Claude Desktop app, see
+   `chronicle setup --project my-project` and paste what it prints. Details for
+   the Desktop app:
    [docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop-the-chat-tab).
 
 Everyday commands are the same as in the [Windows table](#everyday-commands).

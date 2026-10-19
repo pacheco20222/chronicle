@@ -15,6 +15,10 @@ class RegistryError(Exception):
     """Raised when the registry file exists but can't be parsed as JSON."""
 
 
+class AlreadyRegisteredError(Exception):
+    """Raised when a folder is already registered under a different project."""
+
+
 def _load(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
@@ -24,7 +28,7 @@ def _load(path: Path) -> dict[str, str]:
         raise RegistryError(f"{path} exists but isn't valid JSON: {e}") from e
 
 
-def register(cwd: Path, project: str) -> None:
+def register(cwd: Path, project: str, force: bool = False) -> None:
     resolved = cwd.resolve()
     if resolved == Path.home().resolve() or resolved == Path(resolved.anchor):
         raise ValueError(
@@ -34,6 +38,13 @@ def register(cwd: Path, project: str) -> None:
     path = registry_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     data = _load(path)
+    existing = data.get(str(resolved))
+    if existing and existing != project and not force:
+        raise AlreadyRegisteredError(
+            f"{resolved} is already registered as project '{existing}', not "
+            f"'{project}'. If that is a mistake, re-run with --force to "
+            f"re-register it."
+        )
     data[str(cwd.resolve())] = project
     path.write_text(json.dumps(data, indent=2, sort_keys=True))
 

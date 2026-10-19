@@ -8,8 +8,11 @@ Self-hosted, project-scoped memory for Claude Code, Cursor, and Codex.
 Everyday:
   start [--port N] [--background]   start Qdrant (if needed) and the dashboard
   stop                              stop a backgrounded dashboard
-  register --project NAME           register the current folder as a project
-  setup [--project NAME]            print MCP config for Claude Code, Cursor, Codex
+  register NAME [--force]           register the current folder as a project
+  setup AGENT --project NAME [--print]
+                                    write the MCP config for AGENT, one of
+                                    claude-desktop, claude-code, cursor, codex
+  setup [--project NAME]            print the config for every agent instead
   update                            update this chronicle clone to the latest main
 
 Memories:

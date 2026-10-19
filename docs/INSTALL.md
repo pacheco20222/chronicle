@@ -219,6 +219,24 @@ This works in the Desktop app's **Chat** tab. It does not make Chronicle
 work on claude.ai in a browser — see the
 [README's known gap](../README.md#known-gap-local-clients-only-not-cloud-chat).
 
+**Easiest: let Chronicle write the config.** With `chronicle` on your PATH
+(see [Recommended: put `chronicle` on your PATH](#recommended-put-chronicle-on-your-path)):
+
+```bash
+chronicle setup claude-desktop --project your-project-name
+```
+
+It adds a `chronicle-your-project-name` entry to `claude_desktop_config.json`
+(creating the file if needed), leaves every other key alone, saves the old
+file as `claude_desktop_config.json.bak`, and refuses to touch a file that
+isn't valid JSON. Re-running it is harmless. Add `--print` to see what it
+would write without changing anything. Run it once per project (each gets
+its own entry), then do step 4 below: fully quit and reopen Desktop.
+The same command exists for the other agents, run from the repo folder:
+`chronicle setup claude-code|cursor|codex --project NAME`.
+
+The manual steps below do the same thing by hand.
+
 **Steps** (Docker/OrbStack running and the repo cloned with
 `docker compose up -d`, as in Option B steps 1–2):
 
