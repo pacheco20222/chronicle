@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Native Windows support (PowerShell 7/5.1, cmd, Git Bash), a `chronicle`
+  command on PATH (`start`, `stop`, `serve`, `update`, ...), Docker/Qdrant
+  guidance when the vector store is down, `chronicle update`.
+- `chronicle setup <claude-desktop|claude-code|cursor|codex> --project NAME`
+  writes the agent's MCP config (and, for Claude Code, the session-start
+  recall hook) safely; `--print` previews.
+- `chronicle register NAME` positional form.
+- Full test suite CI on Linux and macOS, plus a `pip-audit` job.
+- `SECURITY.md`.
+
+### Changed
+- `chronicle register` and `memory_register_project` refuse to re-point a
+  folder that is registered to another project unless forced.
+- Session-start recall output now fences saved text and labels it as
+  untrusted data, not instructions.
+- `docker-compose.yml` publishes Qdrant on `127.0.0.1` only (run
+  `docker compose up -d` again to recreate an existing container).
+- Dependencies re-locked: clears all known advisories (pyjwt, urllib3, mcp).
+
+### Fixed
+- Windows: UTF-8 hook output, plugin paths with spaces, dashboard
+  background start/stop, PowerShell 5.1 backup scripts.
+- Docs wrongly said the backup scripts skip the SQLite database.
+
 ## 3.1.1 — 2026-09-28
 
 ### Fixed

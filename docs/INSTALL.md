@@ -13,10 +13,10 @@ automatically, once, the first time you save a memory.
 **Where your data lives:** every registered project's memories live in
 one SQLite file, `~/.chronicle/chronicle.db` — that's the canonical
 store. Docker/Qdrant only holds a derived vector index used for
-semantic search; deleting and rebuilding it loses nothing durable, but
-`~/.chronicle/chronicle.db` itself is not something today's backup
-scripts cover (see [docs/ARCHITECTURE.md § Backups](ARCHITECTURE.md#backups))
-— copy that file directly if you want a real backup.
+semantic search; deleting and rebuilding it loses nothing durable. The backup scripts
+back up `~/.chronicle/chronicle.db` first (see
+[docs/ARCHITECTURE.md § Backups](ARCHITECTURE.md#backups)); a plain copy of
+that one file is also a complete backup.
 
 ## Option A: Plugin install (recommended for Claude Code)
 

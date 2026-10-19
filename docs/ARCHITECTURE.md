@@ -213,18 +213,19 @@ labeled as proxies, never fabricated ground truth.
 
 ## Backups
 
-`scripts/backup.sh` snapshots the Qdrant collection (the derived semantic
-index); `scripts/export_json.sh` exports every memory as a flat,
-human-readable JSON file (no vectors). Both prune to the newest 14.
-`scripts/daily_backup.sh` runs both in sequence — see
+`scripts/backup.sh` first backs up the canonical SQLite database
+(`~/.chronicle/chronicle.db`, one file for every registered project; it uses
+`sqlite3 .backup` when available, which is safe against a concurrent writer,
+and a plain copy otherwise), then snapshots the Qdrant collection (the derived
+semantic index). `scripts/export_json.sh` exports every memory as a flat,
+human-readable JSON file (no vectors). All prune to the newest 14.
+`scripts/daily_backup.sh` runs them in sequence — see
 `scripts/com.chronicle.dailybackup.plist` for the macOS `launchd` schedule
 (3 AM daily). Windows equivalents (`backup.ps1`, `export_json.ps1`,
 `daily_backup.ps1`) live in the same folder with the same behavior.
 
-**Since the 3.0.0 storage rearchitecture, none of the above back up the
-canonical SQLite database** (`~/.chronicle/chronicle.db`, one file for every
-registered project). The Qdrant snapshot and the JSON export are both
-*derived* from it and are not a substitute for backing it up directly — copy
-`~/.chronicle/chronicle.db` itself (a plain file copy is sufficient; SQLite
-requires no special snapshot tooling) before any operation that could lose
-it. This is a known gap in the backup scripts, not a design choice.
+The SQLite file is what matters: the Qdrant snapshot and the JSON export are
+*derived* from it. Restoring means putting the `.db` file back. Note there is no
+`chronicle reindex` command yet, so memories restored without their Qdrant
+vectors are still found by lexical search but not by semantic search until
+they are re-embedded.
