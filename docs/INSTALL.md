@@ -457,7 +457,7 @@ chronicle --help                 # every command, grouped
 chronicle start                  # start Qdrant if needed, then the dashboard
 chronicle start --background     # same, but keep running after the terminal closes
 chronicle stop                   # stop a backgrounded dashboard
-chronicle update                 # pull the latest main, sync deps, rebuild the dashboard
+chronicle update                 # pull the latest main, sync deps, rebuild the dashboard, reindex (semantic on)
 chronicle register --project your-project-name
 chronicle import notes.md --project your-project-name --type note
 ```

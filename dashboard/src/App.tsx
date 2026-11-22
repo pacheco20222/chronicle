@@ -72,8 +72,67 @@ function ProjectCardView({ project, onView }: { project: ProjectCard; onView: ()
   return <Card className="project-plate"><CardHeader><div className="project-title-row"><h2>{project.name}</h2><Badge>{project.node_count} stars</Badge></div><p className="project-path mono" title={project.paths[0]}>{project.paths[0] || "unregistered path"}</p></CardHeader><CardContent className="project-card-content"><div className="project-stats"><div><strong>{project.node_count.toLocaleString()}</strong><span className="mono">stars</span></div><div><strong>{project.edge_count.toLocaleString()}</strong><span className="mono">edges</span></div></div><div className="type-chips">{Object.entries(project.type_counts).map(([type, count]) => <span key={type} className="type-chip" style={{ color: colorForType(type), borderColor: `${colorForType(type)}55` }}><i style={{ backgroundColor: colorForType(type) }} />{type} <b>{count}</b></span>)}</div><Button className="view-graph-button" onClick={onView}>View graph <span aria-hidden="true">→</span></Button></CardContent></Card>;
 }
 
+type RefreshStatus = { status: "idle" | "running" | "done" | "error"; done: number; total: number; error: string | null };
+
+function RefreshAll({ semantic }: { semantic: boolean }) {
+  const [status, setStatus] = useState<RefreshStatus | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [pollKey, setPollKey] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const running = status?.status === "running";
+
+  // Poll while a refresh runs; also picks up the one started with the dashboard.
+  useEffect(() => {
+    if (!semantic) return;
+    let alive = true;
+    let timer: number | undefined;
+    async function poll() {
+      try {
+        const next = await callTool<RefreshStatus>("memory_refresh_status");
+        if (!alive) return;
+        setStatus(next);
+        if (next.status === "running") timer = window.setTimeout(poll, 1000);
+      } catch (reason) {
+        if (alive) setFailure(reason instanceof Error ? reason.message : "Could not read refresh progress");
+      }
+    }
+    void poll();
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [semantic, pollKey]);
+
+  useEffect(() => {
+    if (!running) return;
+    const startedAt = Date.now();
+    setElapsed(0);
+    const tick = window.setInterval(() => setElapsed(Math.round((Date.now() - startedAt) / 1000)), 1000);
+    return () => window.clearInterval(tick);
+  }, [running]);
+
+  async function start() {
+    setFailure(null);
+    try {
+      setStatus(await callTool<RefreshStatus>("memory_refresh_all"));
+      setPollKey((key) => key + 1);
+    } catch (reason) {
+      setFailure(reason instanceof Error ? reason.message : "Could not start the refresh");
+    }
+  }
+
+  if (!semantic) return <div className="refresh-all mono" role="note">Keyword search only: there is no similarity index to update. Run <b>chronicle semantic enable</b> to turn it on.</div>;
+  const percent = status && status.total > 0 ? Math.round((status.done / status.total) * 100) : 0;
+  const detail = running
+    ? status.total === 0 ? "loading the embedding model ..." : `${status.done.toLocaleString()} / ${status.total.toLocaleString()} memories · ${percent}% · ${elapsed}s`
+    : status?.status === "done" ? `Updated ${status.total.toLocaleString()} memories.` : "";
+  const message = failure || (status?.status === "error" ? status.error : null);
+  return <div className="refresh-all">
+    <Button variant="soft" onClick={() => void start()} disabled={running}>{running ? "Updating ..." : "Update all projects"}</Button>
+    {(running || status?.status === "done") && <div className="refresh-progress"><div className="refresh-track" role="progressbar" aria-label="Updating all projects" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><div className="refresh-fill" style={{ width: `${running && status.total === 0 ? 4 : percent}%` }} /></div><span className="mono">{detail}</span></div>}
+    {message && <p className="control-note" role="alert">{message}</p>}
+  </div>;
+}
+
 function ProjectsTab({ snapshot, onView }: { snapshot: DashboardSnapshot; onView: (project: string) => void }) {
-  return <ScrollArea className="data-page"><div className="page-heading"><div><h1>Projects in memory</h1><p>Chart plates summarize live memory counts. Select one to narrow graph without changing stored memories.</p></div><div className="page-total mono">{snapshot.projects.length.toString().padStart(2, "0")} projects</div></div><div className="project-grid">{snapshot.projects.map((project) => <ProjectCardView key={project.name} project={project} onView={() => onView(project.name)} />)}</div></ScrollArea>;
+  return <ScrollArea className="data-page"><div className="page-heading"><div><h1>Projects in memory</h1><p>Chart plates summarize live memory counts. Select one to narrow graph without changing stored memories.</p></div><div className="page-total mono">{snapshot.projects.length.toString().padStart(2, "0")} projects</div></div><RefreshAll semantic={snapshot.semantic !== false} /><div className="project-grid">{snapshot.projects.map((project) => <ProjectCardView key={project.name} project={project} onView={() => onView(project.name)} />)}</div></ScrollArea>;
 }
 
 function ControlReadout({ label, value, tone = "" }: { label: string; value: ReactNode; tone?: string }) {

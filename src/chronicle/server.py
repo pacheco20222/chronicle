@@ -4,7 +4,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
 
-from chronicle import config, dashboard, embeddings, graph_cli, registry, services
+from chronicle import config, dashboard, embeddings, graph_cli, refresh, registry, services
 from chronicle.core.runtime import get_runtime
 
 mcp = FastMCP(
@@ -394,6 +394,19 @@ def memory_dashboard_graph(
 @mcp.tool
 def memory_dashboard_snapshot() -> dict:
     return dashboard.build_snapshot(_get_service())
+
+
+@mcp.tool
+def memory_refresh_all() -> dict:
+    try:
+        return refresh.start(_get_service())
+    except RuntimeError as error:
+        raise ToolError(str(error)) from None
+
+
+@mcp.tool
+def memory_refresh_status() -> dict:
+    return refresh.status()
 
 
 @mcp.tool

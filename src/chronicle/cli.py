@@ -14,6 +14,7 @@ Everyday:
                                     claude-desktop, claude-code, cursor, codex
   setup [--project NAME]            print the config for every agent instead
   update                            update this chronicle clone to the latest main
+                                    (and refresh every project's similarity index)
 
 Search:
   semantic enable|disable|status    turn similarity search (Qdrant + model) on or off

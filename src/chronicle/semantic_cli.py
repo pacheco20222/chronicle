@@ -4,11 +4,18 @@ import sys
 from chronicle import config
 
 
-def reindex(service, embed, project: str | None = None, say=print) -> int:
-    """(Re)build the derived vector index from the SQLite memories."""
+def reindex(service, embed, project: str | None = None, say=print, progress=None) -> int:
+    """(Re)build the derived vector index from the SQLite memories.
+
+    `progress(done, total)` is called once up front and after every memory.
+    """
     rows = [row for row in service.repository.all(project) if row.status != "deleted"]
+    if progress:
+        progress(0, len(rows))
     for done, row in enumerate(rows, start=1):
         service.vector_index.upsert(row.id, embed(row.content), {"project": row.project, "type": row.type})
+        if progress:
+            progress(done, len(rows))
         if done % 25 == 0 or done == len(rows):
             say(f"Indexed {done}/{len(rows)} memories...")
     return len(rows)

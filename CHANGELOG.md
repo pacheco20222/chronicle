@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- With semantic search on, `chronicle update` and the dashboard's startup
+  re-embed every project's memories, so the similarity index is current
+  without a manual `chronicle reindex`.
+- The dashboard's Projects tab has an **Update all projects** button with a
+  live progress bar (memories done, percent, seconds elapsed). It also shows
+  the refresh that started with the dashboard. In keyword-only mode it
+  explains there is no index to update. New MCP tools: `memory_refresh_all`
+  and `memory_refresh_status`.
+
 ## 3.2.0 — 2026-10-19
 
 ### Changed (read this if you upgrade)

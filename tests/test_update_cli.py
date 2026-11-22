@@ -55,6 +55,7 @@ def repos(tmp_path):
 @pytest.fixture
 def side_effects(monkeypatch):
     calls = []
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "0")  # no real reindex from these tests
     monkeypatch.setattr(update_cli, "_sync_dependencies", lambda repo: calls.append("deps"))
     monkeypatch.setattr(update_cli, "_build_dashboard", lambda repo: calls.append("dashboard"))
     return calls
@@ -110,6 +111,41 @@ def test_rerun_finishes_an_interrupted_update(repos, side_effects, capsys):
 
     assert side_effects == ["deps", "dashboard"]
     assert "already up to date" in capsys.readouterr().out
+
+
+def test_update_refreshes_the_similarity_index_when_semantic_is_on(repos, side_effects, monkeypatch):
+    _, clone = repos
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "1")
+    ran = []
+    real_run = update_cli._run
+    monkeypatch.setattr(
+        update_cli,
+        "_run",
+        lambda args, cwd, **kw: ran.append(args[1:]) or subprocess.CompletedProcess(args, 0)
+        if args[0] == sys.executable
+        else real_run(args, cwd, **kw),
+    )
+
+    update_cli.update(clone)
+
+    assert ran == [["-m", "chronicle", "reindex"]]
+
+
+def test_failed_refresh_only_warns(repos, side_effects, monkeypatch, capsys):
+    _, clone = repos
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "1")
+    real_run = update_cli._run
+    monkeypatch.setattr(
+        update_cli,
+        "_run",
+        lambda args, cwd, **kw: subprocess.CompletedProcess(args, 1)
+        if args[0] == sys.executable
+        else real_run(args, cwd, **kw),
+    )
+
+    update_cli.update(clone)
+
+    assert "chronicle reindex" in capsys.readouterr().err
 
 
 def test_dependency_sync_never_reinstalls_chronicle_itself(monkeypatch, tmp_path):

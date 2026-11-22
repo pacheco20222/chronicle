@@ -110,3 +110,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 1px
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
 
 .semantic-note { position: absolute; z-index: 5; top: 12px; left: 50%; transform: translateX(-50%); max-width: min(560px, 90%); padding: 8px 12px; border: 1px solid var(--edge, rgba(255,255,255,.2)); background: rgba(10, 12, 20, .78); color: var(--ink-dim); font-size: 11px; text-align: center; }.semantic-note b { color: var(--ink); }
+
+.refresh-all { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 0 auto 26px; color: var(--ink-dim); font-size: 11px; }
+.refresh-all b { color: var(--ink); }
+.refresh-progress { display: flex; flex: 1 1 260px; align-items: center; gap: 12px; min-width: 0; }
+.refresh-track { flex: 1; height: 6px; overflow: hidden; border: 1px solid var(--line); border-radius: 2px; background: rgba(5, 10, 23, .56); }
+.refresh-fill { height: 100%; background: var(--brass); transition: width .4s ease; }
+.refresh-progress span { color: var(--ink-dim); font-size: 11px; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .refresh-fill { transition: none; } }
