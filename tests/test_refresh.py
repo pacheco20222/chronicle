@@ -92,3 +92,12 @@ def test_dashboard_start_survives_a_failed_refresh(monkeypatch, capsys):
     dashboard_cli.run_foreground(9)
 
     assert "skipped the startup refresh" in capsys.readouterr().err
+
+
+def test_background_start_prints_the_dashboard_link(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("CHRONICLE_STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(dashboard_cli.subprocess, "Popen", lambda *a, **k: type("P", (), {"pid": 42})())
+
+    dashboard_cli.start_background(8765)
+
+    assert "http://127.0.0.1:8765" in capsys.readouterr().out

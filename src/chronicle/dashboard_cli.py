@@ -173,6 +173,7 @@ def start_background(port: int) -> None:
     )
     path.write_text(str(child.pid))
     print(f"Chronicle dashboard started in background (PID {child.pid})")
+    print(f"Open the dashboard: http://{HOST}:{port}")
 
 
 def stop() -> None:
