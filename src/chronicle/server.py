@@ -405,6 +405,32 @@ def memory_refresh_all() -> dict:
 
 
 @mcp.tool
+def memory_add_project(folder: str, name: str, type: str = "note") -> dict:
+    try:
+        return refresh.add_project(_get_service(), folder, name, type)
+    except (ValueError, registry.AlreadyRegisteredError) as error:
+        raise ToolError(str(error)) from None
+
+
+@mcp.tool
+def memory_list_folders(path: str | None = None) -> dict:
+    """Sub-folders of `path` (the home folder when omitted), for the dashboard's folder picker."""
+    here = Path(path).expanduser() if path else Path.home()
+    here = here.resolve()
+    if not here.is_dir():
+        raise ToolError(f"{path} is not a folder")
+    try:
+        names = sorted(
+            (entry.name for entry in here.iterdir() if not entry.name.startswith(".") and entry.is_dir()),
+            key=str.lower,
+        )
+    except OSError:  # unreadable folder: show it as empty rather than failing the picker
+        names = []
+    parent = None if here == Path(here.anchor) else str(here.parent)
+    return {"path": str(here), "parent": parent, "folders": names}
+
+
+@mcp.tool
 def memory_refresh_status() -> dict:
     return refresh.status()
 

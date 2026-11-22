@@ -72,33 +72,94 @@ function ProjectCardView({ project, onView }: { project: ProjectCard; onView: ()
   return <Card className="project-plate"><CardHeader><div className="project-title-row"><h2>{project.name}</h2><Badge>{project.node_count} stars</Badge></div><p className="project-path mono" title={project.paths[0]}>{project.paths[0] || "unregistered path"}</p></CardHeader><CardContent className="project-card-content"><div className="project-stats"><div><strong>{project.node_count.toLocaleString()}</strong><span className="mono">stars</span></div><div><strong>{project.edge_count.toLocaleString()}</strong><span className="mono">edges</span></div></div><div className="type-chips">{Object.entries(project.type_counts).map(([type, count]) => <span key={type} className="type-chip" style={{ color: colorForType(type), borderColor: `${colorForType(type)}55` }}><i style={{ backgroundColor: colorForType(type) }} />{type} <b>{count}</b></span>)}</div><Button className="view-graph-button" onClick={onView}>View graph <span aria-hidden="true">→</span></Button></CardContent></Card>;
 }
 
-type RefreshStatus = { status: "idle" | "running" | "done" | "error"; done: number; total: number; error: string | null };
+type JobStatus = { status: "idle" | "running" | "done" | "error"; label: string; done: number; total: number; error: string | null };
+type FolderListing = { path: string; parent: string | null; folders: string[] };
 
-function RefreshAll({ semantic }: { semantic: boolean }) {
-  const [status, setStatus] = useState<RefreshStatus | null>(null);
+function baseName(path: string) {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? "";
+}
+
+function joinPath(folder: string, child: string) {
+  const separator = folder.includes("\\") ? "\\" : "/";
+  return `${folder.replace(/[\\/]$/, "")}${separator}${child}`;
+}
+
+function AddProjectDialog({ onClose, onStarted }: { onClose: () => void; onStarted: () => void }) {
+  const [listing, setListing] = useState<FolderListing | null>(null);
+  const [pathInput, setPathInput] = useState("");
+  const [name, setName] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
+  const [type, setType] = useState("note");
+  const [message, setMessage] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  async function open(path?: string) {
+    try {
+      const next = await callTool<FolderListing>("memory_list_folders", path ? { path } : {});
+      setListing(next);
+      setPathInput(next.path);
+      if (!nameTouched) setName(baseName(next.path));
+      setMessage(null);
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Could not open that folder");
+    }
+  }
+  useEffect(() => { void open(); }, []);
+
+  async function add() {
+    if (!listing) return;
+    setAdding(true);
+    try {
+      await callTool("memory_add_project", { folder: listing.path, name, type });
+      onStarted();
+      onClose();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Could not add the project");
+      setAdding(false);
+    }
+  }
+
+  return <div className="dialog-backdrop" onClick={onClose}><div className="dialog case-plate" role="dialog" aria-modal="true" aria-label="Add a project" onClick={(event) => event.stopPropagation()}>
+    <div className="plate-label">add project index</div>
+    <p className="dialog-help">Pick the project's folder. Its .md and .txt files are read into memory; add the same folder again later to pick up changes.</p>
+    <form className="dialog-row" onSubmit={(event) => { event.preventDefault(); void open(pathInput); }}><Input value={pathInput} onChange={(event) => setPathInput(event.target.value)} aria-label="Folder path" className="mono" /><Button type="submit" variant="ghost">Go</Button></form>
+    <ScrollArea className="folder-list"><ul>
+      {listing?.parent && <li><button className="folder-row" onClick={() => void open(listing.parent!)}>.. (up)</button></li>}
+      {listing?.folders.map((folder) => <li key={folder}><button className="folder-row" onClick={() => void open(joinPath(listing.path, folder))}>{folder}</button></li>)}
+      {listing && listing.folders.length === 0 && <li className="control-note">No sub-folders here.</li>}
+    </ul></ScrollArea>
+    <div className="dialog-row"><label className="dialog-field">name<Input value={name} onChange={(event) => { setName(event.target.value); setNameTouched(true); }} /></label><label className="dialog-field">memory type<select className="search-input" value={type} onChange={(event) => setType(event.target.value)}>{Object.keys(TYPE_COLORS).map((option) => <option key={option} value={option}>{option}</option>)}</select></label></div>
+    {message && <p className="control-note" role="alert">{message}</p>}
+    <div className="dialog-row dialog-actions"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => void add()} disabled={!listing || !name.trim() || adding}>{adding ? "Adding ..." : "Add this folder"}</Button></div>
+  </div></div>;
+}
+
+// Top-right buttons plus the progress strip under the top bar. One shared job on the server.
+function ProjectActions({ onFinished }: { onFinished: () => void }) {
+  const [job, setJob] = useState<JobStatus | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [pollKey, setPollKey] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const running = status?.status === "running";
+  const [adding, setAdding] = useState(false);
+  const running = job?.status === "running";
 
-  // Poll while a refresh runs; also picks up the one started with the dashboard.
+  // Poll while a job runs; also picks up the refresh that started with the dashboard.
   useEffect(() => {
-    if (!semantic) return;
     let alive = true;
     let timer: number | undefined;
     async function poll() {
       try {
-        const next = await callTool<RefreshStatus>("memory_refresh_status");
+        const next = await callTool<JobStatus>("memory_refresh_status");
         if (!alive) return;
-        setStatus(next);
+        setJob((previous) => { if (previous?.status === "running" && next.status !== "running") onFinished(); return next; });
         if (next.status === "running") timer = window.setTimeout(poll, 1000);
       } catch (reason) {
-        if (alive) setFailure(reason instanceof Error ? reason.message : "Could not read refresh progress");
+        if (alive) setFailure(reason instanceof Error ? reason.message : "Could not read progress");
       }
     }
     void poll();
     return () => { alive = false; window.clearTimeout(timer); };
-  }, [semantic, pollKey]);
+  }, [pollKey]);
 
   useEffect(() => {
     if (!running) return;
@@ -108,31 +169,33 @@ function RefreshAll({ semantic }: { semantic: boolean }) {
     return () => window.clearInterval(tick);
   }, [running]);
 
-  async function start() {
+  async function updateAll() {
     setFailure(null);
     try {
-      setStatus(await callTool<RefreshStatus>("memory_refresh_all"));
+      setJob(await callTool<JobStatus>("memory_refresh_all"));
       setPollKey((key) => key + 1);
     } catch (reason) {
-      setFailure(reason instanceof Error ? reason.message : "Could not start the refresh");
+      setFailure(reason instanceof Error ? reason.message : "Could not start the update");
     }
   }
 
-  if (!semantic) return <div className="refresh-all mono" role="note">Keyword search only: there is no similarity index to update. Run <b>chronicle semantic enable</b> to turn it on.</div>;
-  const percent = status && status.total > 0 ? Math.round((status.done / status.total) * 100) : 0;
-  const detail = running
-    ? status.total === 0 ? "loading the embedding model ..." : `${status.done.toLocaleString()} / ${status.total.toLocaleString()} memories · ${percent}% · ${elapsed}s`
-    : status?.status === "done" ? `Updated ${status.total.toLocaleString()} memories.` : "";
-  const message = failure || (status?.status === "error" ? status.error : null);
-  return <div className="refresh-all">
-    <Button variant="soft" onClick={() => void start()} disabled={running}>{running ? "Updating ..." : "Update all projects"}</Button>
-    {(running || status?.status === "done") && <div className="refresh-progress"><div className="refresh-track" role="progressbar" aria-label="Updating all projects" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><div className="refresh-fill" style={{ width: `${running && status.total === 0 ? 4 : percent}%` }} /></div><span className="mono">{detail}</span></div>}
-    {message && <p className="control-note" role="alert">{message}</p>}
-  </div>;
+  const percent = job && job.total > 0 ? Math.round((job.done / job.total) * 100) : 0;
+  const detail = !job ? "" : running
+    ? job.total === 0 ? `${job.label} ...` : `${job.label}: ${job.done.toLocaleString()} / ${job.total.toLocaleString()} · ${percent}% · ${elapsed}s`
+    : job.status === "done" ? `${job.label}: done (${job.total.toLocaleString()})` : "";
+  const message = failure || (job?.status === "error" ? job.error : null);
+  return <>
+    <div className="project-actions"><Button variant="soft" onClick={() => setAdding(true)} disabled={running}>Add project</Button><Button variant="soft" onClick={() => void updateAll()} disabled={running}>{running ? "Working ..." : "Update all"}</Button></div>
+    {(running || job?.status === "done" || message) && <div className="job-strip" role="status">
+      {(running || job?.status === "done") && <div className="refresh-track" role="progressbar" aria-label={job?.label || "Progress"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><div className="refresh-fill" style={{ width: `${running && job.total === 0 ? 4 : percent}%` }} /></div>}
+      <span className="mono">{message ?? detail}</span>
+    </div>}
+    {adding && <AddProjectDialog onClose={() => setAdding(false)} onStarted={() => setPollKey((key) => key + 1)} />}
+  </>;
 }
 
 function ProjectsTab({ snapshot, onView }: { snapshot: DashboardSnapshot; onView: (project: string) => void }) {
-  return <ScrollArea className="data-page"><div className="page-heading"><div><h1>Projects in memory</h1><p>Chart plates summarize live memory counts. Select one to narrow graph without changing stored memories.</p></div><div className="page-total mono">{snapshot.projects.length.toString().padStart(2, "0")} projects</div></div><RefreshAll semantic={snapshot.semantic !== false} /><div className="project-grid">{snapshot.projects.map((project) => <ProjectCardView key={project.name} project={project} onView={() => onView(project.name)} />)}</div></ScrollArea>;
+  return <ScrollArea className="data-page"><div className="page-heading"><div><h1>Projects in memory</h1><p>Chart plates summarize live memory counts. Select one to narrow graph without changing stored memories.</p></div><div className="page-total mono">{snapshot.projects.length.toString().padStart(2, "0")} projects</div></div><div className="project-grid">{snapshot.projects.map((project) => <ProjectCardView key={project.name} project={project} onView={() => onView(project.name)} />)}</div></ScrollArea>;
 }
 
 function ControlReadout({ label, value, tone = "" }: { label: string; value: ReactNode; tone?: string }) {
@@ -270,7 +333,7 @@ export default function App() {
   useEffect(() => { const onPopState = () => { setRoute(readRoute()); setSelected(null); }; window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
   useEffect(() => { void refresh(); }, []);
 
-  return <main className="app-shell"><header className="topbar"><button className="brand" onClick={() => navigate("graph")} aria-label="Open all memory graph"><span className="brand-mark">✦</span><span>chronicle</span><small>memory field</small></button><nav className="tab-nav" aria-label="Dashboard sections">{(["graph", "projects", "control"] as Tab[]).map((tab) => <TabButton key={tab} active={route.tab === tab} onClick={() => navigate(tab, tab === "graph" ? route.project : null)}>{tab}<span>{tab === "graph" ? snapshot?.graph.nodes.length ?? "—" : tab === "projects" ? snapshot?.projects.length ?? "—" : ""}</span></TabButton>)}</nav><div className="endpoint-status"><i className={error ? "status-light bad" : "status-light"} />local / <span className="mono">127.0.0.1</span></div></header>{error && <div className="app-alert"><span><b>MCP unavailable:</b> {error}</span><Button variant="soft" onClick={() => void refresh()}>Retry</Button></div>}{!snapshot && !error && <div className="loading-state mono">loading memory field ...</div>}{snapshot && route.tab === "graph" && <GraphTab snapshot={snapshot} project={route.project} selectedId={selected?.id ?? null} onSelect={(node) => { setSelectedScope(null); setSelected(node); }} onSelectScope={(scope) => { setSelected(null); setSelectedScope(scope); }} />}{snapshot && route.tab === "projects" && <ProjectsTab snapshot={snapshot} onView={(project) => navigate("graph", project)} />}{snapshot && route.tab === "control" && <ControlTab snapshot={snapshot} onRefresh={() => void refresh()} refreshing={refreshing} />}{selected && snapshot && <MemoryCasePlate selected={selected} snapshot={snapshot} onSelect={setSelected} onClose={() => setSelected(null)} onRefresh={refresh} onError={setError} />}{selectedScope && <ScopeCasePlate scope={selectedScope} onClose={() => setSelectedScope(null)} onRefresh={refresh} onError={setError} onMoved={(newPath) => setSelectedScope((current) => current ? { ...current, path: newPath } : current)} />}</main>;
+  return <main className="app-shell"><header className="topbar"><button className="brand" onClick={() => navigate("graph")} aria-label="Open all memory graph"><span className="brand-mark">✦</span><span>chronicle</span><small>memory field</small></button><nav className="tab-nav" aria-label="Dashboard sections">{(["graph", "projects", "control"] as Tab[]).map((tab) => <TabButton key={tab} active={route.tab === tab} onClick={() => navigate(tab, tab === "graph" ? route.project : null)}>{tab}<span>{tab === "graph" ? snapshot?.graph.nodes.length ?? "—" : tab === "projects" ? snapshot?.projects.length ?? "—" : ""}</span></TabButton>)}</nav><ProjectActions onFinished={() => void refresh()} /><div className="endpoint-status"><i className={error ? "status-light bad" : "status-light"} />local / <span className="mono">127.0.0.1</span></div></header>{error && <div className="app-alert"><span><b>MCP unavailable:</b> {error}</span><Button variant="soft" onClick={() => void refresh()}>Retry</Button></div>}{!snapshot && !error && <div className="loading-state mono">loading memory field ...</div>}{snapshot && route.tab === "graph" && <GraphTab snapshot={snapshot} project={route.project} selectedId={selected?.id ?? null} onSelect={(node) => { setSelectedScope(null); setSelected(node); }} onSelectScope={(scope) => { setSelected(null); setSelectedScope(scope); }} />}{snapshot && route.tab === "projects" && <ProjectsTab snapshot={snapshot} onView={(project) => navigate("graph", project)} />}{snapshot && route.tab === "control" && <ControlTab snapshot={snapshot} onRefresh={() => void refresh()} refreshing={refreshing} />}{selected && snapshot && <MemoryCasePlate selected={selected} snapshot={snapshot} onSelect={setSelected} onClose={() => setSelected(null)} onRefresh={refresh} onError={setError} />}{selectedScope && <ScopeCasePlate scope={selectedScope} onClose={() => setSelectedScope(null)} onRefresh={refresh} onError={setError} onMoved={(newPath) => setSelectedScope((current) => current ? { ...current, path: newPath } : current)} />}</main>;
 }
 
 function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
