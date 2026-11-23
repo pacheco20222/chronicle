@@ -18,6 +18,20 @@ def _add_cli(app: str, command: list[str], dry_run: bool) -> str:
     return f"Set up Chronicle for {app}."
 
 
+def _merge_global_server(path: Path, entry: dict, dry_run: bool) -> str:
+    config = setup_cli._read_json(path)
+    servers = config.get("mcpServers", {})
+    existing = servers.get("chronicle") if isinstance(servers, dict) else None
+    env = existing.get("env") if isinstance(existing, dict) else None
+    if isinstance(env, dict) and "CHRONICLE_PROJECT" in env:
+        return (
+            f"Skipped {path}: Chronicle is pinned to project '{env['CHRONICLE_PROJECT']}'. "
+            "Remove env.CHRONICLE_PROJECT from mcpServers.chronicle, then rerun "
+            "`chronicle setup --global` for global behavior."
+        )
+    return setup_cli._merge_server(path, "chronicle", entry, dry_run)
+
+
 def setup_global(dry_run: bool, hook: bool) -> list[str]:
     """Return status lines after configuring installed apps in discovery order."""
     install_dir = Path(setup_cli.__file__).resolve().parents[2]
@@ -39,7 +53,7 @@ def setup_global(dry_run: bool, hook: bool) -> list[str]:
         lines.append("skipped: Claude Code not found")
 
     if (home / ".cursor").is_dir():
-        lines.append(setup_cli._merge_server(home / ".cursor" / "mcp.json", "chronicle", entry, dry_run))
+        lines.append(_merge_global_server(home / ".cursor" / "mcp.json", entry, dry_run))
     else:
         lines.append("skipped: Cursor not found")
 
@@ -53,7 +67,7 @@ def setup_global(dry_run: bool, hook: bool) -> list[str]:
     except SystemExit:
         desktop_path = None
     if desktop_path is not None and desktop_path.parent.is_dir():
-        lines.append(setup_cli._merge_server(desktop_path, "chronicle", entry, dry_run))
+        lines.append(_merge_global_server(desktop_path, entry, dry_run))
         if not dry_run:
             lines.append("Fully quit Claude Desktop (Cmd+Q / tray > Quit) and reopen it, then start a new chat.")
     else:

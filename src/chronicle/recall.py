@@ -59,7 +59,9 @@ def main() -> None:
         return
     project = resolution.project
     if resolution.registered_now:
-        print(f"[Chronicle] {take_registration_notice()}")
+        notice = take_registration_notice()
+        if notice is not None:
+            print(f"[Chronicle] {notice}")
     checkpoint = latest_checkpoint(project)
     if checkpoint:
         print(checkpoint)

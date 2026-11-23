@@ -51,13 +51,13 @@ def test_entries_have_no_pinned_project(fake_home, calls):
         entry = json.loads(path.read_text())["mcpServers"]["chronicle"]
         assert entry == {
             "command": "/tools/uv",
-            "args": ["--directory", install_dir.as_posix(), "run", "chronicle"],
+            "args": ["run", "--project", install_dir.as_posix(), "chronicle"],
         }
 
 
 def test_claude_code_uses_user_scope_and_user_hook(fake_home, calls):
     setup_global(dry_run=False, hook=True)
-    command = ["/tools/uv", "--directory", Path(setup_cli.__file__).resolve().parents[2].as_posix(), "run", "chronicle"]
+    command = ["/tools/uv", "run", "--project", Path(setup_cli.__file__).resolve().parents[2].as_posix(), "chronicle"]
     assert calls == [
         ["claude", "mcp", "add", "--scope", "user", "chronicle", "--", *command],
         ["codex", "mcp", "add", "chronicle", "--", *command],
@@ -171,10 +171,16 @@ def test_none_project_helpers_support_clone_and_wheel(isolated_apps, monkeypatch
     for install_dir in [clone, isolated_apps]:
         entry = setup_cli._server_entry(None, install_dir)
         assert "env" not in entry
+        assert "--directory" not in entry["args"]
+        if install_dir == clone:
+            assert entry["args"] == ["run", "--project", clone.as_posix(), "chronicle"]
         command = setup_cli._recall_hook_command(None, install_dir)
         if platform == "win32":
             command = base64.b64decode(command.split("-EncodedCommand ")[1]).decode("utf-16le")
         assert "CHRONICLE_PROJECT" not in command
+        assert "--directory" not in command
+        if install_dir == clone:
+            assert "uv run --project " in command
         assert "chronicle-recall" in command or "-m chronicle.recall" in command
 
 
@@ -186,3 +192,34 @@ def test_global_prefers_installed_executable(fake_home, calls, monkeypatch):
     assert json.loads((fake_home / ".cursor" / "mcp.json").read_text())["mcpServers"]["chronicle"] == {
         "command": executable.as_posix(), "args": [],
     }
+
+
+@pytest.mark.parametrize("client", [".cursor/mcp.json", "Claude/config.json"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_global_preserves_pinned_entry(fake_home, calls, capsys, client, dry_run):
+    path = fake_home / client
+    original = b'{ "mcpServers": { "chronicle": { "command": "old", "env": { "CHRONICLE_PROJECT": "dolphin" } } } }\n'
+    path.write_bytes(original)
+
+    setup_cli.main(["--global", "--no-hook", *(["--print"] if dry_run else [])])
+
+    assert path.read_bytes() == original
+    assert not path.with_name(path.name + ".bak").exists()
+    output = capsys.readouterr().out
+    assert "pinned to project 'dolphin'" in output
+    assert "Remove env.CHRONICLE_PROJECT" in output
+    assert str(path) in output
+
+
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+def test_global_clone_hook_preserves_cwd(isolated_apps, monkeypatch, platform):
+    monkeypatch.setattr(setup_cli.sys, "platform", platform)
+    clone = Path(setup_cli.__file__).resolve().parents[2]
+
+    command = setup_cli._recall_hook_command(None, clone)
+
+    if platform == "win32":
+        command = base64.b64decode(command.split("-EncodedCommand ")[1]).decode("utf-16le")
+    assert "uv run --project " in command
+    assert "--directory" not in command
+    assert "CHRONICLE_PROJECT" not in command

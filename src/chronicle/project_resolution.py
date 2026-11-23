@@ -43,7 +43,7 @@ def resolve(cwd: Path) -> Resolution:
         if other_paths:
             raise ProjectNotFoundError(
                 f"Project name '{root.name}' is already used by {other_paths[0]}. "
-                "Use memory_register_project to choose a different project name."
+                "Please ask the user for a different name, then call memory_register_project(name)."
             )
         try:
             from chronicle import config

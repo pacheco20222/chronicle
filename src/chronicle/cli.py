@@ -151,3 +151,8 @@ def main() -> None:
         print(HELP, end="", file=sys.stderr)
         raise SystemExit(2)
     handler(rest)
+    from chronicle import project_resolution
+
+    notice = project_resolution.take_registration_notice()
+    if notice is not None:
+        print(f"[Chronicle] {notice}", file=sys.stderr)

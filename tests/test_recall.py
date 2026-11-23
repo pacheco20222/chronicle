@@ -156,3 +156,21 @@ def test_saved_text_cannot_close_the_fence_early(monkeypatch):
     monkeypatch.setattr(recall, "get_runtime", lambda: type("R", (), {"get_latest": lambda self, *a: record})())
     out = recall.latest_checkpoint("p")
     assert out.count(recall._END) == 1 and out.count(recall._BEGIN) == 1
+
+
+def test_recall_does_not_print_a_consumed_notice(tmp_path, monkeypatch, capsys):
+    repo = git_repo(tmp_path / "dolphin")
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.chdir(repo)
+    resolve = recall.resolve
+
+    def resolve_after_notice_consumed(cwd):
+        resolution = resolve(cwd)
+        recall.take_registration_notice()
+        return resolution
+
+    monkeypatch.setattr(recall, "resolve", resolve_after_notice_consumed)
+
+    recall.main()
+
+    assert capsys.readouterr().out == ""

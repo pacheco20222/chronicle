@@ -66,7 +66,8 @@ def test_name_used_by_another_path_is_refused(tmp_path):
     with pytest.raises(ProjectNotFoundError, match="already used by") as error:
         resolve(other)
     assert str(first.resolve()) in str(error.value)
-    assert "memory_register_project" in str(error.value)
+    assert "ask the user for a different name" in str(error.value)
+    assert "then call memory_register_project(name)" in str(error.value)
     assert registry.list_projects() == {"api": [str(first.resolve())]}
     assert take_registration_notice() is None
 

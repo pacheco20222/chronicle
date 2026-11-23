@@ -18,6 +18,8 @@ Call `memory_list_scopes`. If the tool is missing or errors:
   install it yourself.
 - If the error says this folder isn't registered: ask the user which project
   to use, then call `memory_register_project(name)`.
+- If the error says the name is already used by another folder: ask the user
+  for a different name, then call `memory_register_project(name)`.
 - If the error says the name already has memories: ask whether this folder
   belongs to that project or should use a different name, then call
   `memory_register_project(name)` with the agreed name.
