@@ -9,6 +9,8 @@ Everyday:
   start [--port N] [--background]   start the dashboard (and Qdrant if semantic search is on)
   stop                              stop a backgrounded dashboard
   register NAME [--force]           register the current folder as a project
+  setup --global [--print] [--no-hook]
+                                    install once for every installed app at user level
   setup AGENT --project NAME [--print]
                                     write the MCP config for AGENT, one of
                                     claude-desktop, claude-code, cursor, codex

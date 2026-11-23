@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- `chronicle setup --global` installs once for every installed app at user
+  level. Git repos register automatically on first use with a one-time
+  notice; other folders, including Obsidian vaults, ask first. If a folder's
+  name already exists as a project in storage, the agent asks whether to
+  connect it or use a different name instead of auto-registering it.
+  Claude Desktop uses a single global `chronicle` entry with `scope_path`
+  per call after `memory_list_scopes`.
 - With semantic search on, `chronicle update` and the dashboard's startup
   re-embed every project's memories, so the similarity index is current
   without a manual `chronicle reindex`.

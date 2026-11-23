@@ -1,5 +1,48 @@
 # Installing Chronicle
 
+## Install once
+
+With [uv](https://docs.astral.sh/uv/) installed, clone Chronicle and put it on
+your PATH (run `uv tool update-shell` if needed):
+
+```bash
+git clone git@github.com:pacheco20222/chronicle.git
+cd chronicle
+uv tool install --editable .
+chronicle setup --global
+```
+
+This configures every installed app at user level, skipping apps not found:
+
+- **Claude Code:** `claude mcp add --scope user` plus a user-level recall hook
+  in `~/.claude/settings.json`.
+- **Cursor:** `~/.cursor/mcp.json`.
+- **Codex:** `codex mcp add`.
+- **Claude Desktop:** one global `chronicle` entry in
+  `claude_desktop_config.json`, serving all projects.
+
+Use `chronicle setup --global --print` to preview without changing anything,
+or `chronicle setup --global --no-hook` to skip Claude Code's recall hook.
+Setup warns if a project-level `.mcp.json` also defines `chronicle`;
+resolve that duplicate before relying on the global entry.
+
+**In a git repo:** the first use automatically registers it as a project.
+A one-time `[Chronicle] Registered ...` notice appears through Claude Code's
+recall hook or the first tool result. Each repo keeps its own memories.
+If the folder's name already exists as a project in storage, Chronicle does
+not auto-register it: the agent asks whether this folder belongs to that
+project or should use a different name.
+
+**In other folders, including Obsidian vaults:** the agent asks once which
+project to use, then calls `memory_register_project(name)`. When running
+Claude Code inside Obsidian, the vault is the folder being registered.
+
+**In Claude Desktop:** say which project you mean. The agent calls
+`memory_list_scopes`, confirms the project, and passes `scope_path` on every
+call for that chat. One entry serves all projects; Desktop has no working
+directory to infer one from. To pin a single project instead, use
+`chronicle setup claude-desktop --project NAME`.
+
 ## Prerequisites
 
 1. **uv** installed ([docs.astral.sh/uv](https://docs.astral.sh/uv/)).
@@ -29,7 +72,9 @@ back up `~/.chronicle/chronicle.db` first (see
 [docs/ARCHITECTURE.md § Backups](ARCHITECTURE.md#backups)); a plain copy of
 that one file is also a complete backup.
 
-## Option A: Plugin install (recommended for Claude Code)
+## Alternative: per-project install
+
+### Option A: Plugin install (recommended for Claude Code)
 
 Inside Claude Code, in whichever repo you want Chronicle available in:
 
@@ -106,7 +151,7 @@ not using Claude Code, want to see exactly what the plugin command
 does under the hood, or ran into something `/chronicle:chronicle-register` didn't
 handle.
 
-### Updating
+#### Updating
 
 The plugin isn't per-project — every project that has it enabled reads
 from one shared cache (`~/.claude/plugins/cache/chronicle`), so you only
@@ -126,9 +171,9 @@ update once, not once per project:
 Restart any open Claude Code or Codex session afterward to pick up the
 new version.
 
-## Option B: Manual install
+### Option B: Manual install
 
-### 1. Clone
+#### 1. Clone
 
 ```bash
 git clone git@github.com:pacheco20222/chronicle.git
@@ -142,7 +187,7 @@ Nothing else needs to run. If you want semantic search, `chronicle semantic enab
 curl -s http://localhost:6333/collections
 ```
 
-### 2. Get your install path
+#### 2. Get your install path
 
 ```bash
 uv run chronicle setup
@@ -154,7 +199,7 @@ command, with your actual clone path already filled in — you don't
 need to hand-edit any paths yourself. Re-run it with `--project NAME`
 to have the project id filled in too, instead of a placeholder.
 
-### 3. Claude Code
+#### 3. Claude Code
 
 Claude Code scopes MCP servers **per repository**, automatically —
 whichever repo's `.mcp.json` is present is what's active for that
@@ -182,7 +227,7 @@ project's memories from ever showing up in another's. Open (or
 restart) a Claude Code session in that repo and `memory_add`/
 `memory_search` will be available.
 
-#### Optional: auto-loading checkpoints and documents
+##### Optional: auto-loading checkpoints and documents
 
 Chronicle can automatically surface your latest checkpoint and project
 overview at the start of every session, via a Claude Code hook. Add a
@@ -210,7 +255,7 @@ If a `.claude/settings.json` already exists in that repo, add the
 `"hooks"` key alongside whatever's already there rather than replacing
 the file.
 
-### 4. Claude Desktop (the Chat tab)
+#### 4. Claude Desktop (the Chat tab)
 
 The Claude Desktop app is not Claude Code, and setup differs in four ways:
 
@@ -309,7 +354,7 @@ The manual steps below do the same thing by hand.
 - Invalid JSON: a trailing comma or missing bracket stops Desktop from
   loading any server. Paste the file into a JSON validator.
 
-### 5. Cursor
+#### 5. Cursor
 
 Cursor's MCP config is the same `mcpServers` JSON shape as Claude
 Code's, just a different file: `.cursor/mcp.json` at the root of
@@ -359,7 +404,7 @@ checkpoint instead of the actual newest one. Wire up your own
 equivalent of Cursor's session-start behavior, if it has one in your
 version, to make this automatic instead of asked-for.
 
-### 6. Codex
+#### 6. Codex
 
 Codex's MCP configuration is global (`~/.codex/config.toml`), not a
 per-repo file like Claude Code's `.mcp.json` — but Codex *does* launch
@@ -435,9 +480,9 @@ works automatically too, since resolution happens per-invocation from
 each session's own working directory — there's no shared state between
 them beyond the registry file both read from.
 
-### 7. Running `chronicle`'s other commands (import, graph, dashboard, scope)
+#### 7. Running `chronicle`'s other commands (import, graph, dashboard, scope)
 
-#### Recommended: put `chronicle` on your PATH
+##### Recommended: put `chronicle` on your PATH
 
 From inside your chronicle clone, once:
 
@@ -482,7 +527,7 @@ server, so existing `.mcp.json` / Codex configs keep working unchanged;
 `notes.md` above) resolve against wherever you are, so the `--directory`
 gotcha below doesn't apply.
 
-#### Without installing: `uv run`
+##### Without installing: `uv run`
 
 `chronicle import`, `chronicle graph`, `chronicle dashboard`, and `chronicle
 scope` aren't called by Claude Code or Codex — you run these yourself,
@@ -547,7 +592,7 @@ Then (re)start `chronicle dashboard start`. Until it's built, the page
 at `127.0.0.1:8765` only shows these build instructions; the `/mcp`
 endpoint works either way.
 
-#### Organizing projects into cores and sub-cores
+##### Organizing projects into cores and sub-cores
 
 A **core** is just a scope with nothing above it, and a **sub-core** is a
 scope with a parent — there's no separate concept or command for either
@@ -686,7 +731,7 @@ currently no way to remove it outright or rename it in place — moving a
 project to a differently-named parent (`scope create` the new name,
 `scope move` each project to it) is the only workaround for a rename.
 
-### 8. Windows
+#### 8. Windows
 
 Two real options, same as always — pick one, don't mix them for the
 same install:
@@ -726,7 +771,7 @@ browser-opening and `chronicle import`'s file reading have no OS-specific
 code path to work around. The same `cd` / `--directory` rule from §6
 applies exactly as written.
 
-#### MCP connects, but the first memory tool fails
+##### MCP connects, but the first memory tool fails
 
 Chronicle now waits until the first `memory_add` or `memory_search` call to
 load FastEmbed and, on a new install, download the embedding model. This
@@ -749,7 +794,7 @@ memory tool. If the command above reports an error, fix that error and
 run it again; a failed initialization leaves the model uninitialized, so
 the next call retries it.
 
-### 9. Verify it worked
+#### 9. Verify it worked
 
 This is just seeding one test memory so there's something to recall —
 on a fresh install the collection is empty, so say anything you like.

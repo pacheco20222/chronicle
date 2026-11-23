@@ -55,9 +55,39 @@ optional `semantic` extra.
 No GPU and no separate embedding service: `fastembed` runs locally on CPU, and
 the model is only loaded when semantic search is on.
 
-## Quick start (Claude Code plugin)
+## Quick start: install once
 
-Prerequisite: [Docker](https://www.docker.com/)/[OrbStack](https://orbstack.dev/)
+Clone Chronicle and put it on your PATH:
+
+```bash
+git clone git@github.com:pacheco20222/chronicle.git
+cd chronicle
+uv tool install --editable .
+chronicle setup --global
+```
+
+Run `uv tool update-shell` if `chronicle` isn't on your PATH. Setup configures
+installed Claude Code, Cursor, Codex, and Claude Desktop apps at user level;
+apps not found are skipped. Add `--print` to preview or `--no-hook` to skip
+Claude Code's recall hook.
+
+Git repos register automatically on first use, with a one-time
+`[Chronicle] Registered ...` notice. If the folder's name already exists as
+a project in storage, the agent asks before connecting it. Other folders,
+including Obsidian vaults, prompt once for registration. Running Claude Code
+inside Obsidian uses the vault as the folder.
+
+Claude Desktop uses one global `chronicle` entry: tell the agent which
+project you mean; it calls `memory_list_scopes` and passes `scope_path` on
+every call for that chat.
+
+See [Install once](docs/INSTALL.md#install-once) for details, or
+[Alternative: per-project install](docs/INSTALL.md#alternative-per-project-install)
+for the existing plugin and manual setup paths.
+
+## Alternative: per-project Claude Code plugin
+
+For semantic search: [Docker](https://www.docker.com/)/[OrbStack](https://orbstack.dev/)
 installed (running is enough — `/chronicle:chronicle-register` starts Qdrant for you).
 
 Inside Claude Code, in whichever repo you want memory in:
@@ -70,14 +100,14 @@ Inside Claude Code, in whichever repo you want memory in:
 
 `--scope project` keeps Chronicle scoped to this one repo — installing it
 here doesn't make it show up in any other project you open. That's the
-recommended default: each repo gets its own isolated memory, and
+per-project alternative: each repo gets its own isolated memory, and
 nothing connects to anything else unless you say so. Want it available
 in another repo too? Run the same three commands there (with that
 repo's own project name) — nothing gets written into either repo
 either way. `/chronicle:chronicle-register` starts Qdrant if it isn't already
 running, then registers the current folder under that project name in
-a small file outside any repo (`~/.chronicle/projects.json`). The first
-`memory_add` you make downloads the embedding model automatically
+a small file outside any repo (`~/.chronicle/projects.json`). With semantic
+search enabled, the first `memory_add` you make downloads the embedding model automatically
 (~500MB, one-time). `memory_add`/`memory_search` work immediately,
 same session, no restart.
 
@@ -104,8 +134,9 @@ registration just works, no re-registering per tool.
 Want Chronicle available everywhere without installing it repo by repo?
 Use `--scope user` instead (Claude Code's default if you omit
 `--scope`) — the plugin itself is then available in every project, but
-each repo still needs its own `/chronicle:chronicle-register` before memory
-tools work there, so nothing is silently connected. Two repos only
+git repos register automatically on first use unless the folder name already
+has memories in storage. For that name collision or a non-git folder, the
+agent asks which project to use before registering. Two repos only
 ever share the same memories if you deliberately register both under
 the *same* project name — that's the one supported way to "join"
 projects, and it's opt-in, never automatic.
@@ -117,7 +148,7 @@ setup) — Claude Code only ever installs a plugin's code once. Use
 `/plugin enable chronicle --scope project` instead; that's the command
 that actually toggles a scope on for an already-installed plugin.
 
-## Quick start (manual / Cursor / Codex)
+## Alternative: manual / Cursor / Codex
 
 First, once, regardless of which of these you use:
 
@@ -174,23 +205,22 @@ only then ask the agent to use it. The project itself is created the
 first time a memory is saved. Repeat per repo, with that repo's own
 `--project` value.
 Cursor has no plugin/marketplace system and no session-start-hook
-equivalent, so there's no one-command install path the way Claude
-Code's plugin has, and no automatic checkpoint/document recall at the
+equivalent. Global setup above writes its config in one command, but
+there is no automatic checkpoint/document recall at the
 start of a session — see
 [docs/INSTALL.md §5](docs/INSTALL.md#5-cursor) for how to ask for that
 recall manually instead.
 
 **Claude Desktop app (Chat tab):** different from Claude Code: no plugin,
-no auto-recall hook, and no folder to infer a project from. You edit
-`claude_desktop_config.json` by hand, with an **absolute path to `uv`**
+no auto-recall hook, and no folder to infer a project from. For this manual
+alternative, edit `claude_desktop_config.json` by hand, with an **absolute path to `uv`**
 (the app does not see your shell `PATH`), then fully quit and reopen the
 app. Follow the numbered steps in
 [docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop-the-chat-tab).
 This does not cover claude.ai in a browser, see
 [Known gap](#known-gap-local-clients-only-not-cloud-chat).
 
-**Codex is different: two separate steps, not one command per
-project.**
+**Codex: one server setup, then optional explicit project registration.**
 
 1. Set up the MCP server **once, ever**, with no project attached:
    ```bash
@@ -198,9 +228,9 @@ project.**
    ```
    Never repeat this for a new project — one server entry serves
    every project you register from here on.
-2. **For every project folder** you want memory in, register it —
-   this is the step it's easy to miss, since Codex has no plugin
-   command to do it for you:
+2. **To choose an explicit project name**, register the folder yourself.
+   Git repos otherwise register automatically on first use; for non-git
+   folders or a name already in storage, the agent asks first:
    ```bash
    cd /path/to/your-project
    uv run --project /absolute/path/to/chronicle chronicle register --project your-project-name
@@ -258,7 +288,7 @@ Git Bash (including the older mintty window).
    http://127.0.0.1:8765. Typing plain `chronicle` at any time shows every
    command plus a status line telling you whether Qdrant and Docker are up.
 5. **Connect a project.** Either install the Claude Code plugin from
-   [Quick start (Claude Code plugin)](#quick-start-claude-code-plugin) (it
+   [Quick start (Claude Code plugin)](#alternative-per-project-claude-code-plugin) (it
    works the same on Windows), or, for a manual setup, run this from your
    project folder and paste what it prints:
    ```powershell
@@ -351,7 +381,7 @@ bash, or fish.
    chronicle start
    ```
 5. **Connect a project:** `chronicle setup claude-desktop --project my-project` writes the Claude Desktop config for you (also `claude-code`, `cursor`, `codex`, run from the repo folder; add `--print` to preview). Or use the Claude Code plugin
-   ([Quick start](#quick-start-claude-code-plugin)), or
+   ([Quick start](#alternative-per-project-claude-code-plugin)), or
    `chronicle setup --project my-project` and paste what it prints. Details for
    the Desktop app:
    [docs/INSTALL.md §4](docs/INSTALL.md#4-claude-desktop-the-chat-tab).
