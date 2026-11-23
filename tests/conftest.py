@@ -1,3 +1,6 @@
+import subprocess
+from pathlib import Path
+
 import pytest
 
 from chronicle.core.repository import MemoryRepository
@@ -23,3 +26,19 @@ def isolate_server_runtime(service, monkeypatch):
     monkeypatch.setattr(server, "_service", service, raising=False)
     monkeypatch.setattr(runtime, "_runtime", service)
     monkeypatch.setattr(config, "SQLITE_PATH", service.repository.database.path)
+
+
+def git_repo(path: Path) -> Path:
+    path.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+    return path
+
+
+@pytest.fixture(autouse=True)
+def isolate_project_resolution(tmp_path, monkeypatch):
+    from chronicle import project_resolution
+
+    monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
+    project_resolution.take_registration_notice()
+    yield
+    project_resolution.take_registration_notice()

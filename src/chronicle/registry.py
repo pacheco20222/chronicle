@@ -49,7 +49,7 @@ def register(cwd: Path, project: str, force: bool = False) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True))
 
 
-def _main_worktree(cwd: Path) -> Path | None:
+def main_worktree(cwd: Path) -> Path | None:
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -68,7 +68,7 @@ def lookup(cwd: Path) -> str | None:
     hit = data.get(str(cwd.resolve()))
     if hit:
         return hit
-    main = _main_worktree(cwd)
+    main = main_worktree(cwd)
     if main is not None:
         return data.get(str(main.resolve()))
     return None

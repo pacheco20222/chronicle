@@ -11,6 +11,7 @@ def test_get_project_reads_env(monkeypatch):
 
 
 def test_get_project_raises_when_unset(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
     monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(RuntimeError):
@@ -18,6 +19,7 @@ def test_get_project_raises_when_unset(monkeypatch, tmp_path):
 
 
 def test_get_project_raises_when_blank(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CHRONICLE_PROJECT", "   ")
     monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(RuntimeError):
@@ -69,6 +71,7 @@ def test_get_project_env_wins_over_registry(monkeypatch, tmp_path):
 
 
 def test_get_project_raises_when_neither_env_nor_registry(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
     monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
     with pytest.raises(RuntimeError):
@@ -82,3 +85,13 @@ def test_get_project_raises_runtime_error_on_corrupt_registry(monkeypatch, tmp_p
     monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(registry_path))
     with pytest.raises(RuntimeError):
         config.get_project()
+
+
+def test_get_project_auto_registers_git_repo(monkeypatch, tmp_path):
+    from conftest import git_repo
+
+    repo = git_repo(tmp_path / "dolphin")
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("CHRONICLE_PROJECT", "   ")
+    assert config.get_project() == "dolphin"
+    assert registry.list_projects() == {"dolphin": [str(repo.resolve())]}

@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from chronicle import registry
+from chronicle import project_resolution
 
 QDRANT_URL = os.environ.get("CHRONICLE_QDRANT_URL", "http://localhost:6333")
 SQLITE_PATH = Path(os.environ.get("CHRONICLE_SQLITE_PATH", Path.home() / ".chronicle" / "chronicle.db")).expanduser()
@@ -42,25 +42,7 @@ def set_semantic(enabled: bool) -> None:
 
 
 def get_project() -> str:
-    project = os.environ.get("CHRONICLE_PROJECT", "").strip()
-    if project:
-        return project
-    try:
-        registered = registry.lookup(Path.cwd())
-    except registry.RegistryError as e:
-        raise RuntimeError(
-            f"CHRONICLE_PROJECT is not set, and the folder registry couldn't "
-            f"be read: {e}. Fix or delete the file and re-register this "
-            f"folder."
-        ) from e
-    if registered:
-        return registered
-    raise RuntimeError(
-        "CHRONICLE_PROJECT is not set and this folder isn't registered. Ask "
-        "Claude to register this folder as a project "
-        "(memory_register_project), or run `chronicle register --project X` "
-        "yourself."
-    )
+    return project_resolution.resolve(Path.cwd()).project
 
 
 def sqlite_url() -> str:
