@@ -36,8 +36,7 @@ def _is_clone(install_dir: Path) -> bool:
 
 
 def _server_entry(project: str | None, install_dir: Path) -> dict:
-    """One `mcpServers` entry. Prefers the installed `chronicle` command and
-    falls back to uv, preserving cwd for global entries."""
+    """One `mcpServers` entry. Global entries preserve cwd without running uv."""
     env = {"env": {"CHRONICLE_PROJECT": project}} if project is not None else {}
     exe = _chronicle_exe()
     if exe:
@@ -45,7 +44,9 @@ def _server_entry(project: str | None, install_dir: Path) -> dict:
     if not _is_clone(install_dir):
         return {"command": Path(sys.executable).as_posix(), "args": ["-m", "chronicle"], **env}
     if project is None:
-        return {"command": "uv", "args": ["run", "--project", install_dir.as_posix(), "chronicle"]}
+        from chronicle.setup_global import _clone_executable
+
+        return {"command": _clone_executable(install_dir, "chronicle"), "args": []}
     return {
         "command": "uv",
         "args": ["--directory", install_dir.as_posix() if sys.platform == "win32" else str(install_dir), "run", "chronicle"],
@@ -134,18 +135,21 @@ def _recall_hook_command(project: str | None, install_dir: Path) -> str:
     if exe:
         sibling = Path(exe).with_name("chronicle-recall" + (".exe" if sys.platform == "win32" else ""))
         recall = sibling.as_posix() if sibling.exists() else None
+    if not recall and project is None and _is_clone(install_dir):
+        from chronicle.setup_global import _clone_executable
+
+        recall = _clone_executable(install_dir, "chronicle-recall")
     if not recall and not _is_clone(install_dir):
         python = Path(sys.executable).as_posix()
         recall_run = f"& {_powershell_quote(python)} -m chronicle.recall" if sys.platform == "win32" else f"{shlex.quote(python)} -m chronicle.recall"
     else:
         recall_run = None
-    directory_flag = "--project" if project is None else "--directory"
     if sys.platform == "win32":
-        run = recall_run or (f"& {_powershell_quote(recall)}" if recall else f"uv run {directory_flag} {_powershell_quote(install_dir.as_posix())} chronicle-recall")
+        run = recall_run or (f"& {_powershell_quote(recall)}" if recall else f"uv run --directory {_powershell_quote(install_dir.as_posix())} chronicle-recall")
         script = f"$env:CHRONICLE_PROJECT={_powershell_quote(project)}; {run}" if project is not None else run
         encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
         return f"powershell.exe -NoProfile -EncodedCommand {encoded}"
-    run = recall_run or (shlex.quote(recall) if recall else f"uv run {directory_flag} {shlex.quote(str(install_dir))} chronicle-recall")
+    run = recall_run or (shlex.quote(recall) if recall else f"uv run --directory {shlex.quote(str(install_dir))} chronicle-recall")
     return f"CHRONICLE_PROJECT={shlex.quote(project)} {run}" if project is not None else run
 
 

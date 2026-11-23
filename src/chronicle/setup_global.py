@@ -9,6 +9,17 @@ from pathlib import Path
 from chronicle import setup_cli
 
 
+def _clone_executable(install_dir: Path, name: str) -> str:
+    directory, suffix = ("Scripts", ".exe") if setup_cli.sys.platform == "win32" else ("bin", "")
+    executable = install_dir / ".venv" / directory / (name + suffix)
+    if not executable.is_file():
+        raise SystemExit(
+            f"chronicle setup: {executable} is missing. Run `uv sync` in the clone "
+            "or `uv tool install --editable .` first; nothing was changed."
+        )
+    return executable.as_posix()
+
+
 def _add_cli(app: str, command: list[str], dry_run: bool) -> str:
     if dry_run:
         return shlex.join(command)
@@ -36,18 +47,18 @@ def setup_global(dry_run: bool, hook: bool) -> list[str]:
     """Return status lines after configuring installed apps in discovery order."""
     install_dir = Path(setup_cli.__file__).resolve().parents[2]
     entry = setup_cli._server_entry(None, install_dir)
-    if entry["command"] == "uv":
-        entry["command"] = Path(shutil.which("uv") or "uv").as_posix()
+    claude = shutil.which("claude")
+    hook_command = setup_cli._recall_hook_command(None, install_dir) if claude and hook else None
     command = [entry["command"], *entry["args"]]
     home = Path.home()
     lines = []
 
-    if shutil.which("claude"):
+    if claude:
         lines.append(_add_cli("claude", ["claude", "mcp", "add", "--scope", "user", "chronicle", "--", *command], dry_run))
         if hook:
             lines.append(setup_cli._merge_hook(
                 home / ".claude" / "settings.json",
-                setup_cli._recall_hook_command(None, install_dir), dry_run,
+                hook_command, dry_run,
             ))
     else:
         lines.append("skipped: Claude Code not found")

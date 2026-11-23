@@ -1,5 +1,6 @@
 import base64
 import json
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -11,6 +12,15 @@ from chronicle.setup_global import setup_global
 
 @pytest.fixture(autouse=True)
 def isolated_apps(tmp_path, monkeypatch):
+    clone = tmp_path / "clone's folder"
+    (clone / "src" / "chronicle").mkdir(parents=True)
+    (clone / "pyproject.toml").touch()
+    for directory, suffix in [("bin", ""), ("Scripts", ".exe")]:
+        scripts = clone / ".venv" / directory
+        scripts.mkdir(parents=True)
+        for name in ["chronicle", "chronicle-recall"]:
+            (scripts / (name + suffix)).touch()
+    monkeypatch.setattr(setup_cli, "__file__", str(clone / "src" / "chronicle" / "setup_cli.py"))
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
@@ -50,14 +60,15 @@ def test_entries_have_no_pinned_project(fake_home, calls):
     for path in [fake_home / ".cursor" / "mcp.json", fake_home / "Claude" / "config.json"]:
         entry = json.loads(path.read_text())["mcpServers"]["chronicle"]
         assert entry == {
-            "command": "/tools/uv",
-            "args": ["run", "--project", install_dir.as_posix(), "chronicle"],
+            "command": (install_dir / ".venv" / ("Scripts/chronicle.exe" if setup_cli.sys.platform == "win32" else "bin/chronicle")).as_posix(),
+            "args": [],
         }
 
 
 def test_claude_code_uses_user_scope_and_user_hook(fake_home, calls):
     setup_global(dry_run=False, hook=True)
-    command = ["/tools/uv", "run", "--project", Path(setup_cli.__file__).resolve().parents[2].as_posix(), "chronicle"]
+    clone = Path(setup_cli.__file__).resolve().parents[2]
+    command = [(clone / ".venv" / ("Scripts/chronicle.exe" if setup_cli.sys.platform == "win32" else "bin/chronicle")).as_posix()]
     assert calls == [
         ["claude", "mcp", "add", "--scope", "user", "chronicle", "--", *command],
         ["codex", "mcp", "add", "chronicle", "--", *command],
@@ -69,6 +80,7 @@ def test_claude_code_uses_user_scope_and_user_hook(fake_home, calls):
     if "-EncodedCommand " in hook:
         hook = base64.b64decode(hook.split("-EncodedCommand ")[1]).decode("utf-16le")
     assert "chronicle-recall" in hook and "CHRONICLE_PROJECT" not in hook
+    assert "uv" not in hook
     assert not list(fake_home.rglob("projects.json"))
     assert not (Path.cwd() / "projects.json").exists()
 
@@ -77,8 +89,8 @@ def test_print_mode_changes_nothing(fake_home, calls):
     before = sorted(fake_home.rglob("*"))
     lines = setup_global(dry_run=True, hook=True)
     assert calls == [] and sorted(fake_home.rglob("*")) == before
-    assert any("claude mcp add --scope user chronicle -- /tools/uv" in line for line in lines)
-    assert any("codex mcp add chronicle -- /tools/uv" in line for line in lines)
+    assert any("claude mcp add --scope user chronicle -- " in line and ".venv/" in line for line in lines)
+    assert any("codex mcp add chronicle -- " in line and ".venv/" in line for line in lines)
     assert any("Would add this SessionStart hook" in line for line in lines)
 
 
@@ -173,14 +185,17 @@ def test_none_project_helpers_support_clone_and_wheel(isolated_apps, monkeypatch
         assert "env" not in entry
         assert "--directory" not in entry["args"]
         if install_dir == clone:
-            assert entry["args"] == ["run", "--project", clone.as_posix(), "chronicle"]
+            executable = clone / ".venv" / ("Scripts/chronicle.exe" if platform == "win32" else "bin/chronicle")
+            assert entry == {"command": executable.as_posix(), "args": []}
+            assert "uv" not in json.dumps(entry)
         command = setup_cli._recall_hook_command(None, install_dir)
         if platform == "win32":
             command = base64.b64decode(command.split("-EncodedCommand ")[1]).decode("utf-16le")
         assert "CHRONICLE_PROJECT" not in command
         assert "--directory" not in command
         if install_dir == clone:
-            assert "uv run --project " in command
+            assert ".venv/" in command
+            assert "uv" not in command
         assert "chronicle-recall" in command or "-m chronicle.recall" in command
 
 
@@ -220,6 +235,41 @@ def test_global_clone_hook_preserves_cwd(isolated_apps, monkeypatch, platform):
 
     if platform == "win32":
         command = base64.b64decode(command.split("-EncodedCommand ")[1]).decode("utf-16le")
-    assert "uv run --project " in command
+    executable = (clone / ".venv" / ("Scripts/chronicle-recall.exe" if platform == "win32" else "bin/chronicle-recall")).as_posix()
+    expected = "& '" + executable.replace("'", "''") + "'" if platform == "win32" else shlex.quote(executable)
+    assert command == expected
+    assert "uv" not in command
     assert "--directory" not in command
     assert "CHRONICLE_PROJECT" not in command
+
+
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+@pytest.mark.parametrize("name", ["chronicle", "chronicle-recall"])
+def test_missing_clone_executable_aborts_before_any_write(fake_home, calls, monkeypatch, platform, name):
+    monkeypatch.setattr(setup_cli.sys, "platform", platform)
+    clone = Path(setup_cli.__file__).resolve().parents[2]
+    directory, suffix = ("Scripts", ".exe") if platform == "win32" else ("bin", "")
+    (clone / ".venv" / directory / (name + suffix)).unlink()
+    before = sorted(fake_home.rglob("*"))
+
+    with pytest.raises(SystemExit) as error:
+        setup_cli.main(["--global"])
+
+    message = str(error.value)
+    assert "uv sync" in message and "in the clone" in message
+    assert "uv tool install --editable ." in message
+    assert "nothing was changed" in message
+    assert sorted(fake_home.rglob("*")) == before
+    assert calls == []
+
+
+@pytest.mark.parametrize("helper,name", [
+    (setup_cli._server_entry, "chronicle"),
+    (setup_cli._recall_hook_command, "chronicle-recall"),
+])
+def test_global_helpers_reject_missing_clone_executable(isolated_apps, helper, name):
+    clone = Path(setup_cli.__file__).resolve().parents[2]
+    directory, suffix = ("Scripts", ".exe") if setup_cli.sys.platform == "win32" else ("bin", "")
+    (clone / ".venv" / directory / (name + suffix)).unlink()
+    with pytest.raises(SystemExit, match="uv sync"):
+        helper(None, clone)
