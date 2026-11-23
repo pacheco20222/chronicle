@@ -2,6 +2,37 @@ from pathlib import Path
 
 from chronicle import recall, registry
 
+from conftest import git_repo
+
+
+def test_recall_announces_an_automatic_registration(tmp_path, monkeypatch, capsys, service):
+    repo = git_repo(tmp_path / "dolphin")
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.chdir(repo)
+    service.add_memory([0.1] * 768, "saved checkpoint", "dolphin", "checkpoint")
+    service.set_document([0.2] * 768, "saved overview", "dolphin", "dolphin", "overview")
+
+    recall.main()
+
+    out = capsys.readouterr().out
+    notice = f"[Chronicle] Registered {repo.resolve()} as Chronicle project 'dolphin' (git repo, automatic)."
+    assert out.startswith(notice + "\n")
+    assert out.index(notice) < out.index("saved checkpoint") < out.index("saved overview")
+
+    recall.main()
+    assert "Registered" not in capsys.readouterr().out
+
+
+def test_recall_after_registration_does_not_announce_again(tmp_path, monkeypatch, capsys):
+    repo = git_repo(tmp_path / "dolphin")
+    registry.register(repo, "dolphin")
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.chdir(repo)
+
+    recall.main()
+
+    assert "Registered" not in capsys.readouterr().out
+
 
 def test_latest_checkpoint_returns_none_when_nothing_saved():
     result = recall.latest_checkpoint("a-project-with-no-checkpoints-ever")
@@ -56,6 +87,7 @@ def test_main_falls_back_to_registry(monkeypatch, tmp_path, capsys, service):
 
 
 def test_main_does_nothing_when_neither_env_nor_registry(monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
     monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
 
@@ -66,6 +98,7 @@ def test_main_does_nothing_when_neither_env_nor_registry(monkeypatch, tmp_path, 
 
 
 def test_main_never_constructs_runtime_when_unresolved(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
     monkeypatch.setenv("CHRONICLE_REGISTRY_PATH", str(tmp_path / "projects.json"))
 

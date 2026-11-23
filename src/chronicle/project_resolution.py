@@ -18,6 +18,8 @@ class Resolution:
 
 
 def resolve(cwd: Path) -> Resolution:
+    global _pending_notice
+
     project = os.environ.get("CHRONICLE_PROJECT", "").strip()
     if project:
         return Resolution(project, False)
@@ -44,7 +46,6 @@ def resolve(cwd: Path) -> Resolution:
                 "Use memory_register_project to choose a different project name."
             )
         registry.register(root, root.name)
-        global _pending_notice
         _pending_notice = (
             f"Registered {root} as Chronicle project '{root.name}' (git repo, automatic)."
         )

@@ -3,9 +3,11 @@ from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
+from mcp.types import TextContent
 
 from chronicle import config, dashboard, embeddings, graph_cli, refresh, registry, services
 from chronicle.core.runtime import get_runtime
+from chronicle.project_resolution import take_registration_notice
 
 mcp = FastMCP(
     "chronicle",
@@ -56,12 +58,11 @@ mcp = FastMCP(
         "stay a few lines, not an essay — a project's own overview remains "
         "the primary thing to read; a parent scope's core is a quick precursor, "
         "not a competing wall of text. Call memory_scope_reparent only when "
-        "the user explicitly asks to reorganize their own scope tree. If any memory "
-        "tool call fails because no project is set for this folder, or "
-        "the user explicitly asks to set up Chronicle here, call "
-        "memory_register_project(name) with a short project id — it "
-        "registers the current folder so every future call in it "
-        "resolves automatically, immediately, no restart needed. Beyond "
+        "the user explicitly asks to reorganize their own scope tree. Git repos "
+        "register automatically. For other folders, ask the user which project "
+        "to use, then call memory_register_project(name). Clients with no project "
+        "folder (Claude Desktop) must call memory_list_scopes, confirm the project "
+        "with the user, and pass scope_path on every call for that chat. Beyond "
         "explicit requests: if you notice a change worth reflecting in "
         "the project overview document, ask before updating it — don't "
         "update it silently. Separately, if a while has passed without "
@@ -129,7 +130,20 @@ class QdrantUnavailableMiddleware(Middleware):
             raise
 
 
+class RegistrationNoticeMiddleware(Middleware):
+    """Append an automatic registration notice to the next tool result once."""
+
+    async def on_call_tool(self, context, call_next):
+        result = await call_next(context)
+        if isinstance(getattr(result, "content", None), list):
+            notice = take_registration_notice()
+            if notice:
+                result.content.append(TextContent(type="text", text=f"[Chronicle] {notice}"))
+        return result
+
+
 mcp.add_middleware(QdrantUnavailableMiddleware())
+mcp.add_middleware(RegistrationNoticeMiddleware())
 
 _service = None
 

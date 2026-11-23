@@ -16,8 +16,11 @@ Call `memory_list_scopes`. If the tool is missing or errors:
 - No `memory_*` tools: Chronicle isn't installed for this agent. Point the user
   to the install steps (`chronicle setup <agent> --project NAME`), don't try to
   install it yourself.
-- "no project is set for this folder": ask the user for a short project name and
-  call `memory_register_project(name)`.
+- Git repos register automatically. For other folders, ask the user which
+  project to use, then call `memory_register_project(name)`.
+- Clients with no project folder (Claude Desktop): call `memory_list_scopes`,
+  confirm the project with the user, and pass `scope_path` on every call for
+  that chat.
 - Any other error: report it as-is. Don't retry in a loop.
 
 Search is keyword-based by default. Only if the user has turned on semantic
@@ -58,6 +61,5 @@ concrete next step.
 
 ## Claude Desktop chat
 
-A chat has no project folder. The user pins a project in the Desktop config
-(`chronicle setup claude-desktop --project NAME`); if it isn't pinned, pass
-`scope_path` on each call.
+A chat has no project folder. Call `memory_list_scopes`, confirm the project
+with the user, and pass `scope_path` on every call for that chat.
