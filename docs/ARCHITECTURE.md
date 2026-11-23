@@ -88,7 +88,7 @@ Manage the tree with `memory_list_scopes`, `memory_scope_reparent`, or
 a deliberate, user-requested action, never a side effect of another tool
 call.
 
-## Tools (20 MCP tools)
+## Tools (24 MCP tools)
 
 - **`memory_add(content, type, supersedes=None, confidence=None, extraction_method=None, scope_path=None) -> dict`** — always creates a new memory.
 - **`memory_search(query, type=None, k=5, max_tokens=None, include_linked=False, scope_path=None) -> list[dict]`** — hybrid FTS5 + vector search, RRF-merged, scoped to the current project by default. `type="checkpoint"` returns the newest checkpoints chronologically instead — query text is ignored for that type, since a checkpoint history is a timeline, not a topic.
@@ -110,6 +110,10 @@ call.
 - **`memory_scope_reparent(path, new_parent_path=None) -> dict`** — move a scope (and its descendants) under a different parent, or to root.
 - **`memory_dashboard_graph(project=None, cross_project=False, k=..., min_similarity=...) -> dict`** — the graph data behind the 3D dashboard: nodes, similarity edges, and the scope tree together.
 - **`memory_dashboard_snapshot() -> dict`** — a summary snapshot for the dashboard's control view.
+- **`memory_add_project(folder, name, type="note") -> dict`** — registers `folder` as project `name` and imports its `.md`/`.txt` files in the background (re-adding re-scans; unchanged files are skipped). Refused while another job runs.
+- **`memory_list_folders(path=None) -> dict`** — visible sub-folders of `path` (home when omitted) plus its parent; backs the dashboard's folder picker.
+- **`memory_refresh_all() -> dict`** — re-embeds every project's memories in the background (semantic search only). Returns the running job if one is already going.
+- **`memory_refresh_status() -> dict`** — progress of the current/last background job: `status`, `label`, `done`, `total`, `error`.
 
 ## Checkpoint / resume
 

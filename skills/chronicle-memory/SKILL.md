@@ -51,8 +51,9 @@ concrete next step.
   `scope_path` unless asked.
 - **Don't rewrite history.** Replace facts with `supersedes`, don't silently
   edit them. Use `memory_edit` only for typos and formatting.
-- **Don't reorganize.** Never call `memory_scope_reparent`, and never call
-  `memory_register_project` with `force=true`, unless the user explicitly asks.
+- **Don't reorganize.** Never call `memory_scope_reparent`, `memory_add_project`
+  or `memory_refresh_all`, and never call `memory_register_project` with
+  `force=true`, unless the user explicitly asks.
 - **Keep memories short.** Prefer a small, specific memory over pasting a file.
 
 ## Claude Desktop chat

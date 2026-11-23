@@ -1,7 +1,8 @@
 """The one background job behind the dashboard's "Add project" and
 "Update all projects" buttons, with progress to poll.
 
-Also run when the dashboard starts. Only one job runs at a time.
+Also run when the dashboard starts. Only one job runs at a time. Also lists
+folders for the "Add project" picker.
 """
 
 import threading
@@ -109,3 +110,19 @@ def add_project(service, folder: str, project: str, type_: str) -> dict:
 
     _spawn(work)
     return snapshot
+
+
+def list_folders(path: str | None = None) -> dict:
+    """Visible sub-folders of `path` (the home folder when omitted) and its parent."""
+    here = (Path(path).expanduser() if path else Path.home()).resolve()
+    if not here.is_dir():
+        raise ValueError(f"{path} is not a folder")
+    try:
+        names = sorted(
+            (entry.name for entry in here.iterdir() if not entry.name.startswith(".") and entry.is_dir()),
+            key=str.lower,
+        )
+    except OSError:  # unreadable folder: show it as empty rather than failing the picker
+        names = []
+    parent = None if here == Path(here.anchor) else str(here.parent)
+    return {"path": str(here), "parent": parent, "folders": names}
