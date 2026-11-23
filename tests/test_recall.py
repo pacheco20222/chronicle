@@ -9,18 +9,38 @@ def test_recall_announces_an_automatic_registration(tmp_path, monkeypatch, capsy
     repo = git_repo(tmp_path / "dolphin")
     monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
     monkeypatch.chdir(repo)
+
+    recall.main()
+
+    out = capsys.readouterr().out
+    notice = f"[Chronicle] Registered {repo.resolve()} as Chronicle project 'dolphin' (git repo, automatic)."
+    assert out == notice + "\n"
+
     service.add_memory([0.1] * 768, "saved checkpoint", "dolphin", "checkpoint")
     service.set_document([0.2] * 768, "saved overview", "dolphin", "dolphin", "overview")
 
     recall.main()
 
     out = capsys.readouterr().out
-    notice = f"[Chronicle] Registered {repo.resolve()} as Chronicle project 'dolphin' (git repo, automatic)."
-    assert out.startswith(notice + "\n")
-    assert out.index(notice) < out.index("saved checkpoint") < out.index("saved overview")
+    assert out.index("saved checkpoint") < out.index("saved overview")
+    assert "Registered" not in out
 
     recall.main()
     assert "Registered" not in capsys.readouterr().out
+
+
+def test_recall_prints_nothing_for_an_unregistered_stored_project(
+    tmp_path, monkeypatch, capsys, service,
+):
+    service.add_memory([0.0], "secret checkpoint", "dolphin", "checkpoint")
+    service.set_document([0.0], "secret overview", "dolphin", "dolphin", "overview")
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.chdir(git_repo(tmp_path / "dolphin"))
+
+    recall.main()
+
+    assert capsys.readouterr().out == ""
+    assert registry.list_projects() == {}
 
 
 def test_recall_after_registration_does_not_announce_again(tmp_path, monkeypatch, capsys):

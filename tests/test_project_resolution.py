@@ -70,6 +70,47 @@ def test_name_used_by_another_path_is_refused(tmp_path):
     assert take_registration_notice() is None
 
 
+def test_name_with_stored_memories_is_not_auto_registered(tmp_path, service):
+    service.add_memory([0.0], "secret", "dolphin", "note")
+
+    with pytest.raises(ProjectNotFoundError, match="already has memories") as error:
+        resolve(git_repo(tmp_path / "dolphin"))
+
+    message = str(error.value)
+    assert "dolphin" in message
+    assert "ask the user" in message
+    assert "memory_register_project('dolphin')" in message
+    assert "different name" in message
+    assert registry.list_projects() == {}
+    assert take_registration_notice() is None
+
+
+def test_name_matching_a_scope_is_not_auto_registered(tmp_path, service):
+    service.repository.get_or_create_scope("personal/dolphin")
+
+    with pytest.raises(ProjectNotFoundError, match="already has memories"):
+        resolve(git_repo(tmp_path / "dolphin"))
+
+    assert registry.list_projects() == {}
+    assert take_registration_notice() is None
+
+
+def test_storage_failure_fails_closed(tmp_path, service, monkeypatch):
+    failure = OSError("storage unavailable")
+
+    def project_exists(name):
+        raise failure
+
+    monkeypatch.setattr(service.repository, "project_exists", project_exists, raising=False)
+
+    with pytest.raises(ProjectNotFoundError) as error:
+        resolve(git_repo(tmp_path / "dolphin"))
+
+    assert error.value.__cause__ is failure
+    assert registry.list_projects() == {}
+    assert take_registration_notice() is None
+
+
 def test_plain_folder_asks_the_user(tmp_path):
     with pytest.raises(ProjectNotFoundError) as error:
         resolve(tmp_path)

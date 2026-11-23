@@ -43,6 +43,12 @@ class MemoryRepository:
         self.database = database
         self.session_factory = database.session_factory
 
+    def project_exists(self, name: str) -> bool:
+        with self.session_factory() as session:
+            if session.scalar(select(Memory.id).where(Memory.project == name).limit(1)) is not None:
+                return True
+            return session.scalar(select(Scope.id).where(Scope.name == name).limit(1)) is not None
+
     def create_memory(
         self,
         *,

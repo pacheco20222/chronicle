@@ -45,6 +45,21 @@ def resolve(cwd: Path) -> Resolution:
                 f"Project name '{root.name}' is already used by {other_paths[0]}. "
                 "Use memory_register_project to choose a different project name."
             )
+        try:
+            from chronicle.core.runtime import get_runtime
+
+            project_exists = get_runtime().repository.project_exists(root.name)
+        except Exception as e:
+            raise ProjectNotFoundError(
+                f"Could not check storage for project '{root.name}'. "
+                "Automatic registration refused; restore storage access and try again."
+            ) from e
+        if project_exists:
+            raise ProjectNotFoundError(
+                f"Project '{root.name}' already has memories. Please ask the user "
+                "whether this folder belongs to that project or should use a different name. "
+                f"If it belongs, call memory_register_project('{root.name}')."
+            )
         registry.register(root, root.name)
         _pending_notice = (
             f"Registered {root} as Chronicle project '{root.name}' (git repo, automatic)."
