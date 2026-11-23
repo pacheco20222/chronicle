@@ -22,6 +22,23 @@ def test_database_bootstrap_includes_memory_fts(service):
         ) == 1
 
 
+def test_repository_project_exists(service):
+    repository = service.repository
+    assert repository.project_exists("dolphin") is False
+
+    repository.create_memory(
+        id="stored-memory", project="dolphin", type_="note", content="secret",
+    )
+    assert repository.project_exists("dolphin") is True
+    assert repository.project_exists("dolph") is False
+
+    repository.get_or_create_scope("personal/orca")
+    assert repository.project_exists("orca") is True
+    assert repository.project_exists("personal") is True
+    assert repository.project_exists("orc") is False
+    assert repository.project_exists("personal/orca") is False
+
+
 def test_add_memory_writes_authoritative_row_and_vector(tmp_path):
     service = make_service(tmp_path)
 

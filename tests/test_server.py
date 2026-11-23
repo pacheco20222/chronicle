@@ -7,6 +7,58 @@ from fastmcp import Client
 
 from chronicle import config, registry, server
 
+from conftest import git_repo
+
+
+def test_first_tool_call_in_a_new_repo_carries_the_notice_once(tmp_path, monkeypatch):
+    repo = git_repo(tmp_path / "dolphin")
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.chdir(repo)
+
+    async def run():
+        async with Client(server.mcp) as client:
+            first = await client.call_tool("memory_add", {"content": "x", "type": "note"})
+            second = await client.call_tool("memory_add", {"content": "y", "type": "note"})
+            notice = f"[Chronicle] Registered {repo.resolve()} as Chronicle project 'dolphin' (git repo, automatic)."
+            assert first.content[-1].text == notice
+            assert not any("Registered" in getattr(c, "text", "") for c in second.content)
+            assert first.data["project"] == second.data["project"] == "dolphin"
+            assert first.data["content"] == "x"
+            assert second.data["content"] == "y"
+
+    anyio.run(run)
+
+
+def test_registration_notice_middleware_leaves_results_without_content_unchanged(tmp_path, monkeypatch):
+    from chronicle import project_resolution
+
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    project_resolution.resolve(git_repo(tmp_path / "dolphin"))
+    result = {"status": "unchanged"}
+
+    async def run():
+        async def call_next(context):
+            return result
+
+        returned = await server.RegistrationNoticeMiddleware().on_call_tool(None, call_next)
+        assert returned is result
+
+    anyio.run(run)
+
+
+def test_registration_notice_middleware_preserves_errors():
+    error = RuntimeError("tool failure")
+
+    async def run():
+        async def call_next(context):
+            raise error
+
+        with pytest.raises(RuntimeError) as caught:
+            await server.RegistrationNoticeMiddleware().on_call_tool(None, call_next)
+        assert caught.value is error
+
+    anyio.run(run)
+
 
 def test_memory_add_and_search_round_trip():
     added = server.memory_add("prefer uv over pip for this project", "decision")

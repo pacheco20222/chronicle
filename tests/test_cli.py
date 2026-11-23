@@ -2,7 +2,8 @@ import subprocess
 
 import pytest
 
-from chronicle import cli, dashboard_cli, services
+from chronicle import cli, dashboard_cli, project_resolution, registry, services
+from conftest import git_repo
 
 
 def _run(monkeypatch, *args):
@@ -207,3 +208,23 @@ def test_ensure_qdrant_does_not_start_docker_for_a_remote_url(monkeypatch):
 
     with pytest.raises(SystemExit, match="isn't local"):
         services.ensure_qdrant()
+
+
+def test_graph_announces_automatic_registration_once(tmp_path, monkeypatch, capsys):
+    repo = git_repo(tmp_path / "dolphin")
+    monkeypatch.delenv("CHRONICLE_PROJECT", raising=False)
+    monkeypatch.chdir(repo)
+
+    _run(monkeypatch, "graph")
+
+    output = capsys.readouterr()
+    assert output.err == (
+        f"[Chronicle] Registered {repo.resolve()} as Chronicle project 'dolphin' "
+        "(git repo, automatic).\n"
+    )
+    assert "[Chronicle]" not in output.out
+    assert registry.list_projects() == {"dolphin": [str(repo.resolve())]}
+    assert project_resolution.take_registration_notice() is None
+
+    _run(monkeypatch, "graph")
+    assert capsys.readouterr().err == ""

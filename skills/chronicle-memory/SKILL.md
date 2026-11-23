@@ -14,11 +14,20 @@ agrees.
 Call `memory_list_scopes`. If the tool is missing or errors:
 
 - No `memory_*` tools: Chronicle isn't installed for this agent. Point the user
-  to the install steps (`chronicle setup <agent> --project NAME`), don't try to
+  to the install steps (`chronicle setup --global`), don't try to
   install it yourself.
-- "no project is set for this folder": ask the user for a short project name and
-  call `memory_register_project(name)`.
+- If the error says this folder isn't registered: ask the user which project
+  to use, then call `memory_register_project(name)`.
+- If the error says the name is already used by another folder: ask the user
+  for a different name, then call `memory_register_project(name)`.
+- If the error says the name already has memories: ask whether this folder
+  belongs to that project or should use a different name, then call
+  `memory_register_project(name)` with the agreed name.
 - Any other error: report it as-is. Don't retry in a loop.
+
+Git repos register automatically on first use unless the folder's name
+already exists as a project in storage. Other folders, including Obsidian
+vaults, require the user's choice before registration.
 
 Search is keyword-based by default. Only if the user has turned on semantic
 search (`chronicle semantic enable`) does it also match by meaning.
@@ -58,6 +67,7 @@ concrete next step.
 
 ## Claude Desktop chat
 
-A chat has no project folder. The user pins a project in the Desktop config
-(`chronicle setup claude-desktop --project NAME`); if it isn't pinned, pass
-`scope_path` on each call.
+A chat has no project folder. Call `memory_list_scopes`, confirm the project
+with the user, and pass `scope_path` on every call for that chat. One global
+`chronicle` entry serves all projects. To pin a single project instead, use
+`chronicle setup claude-desktop --project NAME`.

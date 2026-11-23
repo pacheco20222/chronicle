@@ -9,6 +9,8 @@ Everyday:
   start [--port N] [--background]   start the dashboard (and Qdrant if semantic search is on)
   stop                              stop a backgrounded dashboard
   register NAME [--force]           register the current folder as a project
+  setup --global [--print] [--no-hook]
+                                    install once for every installed app at user level
   setup AGENT --project NAME [--print]
                                     write the MCP config for AGENT, one of
                                     claude-desktop, claude-code, cursor, codex
@@ -149,3 +151,8 @@ def main() -> None:
         print(HELP, end="", file=sys.stderr)
         raise SystemExit(2)
     handler(rest)
+    from chronicle import project_resolution
+
+    notice = project_resolution.take_registration_notice()
+    if notice is not None:
+        print(f"[Chronicle] {notice}", file=sys.stderr)

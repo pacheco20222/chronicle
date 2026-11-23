@@ -1,9 +1,8 @@
-import os
 from pathlib import Path
 
-from chronicle import config, registry
 from chronicle.console import use_utf8_output
 from chronicle.core.runtime import get_runtime
+from chronicle.project_resolution import resolve, take_registration_notice
 
 
 _BEGIN = "<<<CHRONICLE-SAVED-DATA"
@@ -54,14 +53,15 @@ def overview_document(project: str) -> str | None:
 
 def main() -> None:
     use_utf8_output()
-    project = os.environ.get("CHRONICLE_PROJECT", "").strip()
-    if not project:
-        try:
-            project = registry.lookup(Path.cwd()) or ""
-        except Exception:
-            project = ""
-    if not project:
+    try:
+        resolution = resolve(Path.cwd())
+    except Exception:
         return
+    project = resolution.project
+    if resolution.registered_now:
+        notice = take_registration_notice()
+        if notice is not None:
+            print(f"[Chronicle] {notice}")
     checkpoint = latest_checkpoint(project)
     if checkpoint:
         print(checkpoint)
