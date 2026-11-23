@@ -408,7 +408,7 @@ def memory_refresh_all() -> dict:
 def memory_add_project(folder: str, name: str, type: str = "note") -> dict:
     try:
         return refresh.add_project(_get_service(), folder, name, type)
-    except (ValueError, registry.AlreadyRegisteredError) as error:
+    except (ValueError, registry.AlreadyRegisteredError, refresh.JobBusyError) as error:
         raise ToolError(str(error)) from None
 
 

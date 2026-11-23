@@ -29,13 +29,28 @@ def _progress(label: str):
     return lambda done, total: _set(done=done, total=total)
 
 
-def _launch(work) -> dict:
+class JobBusyError(RuntimeError):
+    pass
+
+
+def _claim() -> dict | None:
+    """Mark a job as running; None when one already is."""
     with _lock:
         if _state["status"] == "running":
-            return dict(_state)
+            return None
         _state.update(_IDLE, status="running")
-        snapshot = dict(_state)
+        return dict(_state)
 
+
+def _launch(work) -> dict:
+    snapshot = _claim()
+    if snapshot is None:
+        return status()
+    _spawn(work)
+    return snapshot
+
+
+def _spawn(work) -> None:
     def run() -> None:
         try:
             work()
@@ -44,7 +59,6 @@ def _launch(work) -> dict:
             _set(status="error", error=f"{type(error).__name__}: {error}")
 
     threading.Thread(target=run, name="chronicle-refresh", daemon=True).start()
-    return snapshot
 
 
 def start(service) -> dict:
@@ -77,11 +91,21 @@ def add_project(service, folder: str, project: str, type_: str) -> dict:
     if not project:
         raise ValueError("a project name is required")
     config.validate_type(type_)
-    registry.register(path, project)  # raises on home/root or a name clash
+    # Claim before registering: if another job runs, refuse rather than
+    # register the folder and silently skip its import.
+    snapshot = _claim()
+    if snapshot is None:
+        raise JobBusyError("another refresh is already running; try again when it finishes")
+    try:
+        registry.register(path, project)  # raises on home/root or a name clash
+    except Exception:
+        _set(**_IDLE)
+        raise
 
     def work() -> None:
         import_cli.import_directory(
             service, str(path.resolve()), project, type_, progress=_progress("Reading documents")
         )
 
-    return _launch(work)
+    _spawn(work)
+    return snapshot

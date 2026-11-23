@@ -171,3 +171,12 @@ def test_list_folders_shows_visible_subfolders_and_the_parent(tmp_path):
     assert listing == {"path": str(tmp_path.resolve()), "parent": str(tmp_path.resolve().parent), "folders": ["A", "b"]}
     with pytest.raises(server.ToolError):
         server.memory_list_folders(str(tmp_path / "file.txt"))
+
+
+def test_add_project_while_a_job_runs_refuses_instead_of_dropping_the_import(service, docs_folder, monkeypatch):
+    monkeypatch.setitem(refresh._state, "status", "running")
+
+    with pytest.raises(server.ToolError, match="already running"):
+        server.memory_add_project(str(docs_folder), "myproj")
+
+    assert server.registry.list_projects() == {}
