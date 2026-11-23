@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from chronicle import registry
+from chronicle.core.repository import MemoryRepository
 from chronicle.project_resolution import (
     ProjectNotFoundError,
     Resolution,
@@ -95,20 +96,39 @@ def test_name_matching_a_scope_is_not_auto_registered(tmp_path, service):
     assert take_registration_notice() is None
 
 
-def test_storage_failure_fails_closed(tmp_path, service, monkeypatch):
+def test_storage_failure_fails_closed(tmp_path, monkeypatch):
     failure = OSError("storage unavailable")
 
-    def project_exists(name):
+    def project_exists(self, name):
         raise failure
 
-    monkeypatch.setattr(service.repository, "project_exists", project_exists, raising=False)
+    monkeypatch.setattr(MemoryRepository, "project_exists", project_exists)
 
     with pytest.raises(ProjectNotFoundError) as error:
         resolve(git_repo(tmp_path / "dolphin"))
 
     assert error.value.__cause__ is failure
+    assert "storage unavailable" in str(error.value)
     assert registry.list_projects() == {}
     assert take_registration_notice() is None
+
+
+def test_fresh_repo_auto_registers_when_semantic_runtime_is_unavailable(tmp_path, monkeypatch):
+    from chronicle.core import runtime
+
+    monkeypatch.setenv("CHRONICLE_SEMANTIC", "1")
+
+    def unavailable_runtime():
+        raise OSError("Qdrant unreachable")
+
+    monkeypatch.setattr(runtime, "get_runtime", unavailable_runtime)
+    repo = git_repo(tmp_path / "dolphin")
+
+    assert resolve(repo) == Resolution("dolphin", True)
+    assert registry.list_projects() == {"dolphin": [str(repo.resolve())]}
+    assert take_registration_notice() == (
+        f"Registered {repo.resolve()} as Chronicle project 'dolphin' (git repo, automatic)."
+    )
 
 
 def test_plain_folder_asks_the_user(tmp_path):

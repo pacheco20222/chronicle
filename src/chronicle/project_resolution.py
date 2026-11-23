@@ -46,12 +46,18 @@ def resolve(cwd: Path) -> Resolution:
                 "Use memory_register_project to choose a different project name."
             )
         try:
-            from chronicle.core.runtime import get_runtime
+            from chronicle import config
+            from chronicle.core.repository import MemoryRepository
+            from chronicle.storage.database import Database
 
-            project_exists = get_runtime().repository.project_exists(root.name)
+            database = Database(config.sqlite_url())
+            try:
+                project_exists = MemoryRepository(database).project_exists(root.name)
+            finally:
+                database.engine.dispose()
         except Exception as e:
             raise ProjectNotFoundError(
-                f"Could not check storage for project '{root.name}'. "
+                f"Could not check storage for project '{root.name}': {e}. "
                 "Automatic registration refused; restore storage access and try again."
             ) from e
         if project_exists:
