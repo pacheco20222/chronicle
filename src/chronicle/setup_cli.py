@@ -35,19 +35,19 @@ def _is_clone(install_dir: Path) -> bool:
     return (install_dir / "pyproject.toml").is_file() and (install_dir / "src" / "chronicle").is_dir()
 
 
-def _server_entry(project: str, install_dir: Path) -> dict:
+def _server_entry(project: str | None, install_dir: Path) -> dict:
     """One `mcpServers` entry. Prefers the installed `chronicle` command and
     falls back to `uv --directory <clone> run chronicle`."""
-    env = {"CHRONICLE_PROJECT": project}
+    env = {"env": {"CHRONICLE_PROJECT": project}} if project is not None else {}
     exe = _chronicle_exe()
     if exe:
-        return {"command": exe, "args": [], "env": env}
+        return {"command": exe, "args": [], **env}
     if not _is_clone(install_dir):
-        return {"command": Path(sys.executable).as_posix(), "args": ["-m", "chronicle"], "env": env}
+        return {"command": Path(sys.executable).as_posix(), "args": ["-m", "chronicle"], **env}
     return {
         "command": "uv",
         "args": ["--directory", install_dir.as_posix() if sys.platform == "win32" else str(install_dir), "run", "chronicle"],
-        "env": env,
+        **env,
     }
 
 
@@ -125,7 +125,7 @@ def _merge_server(path: Path, key: str, entry: dict, dry_run: bool) -> str:
     return f"{verb} '{key}' in {path}{backup}."
 
 
-def _recall_hook_command(project: str, install_dir: Path) -> str:
+def _recall_hook_command(project: str | None, install_dir: Path) -> str:
     """SessionStart command that prints the latest checkpoint and overview."""
     exe = _chronicle_exe()
     recall = None
@@ -139,11 +139,11 @@ def _recall_hook_command(project: str, install_dir: Path) -> str:
         recall_run = None
     if sys.platform == "win32":
         run = recall_run or (f"& {_powershell_quote(recall)}" if recall else f"uv run --directory {_powershell_quote(install_dir.as_posix())} chronicle-recall")
-        script = f"$env:CHRONICLE_PROJECT={_powershell_quote(project)}; {run}"
+        script = f"$env:CHRONICLE_PROJECT={_powershell_quote(project)}; {run}" if project is not None else run
         encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
         return f"powershell.exe -NoProfile -EncodedCommand {encoded}"
     run = recall_run or (shlex.quote(recall) if recall else f"uv run --directory {shlex.quote(str(install_dir))} chronicle-recall")
-    return f"CHRONICLE_PROJECT={shlex.quote(project)} {run}"
+    return f"CHRONICLE_PROJECT={shlex.quote(project)} {run}" if project is not None else run
 
 
 def _merge_hook(path: Path, command: str, dry_run: bool) -> str:
@@ -226,9 +226,19 @@ def main(argv: list[str]) -> None:
         help="write the MCP config for this agent (omit to just print every option)",
     )
     parser.add_argument("--project", default=None)
+    parser.add_argument("--global", dest="global_setup", action="store_true", help="set up every installed app at user level")
     parser.add_argument("--no-hook", dest="hook", action="store_false", help="claude-code: skip the session-start recall hook")
     parser.add_argument("--print", dest="dry_run", action="store_true", help="show what would be written; change nothing")
     args = parser.parse_args(argv)
+
+    if args.global_setup:
+        if args.agent is not None or args.project is not None:
+            parser.error("--global cannot be combined with an agent or --project")
+        from chronicle.setup_global import setup_global
+
+        for line in setup_global(args.dry_run, args.hook):
+            print(line)
+        return
 
     if args.agent:
         _setup_agent(args.agent, args.project, args.dry_run, args.hook)
