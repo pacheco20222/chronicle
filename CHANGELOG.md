@@ -18,6 +18,16 @@
 - Importing a folder now skips `node_modules`, `dist`, `build`, `venv`,
   `site-packages` and `__pycache__`.
 
+### Fixed
+- Add project no longer registers a folder and silently skips its import when
+  another job (e.g. the startup refresh) is running; it now refuses with
+  "another refresh is already running".
+
+### Security
+- Dependency upgrades for published advisories: pillow 13.0.0 (via fastembed
+  0.9.1), fastmcp 4.2.4, authlib, certifi, dnspython, filelock 4, joserfc,
+  opentelemetry-api.
+
 ## 3.2.0 — 2026-10-19
 
 ### Changed (read this if you upgrade)
