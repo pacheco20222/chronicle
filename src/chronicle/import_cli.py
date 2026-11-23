@@ -44,51 +44,69 @@ def _chunk_text(text: str, max_chars: int = 24000) -> list[str]:
     return chunks
 
 
-def _import_directory(path: str, project: str, type_: str) -> None:
+# Folders full of third-party or generated text, never a project's own notes.
+_SKIP_DIRS = {"node_modules", "__pycache__", "site-packages", "venv", "dist", "build"}
+
+
+def import_directory(service, path: str, project: str, type_: str, progress=None) -> tuple[int, int, int]:
+    """Import every .md/.txt under `path` as memories; returns (scanned, ingested, unchanged).
+
+    Files whose content is unchanged since the last import are skipped, so
+    re-running picks up edits and new files only. `progress(done, total)` is
+    called once up front and after every file.
+    """
     root = os.path.abspath(path)
     file_paths = []
     for current_root, directories, filenames in os.walk(root):
-        directories[:] = sorted(name for name in directories if not name.startswith("."))
+        directories[:] = sorted(
+            name for name in directories if not name.startswith(".") and name not in _SKIP_DIRS
+        )
         for name in sorted(filenames):
             if name.startswith(".") or os.path.splitext(name)[1] not in {".md", ".txt"}:
                 continue
             file_paths.append(os.path.abspath(os.path.join(current_root, name)))
 
-    service = get_runtime()
     ingested = 0
     unchanged = 0
-    for file_path in file_paths:
+    if progress:
+        progress(0, len(file_paths))
+    for done, file_path in enumerate(file_paths, start=1):
         content = _read_text(file_path)
         content_hash = hashlib.sha256(content.encode()).hexdigest()
         episode_title = f"{os.path.basename(file_path)} sha256:{content_hash[:16]}"
         active_chunks = service.repository.get_active_by_source_locator_all(project, file_path)
         if active_chunks and active_chunks[0].episode_record and active_chunks[0].episode_record.title == episode_title:
             unchanged += 1
-            continue
+        else:
+            for old in active_chunks:
+                service.set_status(old.id, "superseded")
 
-        for old in active_chunks:
-            service.set_status(old.id, "superseded")
-
-        episode = service.repository.create_episode(
-            project=project,
-            locator=file_path,
-            title=episode_title,
-        )
-        pieces = _chunk_text(content, max_chars=_DOCS_CHUNK_MAX_CHARS)
-        for index, piece in enumerate(pieces):
-            vector = embeddings.embed_or_empty(piece)
-            service.add_memory(
-                vector,
-                piece,
-                project,
-                type_,
-                source=file_path,
-                episode_id=episode.id,
-                chunk_index=index if len(pieces) > 1 else None,
+            episode = service.repository.create_episode(
+                project=project,
+                locator=file_path,
+                title=episode_title,
             )
-        ingested += 1
+            pieces = _chunk_text(content, max_chars=_DOCS_CHUNK_MAX_CHARS)
+            for index, piece in enumerate(pieces):
+                vector = embeddings.embed_or_empty(piece)
+                service.add_memory(
+                    vector,
+                    piece,
+                    project,
+                    type_,
+                    source=file_path,
+                    episode_id=episode.id,
+                    chunk_index=index if len(pieces) > 1 else None,
+                )
+            ingested += 1
+        if progress:
+            progress(done, len(file_paths))
+    return len(file_paths), ingested, unchanged
 
-    print(f"Scanned {len(file_paths)} files: {ingested} ingested, {unchanged} unchanged.")
+
+def _import_directory(path: str, project: str, type_: str) -> None:
+    scanned, ingested, unchanged = import_directory(get_runtime(), path, project, type_)
+    print(f"Scanned {scanned} files: {ingested} ingested, {unchanged} unchanged.")
 
 
 def main(argv: list[str]) -> None:

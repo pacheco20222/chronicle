@@ -4,7 +4,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
 
-from chronicle import config, dashboard, embeddings, graph_cli, registry, services
+from chronicle import config, dashboard, embeddings, graph_cli, refresh, registry, services
 from chronicle.core.runtime import get_runtime
 
 mcp = FastMCP(
@@ -394,6 +394,45 @@ def memory_dashboard_graph(
 @mcp.tool
 def memory_dashboard_snapshot() -> dict:
     return dashboard.build_snapshot(_get_service())
+
+
+@mcp.tool
+def memory_refresh_all() -> dict:
+    try:
+        return refresh.start(_get_service())
+    except RuntimeError as error:
+        raise ToolError(str(error)) from None
+
+
+@mcp.tool
+def memory_add_project(folder: str, name: str, type: str = "note") -> dict:
+    try:
+        return refresh.add_project(_get_service(), folder, name, type)
+    except (ValueError, registry.AlreadyRegisteredError) as error:
+        raise ToolError(str(error)) from None
+
+
+@mcp.tool
+def memory_list_folders(path: str | None = None) -> dict:
+    """Sub-folders of `path` (the home folder when omitted), for the dashboard's folder picker."""
+    here = Path(path).expanduser() if path else Path.home()
+    here = here.resolve()
+    if not here.is_dir():
+        raise ToolError(f"{path} is not a folder")
+    try:
+        names = sorted(
+            (entry.name for entry in here.iterdir() if not entry.name.startswith(".") and entry.is_dir()),
+            key=str.lower,
+        )
+    except OSError:  # unreadable folder: show it as empty rather than failing the picker
+        names = []
+    parent = None if here == Path(here.anchor) else str(here.parent)
+    return {"path": str(here), "parent": parent, "folders": names}
+
+
+@mcp.tool
+def memory_refresh_status() -> dict:
+    return refresh.status()
 
 
 @mcp.tool

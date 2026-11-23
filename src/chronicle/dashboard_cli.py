@@ -11,7 +11,8 @@ import uvicorn
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
-from chronicle import server
+from chronicle import config, refresh, server
+from chronicle.core.runtime import get_runtime
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -77,6 +78,12 @@ def run_foreground(port: int) -> None:
             f"only show build instructions. Build it with:\n{_build_hint()}",
             file=sys.stderr,
         )
+    if config.semantic_enabled():
+        try:
+            refresh.start(get_runtime())
+            print("Refreshing every project's similarity index in the background...")
+        except Exception as error:  # e.g. Qdrant isn't up: the dashboard should still serve
+            print(f"Warning: skipped the startup refresh ({error}).", file=sys.stderr)
     uvicorn.run(build_app(), host=HOST, port=port, lifespan="on")
 
 
@@ -166,6 +173,7 @@ def start_background(port: int) -> None:
     )
     path.write_text(str(child.pid))
     print(f"Chronicle dashboard started in background (PID {child.pid})")
+    print(f"Open the dashboard: http://{HOST}:{port}")
 
 
 def stop() -> None:

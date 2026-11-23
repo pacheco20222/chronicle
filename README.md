@@ -276,7 +276,7 @@ Git Bash (including the older mintty window).
 | `chronicle stop` | Stop a `--background` dashboard |
 | `chronicle register NAME` | Register the current folder as a project (`--force` to re-register under a new name) |
 | `chronicle setup AGENT --project NAME` | Write the MCP config for `claude-desktop`, `claude-code`, `cursor` or `codex` (`--print` to preview) |
-| `chronicle update` | Switch the clone to `main`, pull the latest, sync dependencies, rebuild the dashboard |
+| `chronicle update` | Switch the clone to `main`, pull the latest, sync dependencies, rebuild the dashboard, and (with semantic search on) refresh every project's similarity index |
 | `chronicle <command> --help` | Every option for one command |
 
 You never have to start the MCP server yourself: Claude Code, Cursor,

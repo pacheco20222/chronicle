@@ -132,6 +132,25 @@ def _build_dashboard(repo: Path) -> None:
             raise UpdateError(f"`npm {' '.join(step)}` failed in {dashboard}.")
 
 
+def _refresh_projects(repo: Path) -> None:
+    """Re-embed every project's memories with the updated code and dependencies.
+
+    A fresh process, so it runs the code that was just pulled instead of the
+    modules this command already loaded. A failure only warns: the update
+    itself succeeded and `chronicle reindex` can be re-run any time.
+    """
+    from chronicle import config
+
+    if not config.semantic_enabled():
+        return
+    _say("Refreshing every project's similarity index...")
+    if _run([sys.executable, "-m", "chronicle", "reindex"], repo).returncode != 0:
+        _say(
+            "Note: refreshing the similarity index failed; run `chronicle reindex` once it's sorted out.",
+            file=sys.stderr,
+        )
+
+
 def update(repo: Path) -> None:
     old_version = _version(repo)
     old, new = _update_git(repo)
@@ -144,6 +163,7 @@ def update(repo: Path) -> None:
         repo / "dashboard" / "dist" / "index.html"
     ).is_file():
         _build_dashboard(repo)
+    _refresh_projects(repo)
 
     if old == new:
         _say(f"Chronicle is already up to date (version {old_version}).")

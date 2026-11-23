@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- With semantic search on, `chronicle update` and the dashboard's startup
+  re-embed every project's memories, so the similarity index is current
+  without a manual `chronicle reindex`.
+- The dashboard's top-right has **Add project** and **Update all** buttons.
+  Add project opens a folder picker (browse or type a path), reads the
+  folder's `.md`/`.txt` files into memory and registers it as a project;
+  adding the same folder again picks up only changed files. Update all
+  re-embeds every memory (semantic search on). A progress bar under the top
+  bar shows what is running, memories done, percent and seconds elapsed, and
+  also covers the refresh that starts with the dashboard. New MCP tools:
+  `memory_add_project`, `memory_list_folders`, `memory_refresh_all`,
+  `memory_refresh_status`.
+- Importing a folder now skips `node_modules`, `dist`, `build`, `venv`,
+  `site-packages` and `__pycache__`.
+
 ## 3.2.0 — 2026-10-19
 
 ### Changed (read this if you upgrade)
