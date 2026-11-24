@@ -86,3 +86,64 @@ def test_empty_successful_sync_all_clears_stale_error(service):
     mirror = VaultMirror(service)
     assert mirror.sync_all() == []
     assert mirror.status()['last_error'] is None
+
+
+def test_mirror_for_reuses_wired_observer_or_constructs(service):
+    from chronicle.vault.mirror import mirror_for
+
+    fallback = mirror_for(service)
+    assert isinstance(fallback, VaultMirror)
+    assert fallback.service is service
+    wired = VaultMirror(service)
+    service.observers.extend([lambda ids: None, wired.on_memories_changed])
+    assert mirror_for(service) is wired
+
+
+def test_core_add_validates_and_syncs(service, tmp_path):
+    from chronicle import registry
+
+    mirror = VaultMirror(service)
+    with pytest.raises(ValueError, match='no vault configured'):
+        mirror.add_project('p')
+    settings.set_vault_path(tmp_path / 'vault')
+    with pytest.raises(ValueError, match='project does not exist: typo'):
+        mirror.add_project('typo')
+    assert settings.vault_projects() == []
+    service.add_memory([], 'Memory', 'p', 'note')
+    assert mirror.add_project('p').written == 5
+    assert mirror.add_project('p').unchanged == 5
+    registry.register(tmp_path / 'docs', 'registered')
+    assert mirror.add_project('registered').written == 4
+    assert settings.vault_projects() == ['p', 'registered']
+
+
+def test_sync_result_retains_own_error_when_status_write_fails(service, tmp_path, monkeypatch):
+    import shutil
+    from chronicle.vault import mirror as module
+
+    vault = settings.set_vault_path(tmp_path / 'vault')
+    settings.add_project('p')
+    shutil.rmtree(vault)
+    monkeypatch.setattr(module, 'record_status', lambda *args, **kwargs: None)
+    result = VaultMirror(service).sync_project('p')
+    assert 'unavailable' in result.error
+    with pytest.raises(RuntimeError, match='unavailable'):
+        result.raise_for_error()
+
+
+def test_successful_sync_all_ignores_raced_shared_diagnostics(service, tmp_path, monkeypatch):
+    from chronicle.vault import mirror as module
+
+    settings.set_vault_path(tmp_path / 'vault')
+    settings.add_project('p')
+    original = module.record_status
+
+    def raced_status(*args, **kwargs):
+        original(*args, **kwargs)
+        original(error=OSError('concurrent refresh failure'))
+
+    monkeypatch.setattr(module, 'record_status', raced_status)
+    results = VaultMirror(service).sync_all()
+    assert len(results) == 1
+    assert results[0].error is None
+    results[0].raise_for_error()

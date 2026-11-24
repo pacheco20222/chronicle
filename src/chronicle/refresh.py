@@ -131,25 +131,26 @@ def list_folders(path: str | None = None) -> dict:
 def start_vault_sync(service, project: str | None = None) -> dict:
     """Rebuild vault pages through the shared single-job slot."""
     from chronicle.vault import settings
-    from chronicle.vault.mirror import VaultMirror
+    from chronicle.vault.mirror import mirror_for
 
     snapshot = _claim()
     if snapshot is None:
         return status()
-    projects = [project] if project is not None else settings.vault_projects()
-    _set(label="Syncing vault", done=0, total=len(projects))
-    snapshot = status()
+    try:
+        mirror = mirror_for(service)
+        projects = [project] if project is not None else settings.vault_projects()
+        if project is not None:
+            mirror.require_mirrored(project)
+        _set(label="Syncing vault", done=0, total=len(projects))
+        snapshot = status()
 
-    def work() -> None:
-        mirror = next((observer.__self__ for observer in service.observers
-                       if isinstance(getattr(observer, '__self__', None), VaultMirror)), None)
-        mirror = mirror or VaultMirror(service)
-        for done, name in enumerate(projects, 1):
-            mirror.sync_project(name)
-            error = mirror.status().get('last_error')
-            if error:
-                raise RuntimeError(error)
-            _set(done=done, total=len(projects))
+        def work() -> None:
+            for done, name in enumerate(projects, 1):
+                mirror.sync_project(name).raise_for_error()
+                _set(done=done, total=len(projects))
 
-    _spawn(work)
+        _spawn(work)
+    except Exception as error:
+        _set(status="error", error=f"{type(error).__name__}: {error}")
+        raise
     return snapshot

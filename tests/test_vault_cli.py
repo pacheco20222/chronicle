@@ -78,3 +78,22 @@ def test_sync_reports_core_failure(service, tmp_path, monkeypatch, capsys):
         invoke(monkeypatch, 'sync')
     assert error.value.code == 1
     assert 'unavailable' in capsys.readouterr().err
+
+
+def test_cli_sync_refuses_non_opted_in_project(tmp_path, monkeypatch, capsys):
+    settings.set_vault_path(tmp_path / 'vault')
+    with pytest.raises(SystemExit) as error:
+        invoke(monkeypatch, 'sync', 'unknown')
+    assert error.value.code == 1
+    assert 'not opted in' in capsys.readouterr().err
+    assert settings.vault_projects() == []
+
+
+@pytest.mark.parametrize('command', [('sync', 'demo'), ('sync',), ('add', 'demo'), ('remove', 'demo')])
+def test_cli_success_ignores_stale_status(service, tmp_path, monkeypatch, command):
+    service.add_memory([], 'Memory', 'demo', 'note')
+    settings.set_vault_path(tmp_path / 'vault')
+    settings.add_project('demo')
+    # Simulate a refresh error written between this run finishing and status inspection.
+    monkeypatch.setattr(VaultMirror, 'status', lambda self: {'last_error': 'stale refresh error'})
+    invoke(monkeypatch, *command)

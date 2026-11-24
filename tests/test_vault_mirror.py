@@ -344,6 +344,7 @@ def test_remove_project_opts_out_when_vault_unavailable(tmp_path, service, mirro
     vault = configure(tmp_path, 'p')
     add(service)
     shutil.rmtree(vault)
-    assert mirror.remove_project('p') == 0
+    with pytest.raises(RuntimeError, match='generated files could not be deleted'):
+        mirror.remove_project('p')
     assert 'p' not in settings.vault_projects()
     assert mirror.status()['last_error']

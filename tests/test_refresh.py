@@ -180,3 +180,36 @@ def test_add_project_while_a_job_runs_refuses_instead_of_dropping_the_import(ser
         server.memory_add_project(str(docs_folder), "myproj")
 
     assert server.registry.list_projects() == {}
+
+
+@pytest.mark.parametrize('next_job', ['refresh', 'vault'])
+def test_vault_setup_failure_releases_shared_slot(service, monkeypatch, next_job):
+    from chronicle.vault import settings
+
+    def broken_projects():
+        raise OSError('config unavailable')
+
+    with monkeypatch.context() as patch:
+        patch.setattr(settings, 'vault_projects', broken_projects)
+        with pytest.raises(OSError, match='config unavailable'):
+            refresh.start_vault_sync(service)
+    assert refresh.status()['status'] != 'running'
+    start = refresh.start if next_job == 'refresh' else refresh.start_vault_sync
+    assert start(service)['status'] == 'running'
+    wait_until_finished()
+    assert refresh.status()['status'] == 'done'
+
+
+def test_vault_spawn_failure_releases_shared_slot(service, monkeypatch):
+    def broken_spawn(work):
+        raise RuntimeError('thread unavailable')
+
+    with monkeypatch.context() as patch:
+        patch.setattr(refresh, '_spawn', broken_spawn)
+        with pytest.raises(RuntimeError, match='thread unavailable'):
+            refresh.start_vault_sync(service)
+    assert refresh.status()['status'] == 'error'
+    assert 'thread unavailable' in refresh.status()['error']
+    assert refresh.start_vault_sync(service)['status'] == 'running'
+    wait_until_finished()
+    assert refresh.status()['status'] == 'done'

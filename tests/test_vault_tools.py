@@ -164,3 +164,62 @@ def test_add_tool_surfaces_mirror_failure(service, tmp_path):
             assert 'unavailable' in status.data['last_error']
 
     anyio.run(run)
+
+
+def test_sync_tool_refuses_non_opted_in_project(tmp_path):
+    settings.set_vault_path(tmp_path / 'vault')
+
+    async def run():
+        async with Client(server.mcp) as client:
+            with pytest.raises(ToolError, match='not opted in'):
+                await client.call_tool('memory_vault_sync', {'project': 'unknown'})
+            assert settings.vault_projects() == []
+
+    anyio.run(run)
+
+
+def test_successful_tool_operations_ignore_stale_status(service, tmp_path, monkeypatch):
+    service.add_memory([], 'Memory', 'demo', 'note')
+    settings.set_vault_path(tmp_path / 'vault')
+    monkeypatch.setattr(VaultMirror, 'status', lambda self: {'last_error': 'stale refresh error'})
+
+    async def run():
+        async with Client(server.mcp) as client:
+            added = await client.call_tool('memory_vault_add_project', {'project': 'demo'})
+            assert added.data['written'] == 5
+            started = await client.call_tool('memory_vault_sync', {'project': 'demo'})
+            assert started.data['status'] == 'running'
+            for thread in threading.enumerate():
+                if thread.name == 'chronicle-refresh':
+                    await anyio.to_thread.run_sync(lambda: thread.join(timeout=5))
+            assert refresh.status()['status'] == 'done'
+            removed = await client.call_tool('memory_vault_remove_project', {'project': 'demo'})
+            assert removed.data['deleted'] == 4
+
+    anyio.run(run)
+
+
+def test_list_files_defaults_to_small_bounded_payload(tmp_path):
+    from chronicle.vault import catalog
+
+    folder = tmp_path / 'docs'
+    folder.mkdir()
+    for index in range(201):
+        (folder / f'{index:04}.txt').write_text('x')
+    registry.register(folder, 'demo')
+
+    async def run():
+        async with Client(server.mcp) as client:
+            for limit, count, truncated in ((None, 200, True), (1, 1, True), (0, 0, True), (2000, 201, False)):
+                args = {'scope_path': 'demo'}
+                if limit is not None:
+                    args['limit'] = limit
+                result = await client.call_tool('memory_list_files', args)
+                assert len(result.data['files']) == count
+                assert result.data['truncated'] is truncated
+            for limit in (-1, 2001):
+                with pytest.raises(ToolError, match='limit'):
+                    await client.call_tool('memory_list_files', {'scope_path': 'demo', 'limit': limit})
+    anyio.run(run)
+    entries, truncated = catalog.list_files('demo')
+    assert len(entries) == 201 and truncated is False

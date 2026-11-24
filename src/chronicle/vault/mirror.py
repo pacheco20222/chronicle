@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import os
 from pathlib import Path
 
-from chronicle import config
+from chronicle import config, registry
 from chronicle.vault import catalog, settings
 from chronicle.vault.paths import chronicle_root, inside_root, memory_file, project_dir, project_folder_name
 from chronicle.vault.projection import Projection, affected_memories, inbound
@@ -19,6 +19,11 @@ class SyncResult:
     unchanged: int = 0
     deleted: int = 0
     skipped: list[str] = field(default_factory=list)
+    error: str | None = None
+
+    def raise_for_error(self) -> None:
+        if self.error is not None:
+            raise RuntimeError(self.error)
 
 
 def _folder(vault: Path, project: str) -> Path:
@@ -112,11 +117,22 @@ class VaultMirror:
         except Exception as error:
             record_status(error=error, refresh=True)
 
+    def add_project(self, project: str) -> SyncResult:
+        if settings.vault_path() is None:
+            raise ValueError('no vault configured; run chronicle vault set <path> first')
+        if not self.service.repository.project_exists(project) and project not in registry.list_projects():
+            raise ValueError(f'project does not exist: {project}')
+        settings.add_project(project)
+        return self.sync_project(project)
+
+    def require_mirrored(self, project: str) -> None:
+        if not settings.is_mirrored(project):
+            raise ValueError(f'project is not opted in to vault: {project}')
+
     def sync_project(self, project: str) -> SyncResult:
         result = SyncResult(project)
         try:
-            if not settings.is_mirrored(project):
-                return result
+            self.require_mirrored(project)
             vault = self._vault()
             folder = _folder(vault, project)
             projection = Projection(self.service, vault, settings.vault_projects(), [project])
@@ -134,6 +150,7 @@ class VaultMirror:
             result.skipped = sorted(set(result.skipped))
             record_status([project], result.skipped)
         except Exception as error:
+            result.error = str(error)
             record_status(skipped=result.skipped, error=error)
         return result
 
@@ -151,7 +168,7 @@ class VaultMirror:
         last_error = None
         for project in settings.vault_projects():
             results.append(self.sync_project(project))
-            last_error = read_status().get('last_error') or last_error
+            last_error = results[-1].error or last_error
         if results:
             skipped = [path for result in results for path in result.skipped]
             record_status(skipped=skipped, error=RuntimeError(last_error) if last_error else None)
@@ -176,6 +193,7 @@ class VaultMirror:
         except Exception as error:
             failure = RuntimeError(f"generated files could not be deleted for project {project}: {error}")
             record_status(skipped=result.skipped, error=failure)
+            raise failure from error
         return result.deleted
 
     @staticmethod
@@ -199,3 +217,12 @@ class VaultMirror:
                     record_status(error=error)
                     data['last_error'] = str(error)
         return data
+
+
+def mirror_for(service) -> VaultMirror:
+    """Reuse the wired mirror, or construct one for a service without observers."""
+    for observer in service.observers:
+        mirror = getattr(observer, '__self__', None)
+        if isinstance(mirror, VaultMirror):
+            return mirror
+    return VaultMirror(service)

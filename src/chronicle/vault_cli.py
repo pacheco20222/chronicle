@@ -8,10 +8,11 @@ import sys
 from chronicle import registry
 from chronicle.core.runtime import get_runtime
 from chronicle.vault import settings
-from chronicle.vault.mirror import VaultMirror
+from chronicle.vault.mirror import mirror_for
 
 
 def _print_result(result) -> None:
+    result.raise_for_error()
     data = asdict(result)
     line = (f"{data['project']}: {data['written']} written, "
             f"{data['unchanged']} unchanged, {data['deleted']} deleted")
@@ -38,29 +39,18 @@ def _run(args) -> None:
     if args.command == 'set':
         print(f"Vault: {settings.set_vault_path(Path(args.path))}")
         return
-    service = get_runtime()
-    mirror = next((observer.__self__ for observer in service.observers
-                   if isinstance(getattr(observer, '__self__', None), VaultMirror)), None)
-    mirror = mirror or VaultMirror(service)
+    mirror = mirror_for(get_runtime())
     if args.command == 'status':
         _print_status(mirror.status())
         return
     if args.command == 'add':
-        if settings.vault_path() is None:
-            raise ValueError('no vault configured; run chronicle vault set <path> first')
-        if not service.repository.project_exists(args.project) and args.project not in registry.list_projects():
-            raise ValueError(f'project does not exist: {args.project}')
-        settings.add_project(args.project)
-        _print_result(mirror.sync_project(args.project))
+        _print_result(mirror.add_project(args.project))
     elif args.command == 'remove':
         print(f'{args.project}: {mirror.remove_project(args.project)} deleted')
     else:
         results = [mirror.sync_project(args.project)] if args.project is not None else mirror.sync_all()
         for result in results:
             _print_result(result)
-    error = mirror.status().get('last_error')
-    if error:
-        raise RuntimeError(error)
 
 
 def main(argv: list[str]) -> None:

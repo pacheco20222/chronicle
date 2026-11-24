@@ -5,51 +5,31 @@ from dataclasses import asdict
 from fastmcp.exceptions import ToolError
 
 from chronicle import config, refresh, registry
-from chronicle.vault import catalog, settings
-from chronicle.vault.mirror import VaultMirror
-
-
-def _mirror(service) -> VaultMirror:
-    for observer in service.observers:
-        mirror = getattr(observer, '__self__', None)
-        if isinstance(mirror, VaultMirror):
-            return mirror
-    return VaultMirror(service)
-
-
-def _check_error(mirror: VaultMirror) -> None:
-    error = mirror.status().get('last_error')
-    if error:
-        raise ToolError(error)
+from chronicle.vault import catalog
+from chronicle.vault.mirror import mirror_for
 
 
 def _status(get_service) -> dict:
-    return _mirror(get_service()).status()
+    return mirror_for(get_service()).status()
 
 
 def _add(get_service, project: str) -> dict:
-    if settings.vault_path() is None:
-        raise ToolError('no vault configured; run chronicle vault set <path> first')
-    service = get_service()
-    if not service.repository.project_exists(project) and project not in registry.list_projects():
-        raise ToolError(f'project does not exist: {project}')
-    settings.add_project(project)
-    mirror = _mirror(service)
-    result = mirror.sync_project(project)
-    _check_error(mirror)
+    result = mirror_for(get_service()).add_project(project)
+    result.raise_for_error()
     return asdict(result)
 
 
 def _remove(get_service, project: str) -> dict:
-    mirror = _mirror(get_service())
+    mirror = mirror_for(get_service())
     deleted = mirror.remove_project(project)
-    _check_error(mirror)
     return {'project': project, 'deleted': deleted}
 
 
-def _list_files(query: str | None, scope_path: str | None) -> dict:
+def _list_files(query: str | None, scope_path: str | None, limit: int) -> dict:
+    if not 0 <= limit <= 2000:
+        raise ValueError('limit must be between 0 and 2000')
     project = scope_path if scope_path is not None else config.get_project()
-    entries, truncated = catalog.list_files(project, query)
+    entries, truncated = catalog.list_files(project, query, limit=limit)
     files = [{'folder': entry.folder, 'path': entry.relative_path,
               'absolute_path': entry.absolute_path, 'size': entry.size,
               'modified': entry.modified} for entry in entries]
@@ -85,6 +65,8 @@ def register(mcp, get_service) -> None:
         return _call(refresh.start_vault_sync, get_service(), project)
 
     @mcp.tool
-    def memory_list_files(query: str | None = None, scope_path: str | None = None) -> dict:
+    def memory_list_files(
+        query: str | None = None, scope_path: str | None = None, limit: int = 200,
+    ) -> dict:
         """Find documents in this project's registered folders without requiring a vault."""
-        return _call(_list_files, query, scope_path)
+        return _call(_list_files, query, scope_path, limit)
