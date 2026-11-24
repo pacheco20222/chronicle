@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from chronicle import project_resolution
@@ -23,22 +24,36 @@ def semantic_enabled() -> bool:
         return True
     if env in ("0", "false", "no", "off"):
         return False
+    return bool(read_config().get("semantic", False))
+
+
+def read_config() -> dict:
     try:
-        return bool(json.loads(CONFIG_PATH.read_text(encoding="utf-8")).get("semantic", False))
-    except (OSError, ValueError, AttributeError):
-        return False
+        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_config(data: dict) -> None:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=CONFIG_PATH.parent, delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(json.dumps(data, indent=2) + "\n")
+        os.replace(temporary, CONFIG_PATH)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def set_semantic(enabled: bool) -> None:
-    try:
-        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            data = {}
-    except (OSError, ValueError):
-        data = {}
+    data = read_config()
     data["semantic"] = enabled
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    write_config(data)
 
 
 def get_project() -> str:

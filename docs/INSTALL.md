@@ -807,3 +807,55 @@ Then in a later session:
 > "What do you know about this project?"
 
 If it recalls the note, it's working.
+
+## Obsidian vault
+
+Use an existing Obsidian vault as a read-only mirror of selected Chronicle
+projects. With `chronicle` on your PATH, configure the vault and opt in each
+project explicitly:
+
+```bash
+chronicle vault set <path>
+chronicle vault add <project>
+chronicle vault status
+chronicle vault sync
+```
+
+Replace `<path>` with your vault folder (quote paths containing spaces) and
+`<project>` with an existing Chronicle project name. From a clone without
+the PATH command, prefix each command with `uv run`. No projects are
+mirrored until you opt them in. The dashboard's Projects tab also provides
+**Show in Obsidian** per project; the Control tab shows the vault path,
+last error, and **Sync vault**, with progress in the shared job strip.
+`chronicle vault remove <project>` opts out and removes generated project
+pages without deleting Chronicle memories.
+
+Pages live under `<vault>/Chronicle/`: an index, a project page with its
+overview, a chronological log, a files catalog from registered folders,
+and one page per memory. Wikilinks connect memories, project pages, logs,
+and related memories. File entries link to original files; the catalog
+does not copy their contents. Links to projects you have not opted in do
+not expose those projects' memory contents.
+Characters such as `# ^ [ ] |` are removed from generated filenames for Obsidian-safe links.
+
+SQLite remains the source of truth. This is a **read-only mirror**:
+edits to generated pages are overwritten on the next update or sync.
+Keep your own Obsidian notes outside generated pages. Memory changes
+update the mirror automatically; use sync to rebuild pages and refresh
+the file catalog.
+
+**Privacy warning:** vault sync services such as Obsidian Sync, iCloud,
+and Dropbox will upload mirrored projects if the vault is synced. Do not
+opt in client projects you cannot share. Choose projects deliberately;
+Chronicle's local storage does not prevent your vault provider from
+uploading these generated pages.
+
+To “note this file in Chronicle,” ask your agent to call, for example:
+
+```python
+memory_add(content="Design notes for the next release", type="note",
+           source="/absolute/path/to/design.md")
+```
+
+`source` preserves the file reference on the memory and its mirrored
+page; it does not import the file's contents.

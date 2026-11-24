@@ -42,6 +42,7 @@ search (`chronicle semantic enable`) does it also match by meaning.
 | "What did we decide about X?" | `memory_search(query)` |
 | A project brief that updates in place | `memory_set_document(slug=<project name>, type="overview")` / `memory_get_document` |
 | A fact changed | `memory_add(..., supersedes=<old id>)` |
+| Find documents in the project folder | `memory_list_files(query)` |
 | A bug is fixed | `memory_set_status(id, "resolved")` |
 
 A good checkpoint lets someone with zero memory of the conversation resume:
@@ -63,6 +64,12 @@ concrete next step.
 - **Don't reorganize.** Never call `memory_scope_reparent`, `memory_add_project`
   or `memory_refresh_all`, and never call `memory_register_project` with
   `force=true`, unless the user explicitly asks.
+- **Mirror only on request.** Call `memory_vault_add_project` or
+  `memory_vault_remove_project` only when the user asks.
+- **Link file notes.** When asked to note a file or vault note in Chronicle,
+  read it and call `memory_add(..., source=<path>)`.
+- **Find project documents.** Use `memory_list_files` to find documents in the
+  project folder.
 - **Keep memories short.** Prefer a small, specific memory over pasting a file.
 
 ## Claude Desktop chat

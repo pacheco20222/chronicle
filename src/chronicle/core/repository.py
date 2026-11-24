@@ -64,16 +64,19 @@ class MemoryRepository:
         extraction_method: str | None = None,
         episode_id: str | None = None,
         chunk_index: int | None = None,
+        source_kind: str = "external",
     ) -> Memory:
         project = _require_project(project)
         with self.session_factory() as session:
             source_id = None
             if source is not None:
                 source_row = session.scalar(
-                    select(Source).where(Source.project == project, Source.locator == source)
+                    select(Source).where(
+                        Source.project == project, Source.locator == source, Source.kind == source_kind
+                    )
                 )
                 if source_row is None:
-                    source_row = Source(id=str(uuid.uuid4()), project=project, locator=source)
+                    source_row = Source(id=str(uuid.uuid4()), project=project, locator=source, kind=source_kind)
                     session.add(source_row)
                 source_id = source_row.id
             created_at = utc_now()
@@ -109,7 +112,9 @@ class MemoryRepository:
         project = _require_project(project)
         with self.session_factory() as session:
             source_row = session.scalar(
-                select(Source).where(Source.project == project, Source.locator == locator)
+                select(Source).where(
+                    Source.project == project, Source.locator == locator, Source.kind == "external"
+                )
             )
             if source_row is None:
                 source_row = Source(id=str(uuid.uuid4()), project=project, locator=locator)
@@ -194,6 +199,36 @@ class MemoryRepository:
         with self.session_factory() as session:
             return session.scalar(select(Memory).where(Memory.project == project, Memory.slug == slug))
 
+    def memory_projects(self, ids: Iterable[str]) -> dict[str, str]:
+        """Resolve ownership without loading any memory content."""
+        ids = list(ids)
+        if not ids:
+            return {}
+        with self.session_factory() as session:
+            return dict(session.execute(select(Memory.id, Memory.project).where(Memory.id.in_(ids))).all())
+
+    def inbound_relations(self, project: str, target_ids: set[str]) -> list[tuple[str, str, str]]:
+        project = _require_project(project)
+        if not target_ids:
+            return []
+        with self.session_factory() as session:
+            rows = session.execute(
+                select(Memory.id, Memory.relations, Memory.supersedes).where(Memory.project == project)
+            )
+            result = set()
+            for source, relations, predecessor in rows:
+                for relation in relations or []:
+                    if relation.get("target") in target_ids:
+                        result.add((source, relation["type"], relation["target"]))
+                if predecessor in target_ids:
+                    result.add((source, "supersedes", predecessor))
+            return sorted(result)
+
+    def project_memory_ids(self, projects: list[str]) -> set[str]:
+        """Metadata-only target set for one bounded opt-in list."""
+        with self.session_factory() as session:
+            return set(session.scalars(select(Memory.id).where(Memory.project.in_(projects))))
+
     def get_active_by_source_locator(self, project: str, locator: str) -> Memory | None:
         project = _require_project(project)
         statement = (
@@ -203,6 +238,7 @@ class MemoryRepository:
                 Memory.project == project,
                 Source.project == project,
                 Source.locator == locator,
+                Source.kind != "reference",
                 Memory.status.not_in(HIDDEN_STATUSES),
             )
             .order_by(Memory.created_at.desc())
@@ -227,6 +263,7 @@ class MemoryRepository:
                 Memory.project == project,
                 Source.project == project,
                 Source.locator == locator,
+                Source.kind != "reference",
                 Memory.status.not_in(HIDDEN_STATUSES),
             )
         )

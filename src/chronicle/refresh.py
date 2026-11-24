@@ -126,3 +126,31 @@ def list_folders(path: str | None = None) -> dict:
         names = []
     parent = None if here == Path(here.anchor) else str(here.parent)
     return {"path": str(here), "parent": parent, "folders": names}
+
+
+def start_vault_sync(service, project: str | None = None) -> dict:
+    """Rebuild vault pages through the shared single-job slot."""
+    from chronicle.vault import settings
+    from chronicle.vault.mirror import mirror_for
+
+    mirror = mirror_for(service)
+    projects = [project] if project is not None else settings.vault_projects()
+    if project is not None:
+        mirror.require_mirrored(project)
+    snapshot = _claim()
+    if snapshot is None:
+        return status()
+    try:
+        _set(label="Syncing vault", done=0, total=len(projects))
+        snapshot = status()
+
+        def work() -> None:
+            for done, name in enumerate(projects, 1):
+                mirror.sync_project(name).raise_for_error()
+                _set(done=done, total=len(projects))
+
+        _spawn(work)
+    except Exception as error:
+        _set(status="error", error=f"{type(error).__name__}: {error}")
+        raise
+    return snapshot

@@ -21,7 +21,11 @@ def create_runtime(vector_index: VectorIndex | None = None, database: Database |
             vector_index = QdrantVectorIndex()
         else:
             vector_index = NullVectorIndex()
-    return MemoryService(MemoryRepository(database), vector_index)
+    from chronicle.vault.mirror import VaultMirror
+
+    service = MemoryService(MemoryRepository(database), vector_index)
+    service.observers.append(VaultMirror(service).on_memories_changed)
+    return service
 
 
 def get_runtime() -> MemoryService:

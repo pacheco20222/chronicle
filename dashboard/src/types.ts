@@ -69,10 +69,20 @@ export interface ProjectCard {
   type_counts: Record<string, number>;
 }
 
+export type JobStatus = { status: "idle" | "running" | "done" | "error"; label: string; done: number; total: number; error: string | null };
+
+export interface VaultStatus {
+  path: string | null;
+  projects: string[];
+  last_sync: Record<string, string>;
+  last_error: string | null;
+}
+
 export interface DashboardSnapshot {
   semantic?: boolean;
   graph: GraphData;
   projects: ProjectCard[];
+  vault: VaultStatus;
   control: {
     qdrant: { healthy: boolean; collection: string; point_count: number | null; error?: string };
     docker: { available: boolean; health: string; name?: string; cpu?: string | null; memory?: string | null };

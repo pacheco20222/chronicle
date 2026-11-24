@@ -30,6 +30,13 @@ Memories:
                                     write and open a 3D memory graph
   eval --project NAME               report on a project's memory quality
 
+Vault:
+  vault set PATH                    set the Obsidian vault folder
+  vault add PROJECT                 opt in and sync an existing project
+  vault remove PROJECT              opt out and delete generated pages
+  vault status                      show vault projects and diagnostics
+  vault sync [PROJECT]              rebuild one or all mirrored projects
+
 Scopes:
   scope create PATH                 create a scope (and any missing parents)
   scope list [--prefix PATH]        print the scope tree
@@ -98,6 +105,7 @@ COMMANDS = {
     "setup": _module_main("setup_cli"),
     "register": _module_main("register_cli"),
     "scope": _module_main("scope_cli"),
+    "vault": _module_main("vault_cli"),
     "dashboard": _module_main("dashboard_cli"),
     "eval": _module_main("eval_cli"),
     "update": _module_main("update_cli"),

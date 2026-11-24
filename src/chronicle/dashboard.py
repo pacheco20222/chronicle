@@ -4,6 +4,20 @@ import sys
 from collections import Counter
 
 from chronicle import config, graph_cli, registry
+from chronicle.vault.mirror import mirror_for
+
+
+def _vault_status(service) -> dict:
+    try:
+        status = mirror_for(service).status()
+        return {
+            "path": status["vault"],
+            "projects": list(status["projects"]),
+            "last_sync": status.get("last_sync", {}),
+            "last_error": status.get("last_error"),
+        }
+    except Exception as exc:
+        return {"path": None, "projects": [], "last_sync": {}, "last_error": str(exc)}
 
 
 def _docker_status() -> dict:
@@ -202,6 +216,7 @@ def build_snapshot(service) -> dict:
         "semantic": config.semantic_enabled(),
         "graph": graph,
         "projects": projects,
+        "vault": _vault_status(service),
         "control": {
             "qdrant": qdrant,
             "docker": _docker_status(),

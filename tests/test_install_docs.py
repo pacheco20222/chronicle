@@ -1,6 +1,12 @@
 from pathlib import Path
 
 
+def test_install_docs_cover_vault_configuration():
+    install = (Path(__file__).parents[1] / "docs" / "INSTALL.md").read_text()
+
+    assert "chronicle vault set" in install
+
+
 def test_install_docs_lead_with_global_install():
     install = (Path(__file__).parents[1] / "docs" / "INSTALL.md").read_text()
 

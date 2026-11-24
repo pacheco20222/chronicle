@@ -273,3 +273,32 @@ def test_chunk_text_default_matches_new_token_budget():
     text = "\n\n".join([paragraph] * 250)  # 25,000+ chars of content
     chunks = import_cli._chunk_text(text)
     assert len(chunks) <= 2
+
+
+def test_directory_import_batches_all_new_and_superseded_ids(tmp_path, service, monkeypatch):
+    from chronicle.vault import settings
+    from chronicle.vault.mirror import VaultMirror
+
+    monkeypatch.setattr(import_cli.embeddings, 'embed_or_empty', lambda text: [1.0])
+    vault = settings.set_vault_path(tmp_path / 'vault')
+    settings.add_project('p')
+    service.observers.append(VaultMirror(service).on_memories_changed)
+    calls = []
+    service.observers.append(calls.append)
+    folder = tmp_path / 'notes'
+    folder.mkdir()
+    for index in range(50):
+        (folder / f'{index:02}.md').write_text(f'Note {index}')
+    assert import_cli.import_directory(service, str(folder), 'p', 'note') == (50, 50, 0)
+    original_ids = {row.id for row in service.repository.all('p')}
+    assert len(calls) == 1 and set(calls[0]) == original_ids
+    assert len(list((vault / 'Chronicle/p/memories').glob('*.md'))) == 50
+    calls.clear()
+    (folder / '00.md').write_text('Updated note')
+    assert import_cli.import_directory(service, str(folder), 'p', 'note') == (50, 1, 49)
+    rows = service.repository.all('p')
+    assert len(calls) == 1
+    assert set(calls[0]) == {row.id for row in rows if row.content in {'Note 0', 'Updated note'}}
+    calls.clear()
+    assert import_cli.import_directory(service, str(folder), 'p', 'note') == (50, 0, 50)
+    assert calls == []
