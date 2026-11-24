@@ -4,7 +4,10 @@ import unicodedata
 from pathlib import Path
 
 MARKER = "chronicle"
-CONTROL_CHARACTERS = frozenset(map(chr, range(32))) | {"\x7f", "\u2028", "\u2029"}
+CONTROL_CHARACTERS = frozenset(map(chr, (
+    *range(0x20), *range(0x7f, 0xa0), 0x200e, 0x200f,
+    *range(0x2028, 0x202f), *range(0x2066, 0x206a),
+)))
 _RESERVED = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$", re.IGNORECASE)
 
 

@@ -68,7 +68,7 @@ def _source_link(source: str, vault: Path) -> str:
         if scheme:
             return _inert_source(source)
         return _file_source_link(source, vault)
-    except (ValueError, OSError):
+    except (ValueError, OSError, RuntimeError):
         return _inert_source(source)
 
 

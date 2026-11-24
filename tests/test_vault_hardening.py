@@ -126,3 +126,35 @@ def test_unmirrored_project_label_removes_controls_without_leaking_title():
     assert _target_link(LinkTarget('p\n\n# injected', None, 'Secret')) == (
         '(in project p# injected, not mirrored)'
     )
+
+
+def test_unresolvable_home_source_does_not_abort_memory_page(tmp_path, monkeypatch):
+    from chronicle.vault.render import render_memory
+
+    def unavailable_home(*args, **kwargs):
+        raise RuntimeError('Could not determine home directory.')
+
+    monkeypatch.setattr(Path, 'expanduser', unavailable_home)
+    item = dict(id='id', project='p', type='note', status='active', content='Body survives',
+                created_at='2026-11-23T00:00:00+00:00', updated_at='2026-11-23T00:00:00+00:00',
+                source='~nouser/x.pdf')
+    page = render_memory(item, {}, tmp_path)
+    assert 'Body survives' in page
+    assert 'Project: [[Chronicle/p/p|p]]' in page
+    assert 'Source: `~nouser/x.pdf`\n' in page
+    assert 'file://' not in page
+
+
+@pytest.mark.parametrize('control', [
+    *(chr(value) for value in range(0x80, 0xa0)), '\u200e', '\u200f',
+    *(chr(value) for value in range(0x202a, 0x202f)),
+    *(chr(value) for value in range(0x2066, 0x206a)),
+])
+def test_c1_and_bidi_controls_are_inert_in_sources_and_stripped_from_labels(tmp_path, control):
+    from chronicle.vault.render import _markdown_label, _source_link
+
+    source = str(tmp_path / f'report{control}.pdf')
+    assert _source_link(source, tmp_path) == f'`{source.replace(control, " ")}`'
+    assert paths.wikilink(f'a{control}b', f'x{control}y') == '[[ab|xy]]'
+    assert paths.wikilink('note', control) == '[[note|note]]'
+    assert _markdown_label(f'x{control}y') == 'xy'
