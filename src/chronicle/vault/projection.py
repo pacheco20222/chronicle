@@ -1,5 +1,7 @@
 """Privacy-aware links, stable filenames, and scoped neighbor discovery."""
 import json
+import os
+import re
 from pathlib import Path
 
 from chronicle.core.graph import build_graph_data, explicit_relations
@@ -23,17 +25,47 @@ def page_id(path: Path) -> str | None:
     return None
 
 
-def stable_stem(vault: Path, memory: dict) -> str:
-    folder = project_dir(vault, memory['project']) / 'memories'
-    if folder.resolve() != folder:
-        raise ValueError(f'refusing symlinked memories folder: {folder}')
-    for path in sorted(folder.glob(f'*-{memory["id"][:8]}.md')):
-        inside_root(vault, path)
-        if path.is_symlink():
-            raise ValueError(f'refusing symlinked memory page: {path}')
-        if page_id(path) == memory['id']:
+class StemIndex:
+    """Scan each memory directory once; validate only collisions and write targets."""
+    def __init__(self, vault: Path, projects: set[str], write_ids: set[str]):
+        self.candidates: dict[str, dict[str, list[Path]]] = {}
+        self.write_ids = write_ids
+        self.confirmed: dict[Path, str | None] = {}
+        for project in projects:
+            self.candidates[project] = self._scan(vault, project)
+
+    @staticmethod
+    def _scan(vault: Path, project: str) -> dict[str, list[Path]]:
+        folder = project_dir(vault, project) / 'memories'
+        if folder.resolve() != folder:
+            raise ValueError(f'refusing symlinked memories folder: {folder}')
+        candidates: dict[str, list[Path]] = {}
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    match = re.search(r'-([0-9a-fA-F]{8})\.md$', entry.name)
+                    if not match:
+                        continue
+                    path = Path(entry.path)
+                    inside_root(vault, path)
+                    if entry.is_symlink():
+                        raise ValueError(f'refusing symlinked memory page: {path}')
+                    if entry.is_file(follow_symlinks=False):
+                        candidates.setdefault(match[1].lower(), []).append(path)
+        except FileNotFoundError:
+            pass
+        return candidates
+
+    def stem(self, memory: dict) -> str:
+        candidates = self.candidates[memory['project']].get(memory['id'][:8].lower(), [])
+        for path in sorted(candidates):
+            if len(candidates) > 1 or memory['id'] in self.write_ids:
+                if path not in self.confirmed:
+                    self.confirmed[path] = page_id(path)
+                if self.confirmed[path] != memory['id']:
+                    continue
             return path.stem
-    return memory_stem(memory['type'], memory['content'], memory['id'])
+        return memory_stem(memory['type'], memory['content'], memory['id'])
 
 
 def mirrored_rows(service, ids, projects):
@@ -62,7 +94,8 @@ def affected_memories(service, ids, projects, relations) -> dict[str, set[str]]:
 
 
 class Projection:
-    def __init__(self, service, vault: Path, projects: list[str], selected: list[str], relations=None):
+    def __init__(self, service, vault: Path, projects: list[str], selected: list[str], relations=None,
+                 write_ids: set[str] | None = None):
         self.memories = {project: [service._serialize(row) for row in service.repository.all(project)]
                          for project in selected}
         records = {memory['id']: memory for memories in self.memories.values() for memory in memories}
@@ -80,7 +113,10 @@ class Projection:
         ownership = service.repository.memory_projects(targets - records.keys())
         extra = service.repository.get_by_ids([key for key, project in ownership.items() if project in projects])
         records.update({key: service._serialize(row) for key, row in extra.items()})
-        self.links = {key: LinkTarget(memory['project'], stable_stem(vault, memory), memory_title(memory['content']))
+        if write_ids is None:
+            write_ids = {memory["id"] for memories in self.memories.values() for memory in memories}
+        stems = StemIndex(vault, {memory["project"] for memory in records.values()}, write_ids)
+        self.links = {key: LinkTarget(memory['project'], stems.stem(memory), memory_title(memory['content']))
                       for key, memory in records.items()}
         for key in targets - self.links.keys():
             self.links[key] = LinkTarget(ownership.get(key, 'unknown'), None, '')

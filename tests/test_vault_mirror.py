@@ -300,3 +300,50 @@ def test_live_refresh_does_not_copy_content_as_similarity(tmp_path, service, mir
     memory_id = add(service, 'Title\nsimilar: user prose')
     service.confirm_memory(memory_id)
     assert page(vault, memory_id).read_text().count('similar: user prose') == 1
+
+
+@pytest.mark.parametrize("write_first", [False, True])
+def test_projection_reads_headers_only_for_written_unique_candidates(tmp_path, service, mirror, monkeypatch, write_first):
+    from chronicle.vault import projection
+
+    vault = configure(tmp_path, 'p')
+    # Populate once without invoking the live mirror for each setup memory.
+    service.observers.clear()
+    ids = [add(service, f'Memory {index}') for index in range(20)]
+    mirror.sync_project('p')
+    original = projection.page_id
+    scan = projection.os.scandir
+    reads, scans = [], []
+    def tracked_scan(path):
+        scans.append(path)
+        return scan(path)
+    def tracked(path):
+        reads.append(path)
+        return original(path)
+    monkeypatch.setattr(projection, 'page_id', tracked)
+    monkeypatch.setattr(projection.os, 'scandir', tracked_scan)
+    result = projection.Projection(service, vault, ['p'], ['p'], write_ids={ids[0]} if write_first else set())
+    assert scans == [project_dir(vault, 'p') / 'memories']
+    assert reads == ([page(vault, ids[0])] if write_first else [])
+    assert len(result.links) == 20
+
+
+def test_sync_prunes_duplicate_at_noncanonical_path(tmp_path, service, mirror):
+    vault = configure(tmp_path, 'p')
+    memory_id = add(service)
+    canonical = page(vault, memory_id)
+    duplicate = project_dir(vault, 'p') / 'duplicate.md'
+    duplicate.write_text(canonical.read_text())
+    result = mirror.sync_project('p')
+    assert canonical.exists() and not duplicate.exists()
+    assert result.deleted == 1
+    assert mirror.sync_project('p').deleted == 0
+
+
+def test_remove_project_opts_out_when_vault_unavailable(tmp_path, service, mirror):
+    vault = configure(tmp_path, 'p')
+    add(service)
+    shutil.rmtree(vault)
+    assert mirror.remove_project('p') == 0
+    assert 'p' not in settings.vault_projects()
+    assert mirror.status()['last_error']

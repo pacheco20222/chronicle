@@ -6,7 +6,7 @@ from pathlib import Path
 from chronicle import config
 from chronicle.vault import catalog, settings
 from chronicle.vault.paths import chronicle_root, inside_root, memory_file, project_dir, project_folder_name
-from chronicle.vault.projection import Projection, affected_memories, inbound, page_id
+from chronicle.vault.projection import Projection, affected_memories, inbound
 from chronicle.vault.render import render_index, render_log, render_memory, render_project
 from chronicle.vault.state import read_status, record_status
 from chronicle.vault.writer import delete_page, is_generated, write_page
@@ -101,15 +101,16 @@ class VaultMirror:
             vault = self._vault()
             for project in affected:
                 _folder(vault, project)
-            projection = Projection(self.service, vault, projects, list(affected), relations)
+            write_ids = set().union(*affected.values())
+            projection = Projection(self.service, vault, projects, list(affected), relations, write_ids)
             skipped = []
             for project, memory_ids in affected.items():
                 result = SyncResult(project)
                 self._render(vault, project, projection, result, memory_ids)
                 skipped.extend(result.skipped)
-            record_status(affected, skipped)
+            record_status(affected, skipped, refresh=True)
         except Exception as error:
-            record_status(error=error)
+            record_status(error=error, refresh=True)
 
     def sync_project(self, project: str) -> SyncResult:
         result = SyncResult(project)
@@ -125,11 +126,10 @@ class VaultMirror:
             entries, truncated = catalog.list_files(project)
             self._write(vault, folder / 'files.md', catalog.render_files(project, entries, truncated), result)
             self._index(vault, result)
-            ids = {memory['id'] for memory in projection.memories[project]}
             for path in _files(vault, folder):
                 if not is_generated(path):
                     result.skipped.append(str(path))
-                elif path not in expected and page_id(path) not in ids:
+                elif path not in expected:
                     result.deleted += int(delete_page(vault, path))
             result.skipped = sorted(set(result.skipped))
             record_status([project], result.skipped)
@@ -146,6 +146,7 @@ class VaultMirror:
         self._write(vault, chronicle_root(vault) / 'index.md', render_index(projects), result)
 
     def sync_all(self) -> list[SyncResult]:
+        record_status()
         results = []
         last_error = None
         for project in settings.vault_projects():
@@ -159,6 +160,7 @@ class VaultMirror:
     def remove_project(self, project: str) -> int:
         result = SyncResult(project)
         try:
+            settings.remove_project(project)
             vault = self._vault()
             if vault is not None:
                 folder = _folder(vault, project)
@@ -168,12 +170,12 @@ class VaultMirror:
                     else:
                         result.skipped.append(str(path))
                 self._remove_empty_dirs(folder)
-            settings.remove_project(project)
             if vault is not None:
                 self._index(vault, result)
             record_status(skipped=result.skipped)
         except Exception as error:
-            record_status(skipped=result.skipped, error=error)
+            failure = RuntimeError(f"generated files could not be deleted for project {project}: {error}")
+            record_status(skipped=result.skipped, error=failure)
         return result.deleted
 
     @staticmethod

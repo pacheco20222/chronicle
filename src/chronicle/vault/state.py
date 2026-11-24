@@ -35,17 +35,20 @@ def write_status(data: dict) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def record_status(projects=(), skipped=(), error: Exception | None = None) -> None:
+def record_status(projects=(), skipped=(), error: Exception | None = None, *, refresh: bool = False) -> None:
     from datetime import datetime, timezone
 
     if error is not None:
         print(f'Chronicle vault mirror failed: {error}', file=sys.stderr)
     try:
         data = read_status()
-        data['last_error'] = str(error) if error is not None else None
-        data['skipped_user_files'] = sorted(set(skipped))
+        if error is not None or not refresh:
+            data['last_error'] = str(error) if error is not None else None
+        skipped_key = 'last_refresh_skipped_user_files' if refresh else 'skipped_user_files'
+        data[skipped_key] = sorted(set(skipped))
+        time_key = 'last_refresh' if refresh else 'last_sync'
         for project in projects:
-            data.setdefault('last_sync', {})[project] = datetime.now(timezone.utc).isoformat()
+            data.setdefault(time_key, {})[project] = datetime.now(timezone.utc).isoformat()
         write_status(data)
     except Exception as failure:
         print(f'Chronicle vault status failed: {failure}', file=sys.stderr)

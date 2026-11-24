@@ -42,7 +42,8 @@ class MemoryService:
                 print(f"Chronicle observer failed: {error}", file=sys.stderr)
 
     @contextmanager
-    def _batch_notifications(self):
+    def batch_notifications(self):
+        """Notify observers once after a group of writes, including partial failures."""
         self._notification_depth += 1
         try:
             yield
@@ -150,7 +151,7 @@ class MemoryService:
         type_: str,
         source_ids: list[str],
     ) -> str:
-        with self._batch_notifications():
+        with self.batch_notifications():
             merged_id = self.add_memory(vector, content, project, type_)
             for source_id in source_ids:
                 self.link_memories(merged_id, "supersedes", source_id)
@@ -164,7 +165,7 @@ class MemoryService:
         source = self.repository.get(source_id)
         if source is None:
             raise ValueError(f"no memory found with id {source_id!r}")
-        with self._batch_notifications():
+        with self.batch_notifications():
             return [
                 self.add_memory(vector, content, source.project, type_, supersedes=source_id)
                 for vector, content, type_ in new_contents
