@@ -4,11 +4,17 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path, PureWindowsPath
+from urllib.parse import urlsplit
 
 from chronicle.vault.paths import MARKER, project_folder_name, wikilink
 
 _RECENT_PER_TYPE = 5
+_DOCUMENT_EXTENSIONS = frozenset(
+    "pdf doc docx xls xlsx ppt pptx odt ods odp rtf txt md csv json "
+    "png jpg jpeg gif webp svg mp3 mp4 mov wav".split()
+)
 
 
 @dataclass(frozen=True)
@@ -41,19 +47,34 @@ def _markdown_label(text: str) -> str:
     return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
 
+def _inert_source(source: str) -> str:
+    text = source.replace("`", "").replace("\r", " ").replace("\n", " ")
+    return f"`{text}`"
+
+
 def _source_link(source: str, vault: Path) -> str:
-    if source.startswith(("https://", "http://")):
+    windows = PureWindowsPath(source)
+    foreign_windows = os.name != "nt" and windows.is_absolute()
+    scheme = "" if windows.is_absolute() else urlsplit(source).scheme
+    if scheme in {"http", "https"}:
         return f"[{_markdown_label(source)}]({source.replace(' ', '%20').replace('(', '%28').replace(')', '%29')})"
-    path = Path(source)
-    if path.is_relative_to(vault):
-        relative = path.relative_to(vault)
-        target = relative.with_suffix("") if relative.suffix == ".md" else relative
+    if scheme:
+        return _inert_source(source)
+    path = windows if foreign_windows else Path(source).resolve()
+    exists = False if foreign_windows else path.exists()
+    directory = source.endswith(("/", "\\")) if foreign_windows else path.is_dir()
+    suffix = " (file not found)" if not exists else ""
+    if directory or path.suffix.lower().lstrip(".") not in _DOCUMENT_EXTENSIONS:
+        return _inert_source(str(path)) + suffix
+    resolved_vault = None if foreign_windows else vault.resolve()
+    if resolved_vault is not None and path.is_relative_to(resolved_vault):
+        relative = path.relative_to(resolved_vault)
+        target = relative.with_suffix("") if relative.suffix.lower() == ".md" else relative
         link = wikilink(target.as_posix(), path.name)
     else:
-        external = PureWindowsPath(source) if PureWindowsPath(source).is_absolute() else path
-        uri = external.as_uri().replace("(", "%28").replace(")", "%29")
-        link = f"[{_markdown_label(external.name)}]({uri})"
-    return link + (" (file not found)" if not path.exists() else "")
+        uri = path.as_uri().replace("(", "%28").replace(")", "%29")
+        link = f"[{_markdown_label(path.name)}]({uri})"
+    return link + suffix
 
 
 def _memory_links(memory: dict, links: dict[str, LinkTarget]) -> list[tuple[str, str]]:

@@ -262,3 +262,105 @@ def test_log_heading_dates_use_utc_for_created_and_status_events(status):
     headings = [line for line in page.splitlines() if line.startswith('## [')]
     assert len(headings) == (1 if status == 'active' else 2)
     assert all(line.startswith('## [2026-11-20]') for line in headings)
+
+
+@pytest.mark.parametrize('kind', ['traversal', 'outbound_symlink', 'inbound_symlink', 'vault_alias'])
+@pytest.mark.parametrize('missing', [False, True])
+def test_source_containment_uses_resolved_paths(tmp_path, kind, missing):
+    from chronicle.vault.render import render_memory
+
+    vault = tmp_path / 'vault'
+    vault.mkdir()
+    inside = vault / 'note.pdf'
+    outside = tmp_path / 'outside.pdf'
+    if not missing:
+        inside.write_text('inside')
+        outside.write_text('outside')
+    source = vault / '..' / outside.name
+    if kind == 'outbound_symlink':
+        source = vault / 'linked.pdf'
+        source.symlink_to(outside)
+    elif kind == 'inbound_symlink':
+        source = tmp_path / 'linked.pdf'
+        source.symlink_to(inside)
+    elif kind == 'vault_alias':
+        alias = tmp_path / 'alias'
+        alias.symlink_to(vault, target_is_directory=True)
+        vault, source = alias, inside
+    page = render_memory(memory(source=str(source)), {}, vault)
+    expected = '[[note.pdf|note.pdf]]' if kind in {'inbound_symlink', 'vault_alias'} else f'[{outside.name}]({outside.as_uri()})'
+    assert f'Source: {expected}' in page
+    assert ('(file not found)' in page) == missing
+
+
+@pytest.mark.parametrize('inside', [False, True])
+@pytest.mark.parametrize('suffix', ['.app', '.command', '.sh', '.exe', '.bat', '.ps1', '.jar', '', '.html'])
+def test_unsafe_source_extensions_are_inert(tmp_path, inside, suffix):
+    from chronicle.vault.render import render_memory
+
+    vault = tmp_path / 'vault'
+    vault.mkdir()
+    source = (vault if inside else tmp_path) / ('run`me' + suffix)
+    source.write_text('untrusted')
+    page = render_memory(memory(source=str(source)), {}, vault)
+    assert f'Source: `{str(source).replace("`", "")}`\n' in page
+    assert 'file://' not in page
+    source.unlink()
+    assert f'Source: `{str(source).replace("`", "")}` (file not found)' in render_memory(memory(source=str(source)), {}, vault)
+
+
+@pytest.mark.parametrize('suffix', 'pdf doc docx xls xlsx ppt pptx odt ods odp rtf txt md csv json png jpg jpeg gif webp svg mp3 mp4 mov wav'.split())
+def test_document_media_allowlist_is_case_insensitive(tmp_path, suffix):
+    from chronicle.vault.render import render_memory
+
+    source = tmp_path / ('document.' + suffix.upper())
+    source.write_text('document')
+    assert f'Source: [{source.name}]({source.as_uri()})' in render_memory(memory(source=str(source)), {}, tmp_path / 'vault')
+
+
+@pytest.mark.parametrize('inside', [False, True])
+def test_directories_with_document_extensions_are_inert(tmp_path, inside):
+    from chronicle.vault.render import render_memory
+
+    vault = tmp_path / 'vault'
+    vault.mkdir()
+    source = (vault if inside else tmp_path) / 'folder.pdf'
+    source.mkdir()
+    assert f'Source: `{source}`\n' in render_memory(memory(source=str(source)), {}, vault)
+
+
+@pytest.mark.parametrize('source', ['javascript:alert(1)', 'file:///tmp/document.pdf', 'ftp://example.com/a.pdf'])
+def test_non_http_url_sources_are_inert(tmp_path, source):
+    from chronicle.vault.render import render_memory
+
+    assert f'Source: `{source}`\n' in render_memory(memory(source=source), {}, tmp_path)
+
+
+@pytest.mark.parametrize('suffix, clickable', [('.command', False), ('.PDF', True)])
+def test_source_symlink_policy_uses_resolved_extension(tmp_path, suffix, clickable):
+    from chronicle.vault.render import render_memory
+
+    vault = tmp_path / 'vault'
+    vault.mkdir()
+    target = tmp_path / ('target' + suffix)
+    target.write_text('target')
+    source = vault / 'disguised.pdf'
+    source.symlink_to(target)
+    page = render_memory(memory(source=str(source)), {}, vault)
+    expected = f'[{target.name}]({target.as_uri()})' if clickable else f'`{target}`'
+    assert f'Source: {expected}\n' in page
+
+
+@pytest.mark.parametrize('suffix, clickable', [('.PDF', True), ('.exe', False)])
+def test_windows_absolute_sources_on_posix_are_external_without_resolution(tmp_path, monkeypatch, suffix, clickable):
+    import os
+    from pathlib import Path
+    from chronicle.vault.render import render_memory
+
+    if os.name == 'nt':
+        pytest.skip('foreign Windows paths require POSIX')
+    source = 'C:\\documents\\report' + suffix
+    monkeypatch.setattr(Path, 'resolve', lambda *args, **kwargs: pytest.fail('must not resolve foreign source'))
+    page = render_memory(memory(source=source), {}, tmp_path)
+    expected = f'[report{suffix}](file:///C:/documents/report{suffix})' if clickable else f'`{source}`'
+    assert f'Source: {expected} (file not found)' in page
