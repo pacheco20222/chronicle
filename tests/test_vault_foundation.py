@@ -140,7 +140,7 @@ def test_safe_name_handles_windows_reserved_names(name):
 
 
 def test_safe_name_sanitizes_controls_and_truncation():
-    assert paths.safe_name(' a\tb\n c\x00\x7f<>:"/\\|?*.. ', 80) == "a-b-c"
+    assert paths.safe_name(' a\tb\n c\x00\x7f<>:"/\\|?*.. ', 80) == "ab-c"
     assert paths.safe_name("CONlong", 3) != "CON"
     assert len(paths.safe_name("x" * 500, 80)) == 80
     assert paths.safe_name("...", 80) == "untitled"

@@ -158,3 +158,16 @@ def test_c1_and_bidi_controls_are_inert_in_sources_and_stripped_from_labels(tmp_
     assert paths.wikilink(f'a{control}b', f'x{control}y') == '[[ab|xy]]'
     assert paths.wikilink('note', control) == '[[note|note]]'
     assert _markdown_label(f'x{control}y') == 'xy'
+
+
+def test_memory_filename_and_link_agree_after_stripping_format_controls(tmp_path):
+    content = 'a\u2066b\u200ec'
+    stem = paths.memory_stem('note', content, '12345678-abcd')
+    page = paths.memory_file(tmp_path, 'p', stem)
+    target = page.relative_to(tmp_path).with_suffix('').as_posix()
+    link = paths.wikilink(target, content)
+    assert stem == 'note-abc-12345678'
+    assert page.stem == stem
+    assert link == f'[[Chronicle/p/memories/{stem}|abc]]'
+    assert not any(char in value for char in ('\u2066', '\u200e')
+                   for value in (stem, page.name, link))

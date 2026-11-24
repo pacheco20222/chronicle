@@ -45,7 +45,7 @@ def _chunk_text(text: str, max_chars: int = 24000) -> list[str]:
 
 
 # Folders full of third-party or generated text, never a project's own notes.
-_SKIP_DIRS = {"node_modules", "__pycache__", "site-packages", "venv", "dist", "build"}
+SKIP_DIRS = {"node_modules", "__pycache__", "site-packages", "venv", "dist", "build"}
 
 
 def import_directory(service, path: str, project: str, type_: str, progress=None) -> tuple[int, int, int]:
@@ -59,7 +59,7 @@ def import_directory(service, path: str, project: str, type_: str, progress=None
     file_paths = []
     for current_root, directories, filenames in os.walk(root):
         directories[:] = sorted(
-            name for name in directories if not name.startswith(".") and name not in _SKIP_DIRS
+            name for name in directories if not name.startswith(".") and name not in SKIP_DIRS
         )
         for name in sorted(filenames):
             if name.startswith(".") or os.path.splitext(name)[1] not in {".md", ".txt"}:

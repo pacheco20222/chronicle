@@ -54,7 +54,7 @@ def _inert_source(source: str) -> str:
     return f"`{text}`"
 
 
-def _source_link(source: str, vault: Path) -> str:
+def _source_link(source: str, vault: Path | None, label: str | None = None) -> str:
     if any(char in CONTROL_CHARACTERS for char in source):
         return _inert_source(source)
     try:
@@ -67,12 +67,12 @@ def _source_link(source: str, vault: Path) -> str:
             return f"[{_markdown_label(source)}]({destination})"
         if scheme:
             return _inert_source(source)
-        return _file_source_link(source, vault)
+        return _file_source_link(source, vault, label)
     except (ValueError, OSError, RuntimeError):
         return _inert_source(source)
 
 
-def _file_source_link(source: str, vault: Path) -> str:
+def _file_source_link(source: str, vault: Path | None, label: str | None = None) -> str:
     windows = PureWindowsPath(source)
     foreign_windows = os.name != "nt" and windows.is_absolute()
     native = Path(source).expanduser()
@@ -86,14 +86,14 @@ def _file_source_link(source: str, vault: Path) -> str:
     suffix = " (file not found)" if not exists else ""
     if directory or path.suffix.lower().lstrip(".") not in _DOCUMENT_EXTENSIONS:
         return _inert_source(str(path)) + suffix
-    resolved_vault = None if foreign_windows else vault.resolve()
+    resolved_vault = None if foreign_windows or vault is None else vault.resolve()
     if resolved_vault is not None and path.is_relative_to(resolved_vault):
         relative = path.relative_to(resolved_vault)
         target = relative.with_suffix("") if relative.suffix.lower() == ".md" else relative
         link = wikilink(target.as_posix(), _markdown_label(path.name))
     else:
         uri = path.as_uri().replace("(", "%28").replace(")", "%29")
-        link = f"[{_markdown_label(path.name)}]({uri})"
+        link = f"[{_markdown_label(label if label is not None else path.name)}]({uri})"
     return link + suffix
 
 
