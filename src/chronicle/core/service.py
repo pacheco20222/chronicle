@@ -298,6 +298,10 @@ class MemoryService:
     def get_document(self, project: str, slug: str) -> dict | None:
         project = _require_project(project)
         row = self.repository.get_document(project, slug)
+        if row is None and slug == project:
+            # A project's core is looked up by its own name; fall back to an
+            # overview document saved under another slug (e.g. "core").
+            row = self.repository.latest_overview_document(project)
         return self._serialize(row) if row else None
 
     def get_by_source(self, source_id: str) -> list[dict]:
