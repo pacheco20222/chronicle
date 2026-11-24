@@ -20,6 +20,7 @@ export function VaultProjectToggle({ project, vault, onRefresh, running }: {
   const mirrored = vault.projects.includes(project);
 
   async function toggle() {
+    if (mirrored && !window.confirm(`Remove ${project}'s pages from the Obsidian vault? Your memories are not affected.`)) return;
     setSaving(true);
     setError(null);
     try {

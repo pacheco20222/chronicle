@@ -89,8 +89,11 @@ def _file_source_link(source: str, vault: Path | None, label: str | None = None)
     resolved_vault = None if foreign_windows or vault is None else vault.resolve()
     if resolved_vault is not None and path.is_relative_to(resolved_vault):
         relative = path.relative_to(resolved_vault)
-        target = relative.with_suffix("") if relative.suffix.lower() == ".md" else relative
-        link = wikilink(target.as_posix(), _markdown_label(path.name))
+        if any(char in relative.as_posix() for char in "#^[]|"):
+            link = f"[{_markdown_label(path.name)}]({quote(relative.as_posix(), safe='/')})"
+        else:
+            target = relative.with_suffix("") if relative.suffix.lower() == ".md" else relative
+            link = wikilink(target.as_posix(), _markdown_label(path.name))
     else:
         uri = path.as_uri().replace("(", "%28").replace(")", "%29")
         link = f"[{_markdown_label(label if label is not None else path.name)}]({uri})"

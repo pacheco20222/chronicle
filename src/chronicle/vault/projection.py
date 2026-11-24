@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from chronicle.core.graph import build_graph_data, explicit_relations
-from chronicle.vault.paths import inside_root, memory_stem, memory_title, project_dir
+from chronicle.vault.paths import inside_root, memory_stem, memory_title, project_dir, safe_name
 from chronicle.vault.render import LinkTarget
 from chronicle.vault.writer import is_generated
 
@@ -47,6 +47,8 @@ class StemIndex:
                     if not match:
                         continue
                     path = Path(entry.path)
+                    if path.stem != safe_name(path.stem, 80):
+                        continue
                     inside_root(vault, path)
                     if entry.is_symlink():
                         raise ValueError(f'refusing symlinked memory page: {path}')

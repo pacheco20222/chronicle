@@ -836,6 +836,7 @@ and one page per memory. Wikilinks connect memories, project pages, logs,
 and related memories. File entries link to original files; the catalog
 does not copy their contents. Links to projects you have not opted in do
 not expose those projects' memory contents.
+Characters such as `# ^ [ ] |` are removed from generated filenames for Obsidian-safe links.
 
 SQLite remains the source of truth. This is a **read-only mirror**:
 edits to generated pages are overwritten on the next update or sync.

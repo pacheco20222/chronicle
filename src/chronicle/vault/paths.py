@@ -18,7 +18,7 @@ def safe_name(text: str, max_length: int) -> str:
     name = re.sub(r"\s+", "-", text.strip())
     name = "".join(
         char for char in name
-        if char not in '<>:"/\\|?*[]' and unicodedata.category(char) != "Cc"
+        if char not in '<>:"/\\|?*[]#^' and unicodedata.category(char) != "Cc"
     )
     name = re.sub(r"\.{2,}", "-", name).strip(" .-") or "untitled"
     name = name[:max_length].rstrip(" .-") or "untitled"[:max_length]
@@ -29,7 +29,8 @@ def safe_name(text: str, max_length: int) -> str:
 
 
 def memory_title(content: str) -> str:
-    return next((line.strip()[:80] for line in content.splitlines() if line.strip()), "untitled")
+    title = next((line.strip() for line in content.splitlines() if line.strip()), "untitled")
+    return re.sub(r"^#{1,6}\s+", "", title)[:80]
 
 
 def memory_stem(type_: str, content: str, memory_id: str) -> str:
@@ -46,7 +47,7 @@ def chronicle_root(vault: Path) -> Path:
 
 def project_folder_name(project: str) -> str:
     name = safe_name(project, 80)
-    if name != project:
+    if name != project or any(char.isupper() for char in name):
         name += "-" + hashlib.sha256(project.encode("utf-8")).hexdigest()[:8]
     return name
 
@@ -65,7 +66,7 @@ def strip_controls(text: str) -> str:
 
 def wikilink(vault_relative_target: str, alias: str) -> str:
     delimiters = str.maketrans("", "", "|[]")
-    target = strip_controls(vault_relative_target).translate(delimiters)
+    target = strip_controls(vault_relative_target).translate(str.maketrans("", "", "|[]#^"))
     title = strip_controls(alias).translate(delimiters) or target.rstrip("/").rsplit("/", 1)[-1]
     return f"[[{target}|{title}]]"
 

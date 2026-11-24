@@ -133,14 +133,14 @@ def start_vault_sync(service, project: str | None = None) -> dict:
     from chronicle.vault import settings
     from chronicle.vault.mirror import mirror_for
 
+    mirror = mirror_for(service)
+    projects = [project] if project is not None else settings.vault_projects()
+    if project is not None:
+        mirror.require_mirrored(project)
     snapshot = _claim()
     if snapshot is None:
         return status()
     try:
-        mirror = mirror_for(service)
-        projects = [project] if project is not None else settings.vault_projects()
-        if project is not None:
-            mirror.require_mirrored(project)
         _set(label="Syncing vault", done=0, total=len(projects))
         snapshot = status()
 

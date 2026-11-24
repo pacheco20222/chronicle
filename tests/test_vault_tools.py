@@ -166,14 +166,17 @@ def test_add_tool_surfaces_mirror_failure(service, tmp_path):
     anyio.run(run)
 
 
-def test_sync_tool_refuses_non_opted_in_project(tmp_path):
+@pytest.mark.parametrize('project', ['unknown', 'known'])
+def test_sync_tool_refuses_non_opted_in_project(tmp_path, service, project):
     settings.set_vault_path(tmp_path / 'vault')
+    service.add_memory([], 'Known project', 'known', 'note')
 
     async def run():
         async with Client(server.mcp) as client:
             with pytest.raises(ToolError, match='not opted in'):
-                await client.call_tool('memory_vault_sync', {'project': 'unknown'})
+                await client.call_tool('memory_vault_sync', {'project': project})
             assert settings.vault_projects() == []
+            assert refresh.status() == refresh._IDLE
 
     anyio.run(run)
 

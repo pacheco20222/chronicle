@@ -1,11 +1,12 @@
 """Rebuildable Obsidian projection of explicitly opted-in projects."""
 from dataclasses import dataclass, field
+import json
 import os
 from pathlib import Path
 
 from chronicle import config, registry
 from chronicle.vault import catalog, settings
-from chronicle.vault.paths import chronicle_root, inside_root, memory_file, project_dir, project_folder_name
+from chronicle.vault.paths import chronicle_root, inside_root, memory_file, project_dir, project_folder_name, safe_name
 from chronicle.vault.projection import Projection, affected_memories, inbound
 from chronicle.vault.render import render_index, render_log, render_memory, render_project
 from chronicle.vault.state import read_status, record_status
@@ -46,6 +47,25 @@ def _files(vault: Path, folder: Path):
             yield path
 
 
+def _prune_legacy_folder(vault: Path, project: str) -> int:
+    """Remove only this project's marked pages from its former uppercase folder."""
+    name = safe_name(project, 80)
+    if name != project or name == project_folder_name(project):
+        return 0
+    folder = chronicle_root(vault) / name
+    if folder.is_symlink():
+        raise ValueError(f'refusing symlinked legacy project folder: {folder}')
+    deleted = 0
+    for path in _files(vault, folder):
+        if not is_generated(path):
+            continue
+        with path.open(encoding='utf-8') as stream:
+            header = stream.read(8192).split('\n---', 1)[0]
+        if f'project: {json.dumps(project, ensure_ascii=True)}' in header.splitlines():
+            deleted += int(delete_page(vault, path))
+    return deleted
+
+
 class VaultMirror:
     def __init__(self, service):
         self.service = service
@@ -69,15 +89,13 @@ class VaultMirror:
             result.written += 1
 
     def _render(self, vault: Path, project: str, projection: Projection,
-                result: SyncResult, ids: set[str] | None = None) -> set[Path]:
+                result: SyncResult, ids: set[str] | None = None) -> None:
         folder = _folder(vault, project)
         memories, links = projection.memories[project], projection.links
-        expected = {folder / f'{project_folder_name(project)}.md', folder / 'log.md', folder / 'files.md'}
         for memory in memories:
-            path = memory_file(vault, project, links[memory['id']].stem)
-            expected.add(path)
             if ids is not None and memory['id'] not in ids:
                 continue
+            path = memory_file(vault, project, links[memory['id']].stem)
             text = render_memory(memory, links, vault)
             if ids is not None and path.exists() and is_generated(path):
                 # Keep the last sync's semantic graph until the next explicit sync.
@@ -89,7 +107,6 @@ class VaultMirror:
         self._write(vault, folder / f'{project_folder_name(project)}.md',
                     render_project(project, overview, memories, vault, links), result)
         self._write(vault, folder / 'log.md', render_log(project, memories, links), result)
-        return expected
 
     def on_memories_changed(self, ids: list[str]) -> None:
         try:
@@ -138,7 +155,10 @@ class VaultMirror:
             projection = Projection(self.service, vault, settings.vault_projects(), [project])
             if settings.similarity_links() and config.semantic_enabled():
                 projection.add_similarity(self.service, project)
-            expected = self._render(vault, project, projection, result)
+            expected = {folder / f'{project_folder_name(project)}.md', folder / 'log.md', folder / 'files.md'}
+            expected.update(memory_file(vault, project, projection.links[memory['id']].stem)
+                            for memory in projection.memories[project])
+            self._render(vault, project, projection, result)
             entries, truncated = catalog.list_files(project)
             self._write(vault, folder / 'files.md', catalog.render_files(project, entries, truncated), result)
             self._index(vault, result)
@@ -147,6 +167,7 @@ class VaultMirror:
                     result.skipped.append(str(path))
                 elif path not in expected:
                     result.deleted += int(delete_page(vault, path))
+            result.deleted += _prune_legacy_folder(vault, project)
             result.skipped = sorted(set(result.skipped))
             record_status([project], result.skipped)
         except Exception as error:
