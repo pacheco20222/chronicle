@@ -8,6 +8,8 @@ from starlette.routing import Mount, Route
 from starlette.testclient import TestClient
 
 from chronicle import cli, dashboard, dashboard_cli, server
+from chronicle.vault import settings
+from chronicle.vault.mirror import VaultMirror
 
 
 def test_dashboard_app_exposes_streamable_http_on_mcp_path():
@@ -64,6 +66,41 @@ def test_build_snapshot_includes_scopes_for_frontend(service):
     assert "scopes" in snapshot["graph"]
     paths = {s["path"] for s in snapshot["graph"]["scopes"]}
     assert {"work", "work/azure", "chronicle-test"} <= paths
+
+
+def test_snapshot_includes_unconfigured_vault(service):
+    assert dashboard.build_snapshot(service)["vault"] == {
+        "path": None, "projects": [], "last_sync": {}, "last_error": None,
+    }
+
+
+def test_snapshot_includes_configured_vault(service, tmp_path):
+    mirror = VaultMirror(service)
+    service.observers.append(mirror.on_memories_changed)
+    service.add_memory([], "A note", "demo", "note")
+    vault = settings.set_vault_path(tmp_path / "vault")
+    mirror.add_project("demo").raise_for_error()
+
+    status = dashboard.build_snapshot(service)["vault"]
+
+    assert status["path"] == str(vault)
+    assert status["projects"] == ["demo"]
+    assert isinstance(status["last_sync"]["demo"], str)
+    assert status["last_error"] is None
+
+
+def test_snapshot_survives_vault_status_failure(service, monkeypatch):
+    def unavailable(self):
+        raise OSError("vault unavailable")
+
+    monkeypatch.setattr(VaultMirror, "status", unavailable)
+
+    snapshot = dashboard.build_snapshot(service)
+
+    assert "graph" in snapshot
+    assert snapshot["vault"] == {
+        "path": None, "projects": [], "last_sync": {}, "last_error": "vault unavailable",
+    }
 
 
 def test_cli_dispatches_dashboard_subcommand(monkeypatch):

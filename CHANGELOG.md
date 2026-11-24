@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Added
+- Opt-in Obsidian vault mirror with linked project pages, chronological logs,
+  one page per memory, and a file catalog of registered project folders.
+- `chronicle vault` CLI (`set`, `add`, `remove`, `sync`, `status`), dashboard
+  **Show in Obsidian** toggles, and **Sync vault** using shared job progress.
+- MCP tools `memory_vault_status`, `memory_vault_add_project`,
+  `memory_vault_remove_project`, `memory_vault_sync`, and `memory_list_files`.
+- `memory_add(source=...)` records a source file or URL, linking a note back
+  to its origin in the mirror.
 - `chronicle setup --global` installs once for every installed app at user
   level. Git repos register automatically on first use with a one-time
   notice; other folders, including Obsidian vaults, ask first. If a folder's

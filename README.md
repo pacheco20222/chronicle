@@ -28,6 +28,12 @@ another repo's memory by accident.
   or, with `chronicle` on your PATH (below), just `chronicle start` from anywhere — it also starts Qdrant if it isn't running. It binds only to `127.0.0.1:8765` by default; set `CHRONICLE_DASHBOARD_PORT` or pass `--port` to change the port. It always serves every registered project at once, not just the one you're standing in — see [docs/INSTALL.md §7](docs/INSTALL.md#7-running-chronicles-other-commands-import-graph-dashboard-scope) for more.
 - **The `chronicle` command** — `uv tool install --editable .` from your clone puts `chronicle` on your PATH (bash, zsh, PowerShell, cmd). Then `chronicle --help` (or plain `chronicle` in a terminal) lists every command, `chronicle start` / `chronicle stop` replace the long `uv run --directory …` lines, and `chronicle update` pulls the latest version. MCP configs are unaffected — see [docs/INSTALL.md §7](docs/INSTALL.md#recommended-put-chronicle-on-your-path).
 
+## Obsidian vault
+
+Mirror opted-in projects into Obsidian as linked, read-only Markdown pages.
+Configure a vault and choose projects with the CLI or dashboard; see
+[Obsidian vault setup and sync privacy warning](docs/INSTALL.md#obsidian-vault).
+
 ## Requirements
 
 - macOS, Linux, or Windows 10/11 — natively from PowerShell 7, Windows
