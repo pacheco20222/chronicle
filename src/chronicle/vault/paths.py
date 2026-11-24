@@ -14,7 +14,8 @@ _RESERVED = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$", re.IGNORECASE)
 def safe_name(text: str, max_length: int) -> str:
     if max_length < 1:
         raise ValueError("max_length must be positive")
-    name = re.sub(r"\s+", "-", strip_controls(text).strip())
+    text = "".join(" " if char in CONTROL_CHARACTERS else char for char in text)
+    name = re.sub(r"\s+", "-", text.strip())
     name = "".join(
         char for char in name
         if char not in '<>:"/\\|?*[]' and unicodedata.category(char) != "Cc"

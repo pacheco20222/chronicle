@@ -463,3 +463,15 @@ def test_expanded_home_source_remains_a_document_link(tmp_path, monkeypatch):
     source = tmp_path / 'report.pdf'
     source.write_text('document')
     assert _source_link('~/report.pdf', tmp_path / 'vault') == f'[report.pdf]({source.as_uri()})'
+
+
+def test_project_headings_share_markdown_escaping(tmp_path):
+    from chronicle.vault.catalog import render_files
+    from chronicle.vault.render import render_index, render_log, render_project
+
+    project = '<tag>`[x]\n'
+    heading = r'\<tag\>\`\[x\]'
+    for text in (render_project(project, None, [], tmp_path, {}),
+                 render_log(project, [], {}), render_files(project, [], False)):
+        assert f'# {heading}' in text
+    assert '<tag>' not in render_index([(project, '')])

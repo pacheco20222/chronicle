@@ -10,7 +10,6 @@ import stat
 
 from chronicle import registry
 from chronicle.import_cli import SKIP_DIRS
-from chronicle.vault.paths import strip_controls
 from chronicle.vault.render import _frontmatter, _inert_source, _markdown_label, _source_link
 
 
@@ -37,7 +36,11 @@ def _folder_files(folder: str, query: str | None) -> Iterator[CatalogEntry]:
             if name.startswith('.') or (query is not None and query not in relative.casefold()):
                 continue
             try:
-                if not path.resolve().is_relative_to(root):
+                resolved = path.resolve()
+                if not resolved.is_relative_to(root):
+                    continue
+                if any(part.startswith(".") or part in SKIP_DIRS
+                       for part in resolved.relative_to(root).parts):
                     continue
                 metadata = path.stat()
                 if not stat.S_ISREG(metadata.st_mode):
@@ -64,7 +67,7 @@ def list_files(
 def render_files(project: str, entries: list[CatalogEntry], truncated: bool) -> str:
     """Render a marked catalog using the shared source-link policy."""
     folders = registry.list_projects().get(project, [])
-    lines = [f'# {strip_controls(project)} files\n']
+    lines = [f'# {_markdown_label(project)} files\n']
     if not folders:
         lines.append('No project folder registered\n')
     grouped: dict[str, list[CatalogEntry]] = {folder: [] for folder in folders}

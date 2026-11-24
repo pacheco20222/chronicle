@@ -14,6 +14,7 @@ from fake_vector import FakeVectorIndex
 def isolate_config(tmp_path, monkeypatch):
     from chronicle import config
 
+    monkeypatch.setenv("CHRONICLE_STATE_DIR", str(tmp_path / "state"))
     path = tmp_path / "config.json"
     monkeypatch.setenv("CHRONICLE_CONFIG_PATH", str(path))
     monkeypatch.setattr(config, "CONFIG_PATH", path)

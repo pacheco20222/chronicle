@@ -35,7 +35,7 @@ def _frontmatter(**values) -> str:
 
 def _project_link(project: str, section: str | None = None) -> str:
     folder = project_folder_name(project)
-    return wikilink(f"Chronicle/{folder}/{section or folder}", section or project)
+    return wikilink(f"Chronicle/{folder}/{section or folder}", section or _markdown_label(project))
 
 
 def _target_link(target: LinkTarget) -> str:
@@ -112,6 +112,8 @@ def _memory_links(memory: dict, links: dict[str, LinkTarget]) -> list[tuple[str,
         entry = (label, _target_link(links[relation["source"]]))
         if entry not in result:
             result.append(entry)
+    for memory_id in memory.get("_similar") or []:
+        result.append(("similar", _target_link(links[memory_id])))
     return result
 
 
@@ -154,7 +156,7 @@ def render_log(project: str, memories: list[dict], links: dict[str, LinkTarget])
                 event = {"superseded": "superseded", "wrong": "marked wrong", "deleted": "retracted"}[status]
                 events.append((at, event, memory))
     events.sort(key=lambda event: (_timestamp(event[0]), event[2]["id"], event[1]), reverse=True)
-    lines = [f"# {strip_controls(project)} log\n"]
+    lines = [f"# {_markdown_label(project)} log\n"]
     for at, event, memory in events:
         target = links[memory['id']]
         date = _timestamp(at).date().isoformat()
@@ -166,7 +168,7 @@ def render_project(
     project: str, overview: str | None, memories: list[dict], vault: Path,
     links: dict[str, LinkTarget],
 ) -> str:
-    lines = [f"# {strip_controls(project)}\n"]
+    lines = [f"# {_markdown_label(project)}\n"]
     if overview:
         lines.append(overview + "\n")
     lines.append(f"{_project_link(project, 'log')} · {_project_link(project, 'files')}\n")

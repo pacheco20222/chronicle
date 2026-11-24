@@ -1,5 +1,7 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from contextlib import contextmanager
 from datetime import datetime, timezone
+import sys
 import uuid
 
 from chronicle.core.budget import estimate_tokens
@@ -25,6 +27,31 @@ class MemoryService:
     def __init__(self, repository: MemoryRepository, vector_index: VectorIndex):
         self.repository = repository
         self.vector_index = vector_index
+        self.observers: list[Callable[[list[str]], None]] = []
+        self._notification_depth = 0
+        self._pending_ids: set[str] = set()
+
+    def _notify(self, ids: list[str]) -> None:
+        if self._notification_depth:
+            self._pending_ids.update(ids)
+            return
+        for observer in self.observers:
+            try:
+                observer(list(dict.fromkeys(ids)))
+            except Exception as error:
+                print(f"Chronicle observer failed: {error}", file=sys.stderr)
+
+    @contextmanager
+    def _batch_notifications(self):
+        self._notification_depth += 1
+        try:
+            yield
+        finally:
+            self._notification_depth -= 1
+            if not self._notification_depth and self._pending_ids:
+                ids = sorted(self._pending_ids)
+                self._pending_ids.clear()
+                self._notify(ids)
 
     def _serialize(self, row: Memory, score: float | None = None) -> dict:
         result = {
@@ -86,13 +113,16 @@ class MemoryService:
             chunk_index=chunk_index,
         )
         self.vector_index.upsert(memory_id, vector, {"project": project, "type": type_})
+        self._notify([memory_id, supersedes] if supersedes else [memory_id])
         return memory_id
 
     def set_status(self, memory_id: str, status: str) -> None:
         self.repository.set_status(memory_id, status)
+        self._notify([memory_id])
 
     def confirm_memory(self, memory_id: str, confidence: float = 1.0) -> None:
         self.repository.set_confidence(memory_id, confidence)
+        self._notify([memory_id])
 
     def edit_memory(self, memory_id: str, content: str, vector: Sequence[float]) -> None:
         source = self.repository.get(memory_id)
@@ -100,6 +130,7 @@ class MemoryService:
             raise ValueError(f"no memory found with id {memory_id!r}")
         self.repository.edit_content(memory_id, content)
         self.vector_index.upsert(memory_id, vector, {"project": source.project, "type": source.type})
+        self._notify([memory_id])
 
     def retract_memory(self, memory_id: str) -> None:
         self.set_status(memory_id, "deleted")
@@ -109,6 +140,7 @@ class MemoryService:
 
     def link_memories(self, source_id: str, relation_type: str, target_id: str) -> None:
         self.repository.link(source_id, relation_type, target_id)
+        self._notify([source_id, target_id])
 
     def merge_memories(
         self,
@@ -118,9 +150,10 @@ class MemoryService:
         type_: str,
         source_ids: list[str],
     ) -> str:
-        merged_id = self.add_memory(vector, content, project, type_)
-        for source_id in source_ids:
-            self.link_memories(merged_id, "supersedes", source_id)
+        with self._batch_notifications():
+            merged_id = self.add_memory(vector, content, project, type_)
+            for source_id in source_ids:
+                self.link_memories(merged_id, "supersedes", source_id)
         return merged_id
 
     def split_memory(
@@ -131,10 +164,11 @@ class MemoryService:
         source = self.repository.get(source_id)
         if source is None:
             raise ValueError(f"no memory found with id {source_id!r}")
-        return [
-            self.add_memory(vector, content, source.project, type_, supersedes=source_id)
-            for vector, content, type_ in new_contents
-        ]
+        with self._batch_notifications():
+            return [
+                self.add_memory(vector, content, source.project, type_, supersedes=source_id)
+                for vector, content, type_ in new_contents
+            ]
 
     def _merge(self, ranked_lists: list[list[str]], rows: dict[str, Memory], k: int) -> list[dict]:
         scores: dict[str, float] = {}
@@ -291,6 +325,7 @@ class MemoryService:
             extraction_method=extraction_method,
         )
         self.vector_index.upsert(row.id, vector, {"project": project, "type": type_})
+        self._notify([row.id])
         return row.id
 
     def get_all_with_vectors(self, project: str | None = None) -> list[dict]:

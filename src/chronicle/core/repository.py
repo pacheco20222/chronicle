@@ -199,6 +199,36 @@ class MemoryRepository:
         with self.session_factory() as session:
             return session.scalar(select(Memory).where(Memory.project == project, Memory.slug == slug))
 
+    def memory_projects(self, ids: Iterable[str]) -> dict[str, str]:
+        """Resolve ownership without loading any memory content."""
+        ids = list(ids)
+        if not ids:
+            return {}
+        with self.session_factory() as session:
+            return dict(session.execute(select(Memory.id, Memory.project).where(Memory.id.in_(ids))).all())
+
+    def inbound_relations(self, project: str, target_ids: set[str]) -> list[tuple[str, str, str]]:
+        project = _require_project(project)
+        if not target_ids:
+            return []
+        with self.session_factory() as session:
+            rows = session.execute(
+                select(Memory.id, Memory.relations, Memory.supersedes).where(Memory.project == project)
+            )
+            result = set()
+            for source, relations, predecessor in rows:
+                for relation in relations or []:
+                    if relation.get("target") in target_ids:
+                        result.add((source, relation["type"], relation["target"]))
+                if predecessor in target_ids:
+                    result.add((source, "supersedes", predecessor))
+            return sorted(result)
+
+    def project_memory_ids(self, projects: list[str]) -> set[str]:
+        """Metadata-only target set for one bounded opt-in list."""
+        with self.session_factory() as session:
+            return set(session.scalars(select(Memory.id).where(Memory.project.in_(projects))))
+
     def get_active_by_source_locator(self, project: str, locator: str) -> Memory | None:
         project = _require_project(project)
         statement = (

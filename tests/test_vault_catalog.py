@@ -189,3 +189,12 @@ def test_three_file_cap_over_five_matches(tmp_path):
     assert [entry.relative_path for entry in entries] == ['0.pdf', '1.pdf', '2.pdf']
     assert truncated is True
     assert catalog().list_files('p', query='4', limit=3)[1] is False
+
+
+@pytest.mark.parametrize('directory', ['.hidden', 'node_modules', 'dist'])
+def test_file_symlinks_cannot_expose_skipped_targets(tmp_path, directory):
+    folder = tmp_path / 'project'
+    target = put(folder, f'{directory}/secret.pdf')
+    (folder / 'public.pdf').symlink_to(target)
+    registry.register(folder, 'p')
+    assert catalog().list_files('p') == ([], False)

@@ -166,7 +166,7 @@ def test_memory_filename_and_link_agree_after_stripping_format_controls(tmp_path
     page = paths.memory_file(tmp_path, 'p', stem)
     target = page.relative_to(tmp_path).with_suffix('').as_posix()
     link = paths.wikilink(target, content)
-    assert stem == 'note-abc-12345678'
+    assert stem == 'note-a-b-c-12345678'
     assert page.stem == stem
     assert link == f'[[Chronicle/p/memories/{stem}|abc]]'
     assert not any(char in value for char in ('\u2066', '\u200e')
