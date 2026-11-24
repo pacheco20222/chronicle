@@ -10,8 +10,17 @@ from chronicle.storage.database import Database
 from fake_vector import FakeVectorIndex
 
 
+@pytest.fixture(autouse=True)
+def isolate_config(tmp_path, monkeypatch):
+    from chronicle import config
+
+    path = tmp_path / "config.json"
+    monkeypatch.setenv("CHRONICLE_CONFIG_PATH", str(path))
+    monkeypatch.setattr(config, "CONFIG_PATH", path)
+
+
 @pytest.fixture
-def service(tmp_path):
+def service(tmp_path, isolate_config):
     database = Database(f"sqlite:///{tmp_path / 'chronicle.db'}")
     return MemoryService(MemoryRepository(database), FakeVectorIndex())
 
