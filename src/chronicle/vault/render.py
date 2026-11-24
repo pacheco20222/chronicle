@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path, PureWindowsPath
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from chronicle.vault.paths import MARKER, project_folder_name, wikilink
 
 _RECENT_PER_TYPE = 5
+_SOURCE_CONTROLS = frozenset(map(chr, range(32))) | {"\x7f", "\u2028", "\u2029"}
 _DOCUMENT_EXTENSIONS = frozenset(
     "pdf doc docx xls xlsx ppt pptx odt ods odp rtf txt md csv json "
     "png jpg jpeg gif webp svg mp3 mp4 mov wav".split()
@@ -44,23 +45,41 @@ def _target_link(target: LinkTarget) -> str:
 
 
 def _markdown_label(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+    return text.translate({ord(char): "\\" + char for char in "\\[]<>`"})
 
 
 def _inert_source(source: str) -> str:
-    text = source.replace("`", "").replace("\r", " ").replace("\n", " ")
+    text = "".join(" " if char in _SOURCE_CONTROLS else char for char in source if char != "`")
     return f"`{text}`"
 
 
 def _source_link(source: str, vault: Path) -> str:
+    if any(char in _SOURCE_CONTROLS for char in source):
+        return _inert_source(source)
+    try:
+        windows = PureWindowsPath(source)
+        scheme = "" if windows.is_absolute() else urlsplit(source).scheme
+        if scheme in {"http", "https"}:
+            if source.endswith("\\"):
+                return _inert_source(source)
+            destination = quote(source, safe=":/?#[]@!$&'*+,;=%")
+            return f"[{_markdown_label(source)}]({destination})"
+        if scheme:
+            return _inert_source(source)
+        return _file_source_link(source, vault)
+    except (ValueError, OSError):
+        return _inert_source(source)
+
+
+def _file_source_link(source: str, vault: Path) -> str:
     windows = PureWindowsPath(source)
     foreign_windows = os.name != "nt" and windows.is_absolute()
-    scheme = "" if windows.is_absolute() else urlsplit(source).scheme
-    if scheme in {"http", "https"}:
-        return f"[{_markdown_label(source)}]({source.replace(' ', '%20').replace('(', '%28').replace(')', '%29')})"
-    if scheme:
+    native = Path(source).expanduser()
+    if not foreign_windows and not native.is_absolute():
         return _inert_source(source)
-    path = windows if foreign_windows else Path(source).resolve()
+    path = windows if foreign_windows else native.resolve()
+    if any(char in _SOURCE_CONTROLS for char in str(path)):
+        return _inert_source(str(path))
     exists = False if foreign_windows else path.exists()
     directory = source.endswith(("/", "\\")) if foreign_windows else path.is_dir()
     suffix = " (file not found)" if not exists else ""
@@ -70,7 +89,7 @@ def _source_link(source: str, vault: Path) -> str:
     if resolved_vault is not None and path.is_relative_to(resolved_vault):
         relative = path.relative_to(resolved_vault)
         target = relative.with_suffix("") if relative.suffix.lower() == ".md" else relative
-        link = wikilink(target.as_posix(), path.name)
+        link = wikilink(target.as_posix(), _markdown_label(path.name))
     else:
         uri = path.as_uri().replace("(", "%28").replace(")", "%29")
         link = f"[{_markdown_label(path.name)}]({uri})"

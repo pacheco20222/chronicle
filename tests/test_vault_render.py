@@ -364,3 +364,102 @@ def test_windows_absolute_sources_on_posix_are_external_without_resolution(tmp_p
     page = render_memory(memory(source=source), {}, tmp_path)
     expected = f'[report{suffix}](file:///C:/documents/report{suffix})' if clickable else f'`{source}`'
     assert f'Source: {expected} (file not found)' in page
+
+
+@pytest.mark.parametrize('source', ['x\n\n# H.pdf', 'x\n\n<https://evil>.pdf',
+                                    'https://example.com/x\n\n# H', 'a\x00b.pdf',
+                                    'https://example.com/end\\'])
+def test_hostile_source_strings_are_single_inert_code_spans(tmp_path, source):
+    from chronicle.vault.render import _source_link
+
+    if not source.startswith('https:'):
+        source = str(tmp_path / source)
+    rendered = _source_link(source, tmp_path)
+    assert rendered.startswith('`') and rendered.endswith('`')
+    assert rendered.count('`') == 2
+    assert not any(ord(char) < 0x20 or ord(char) == 0x7f or char in '\u2028\u2029' for char in rendered)
+    assert '\n# H' not in rendered and '\n<https://evil>' not in rendered
+
+
+@pytest.mark.parametrize('control', [chr(value) for value in range(32)] + ['\x7f', '\u2028', '\u2029'])
+def test_all_source_control_characters_are_inert(tmp_path, control):
+    from chronicle.vault.render import _source_link
+
+    rendered = _source_link(f'https://example.com/a{control}b.pdf', tmp_path)
+    assert rendered.startswith('`') and rendered.endswith('`')
+    assert control not in rendered
+
+
+def test_link_labels_and_http_destinations_escape_markup(tmp_path):
+    from chronicle.vault.render import _markdown_label, _source_link
+
+    assert _markdown_label('<title>`[x]') == '\\<title\\>\\`\\[x\\]'
+    url = 'https://example.com/a <tag>(1)`'
+    assert _source_link(url, tmp_path) == (
+        '[https://example.com/a \\<tag\\>(1)\\`]'
+        '(https://example.com/a%20%3Ctag%3E%281%29%60)'
+    )
+
+
+def test_external_file_label_escapes_angle_brackets_and_backticks(tmp_path):
+    from chronicle.vault.render import _source_link
+
+    source = tmp_path / '<title>`file.pdf'
+    assert _source_link(str(source), tmp_path / 'vault').startswith(
+        '[\\<title\\>\\`file.pdf]('
+    )
+
+
+def test_relative_source_is_inert_independent_of_cwd(tmp_path, monkeypatch):
+    from chronicle.vault.render import _source_link
+
+    other = tmp_path / 'other'
+    other.mkdir()
+    monkeypatch.chdir(tmp_path)
+    first = _source_link('notes/report.pdf', tmp_path)
+    monkeypatch.chdir(other)
+    assert first == _source_link('notes/report.pdf', tmp_path) == '`notes/report.pdf`'
+
+
+@pytest.mark.parametrize('error', [ValueError('bad path'), OSError('unavailable path')])
+def test_source_path_errors_render_inert(tmp_path, monkeypatch, error):
+    from pathlib import Path
+    from chronicle.vault.render import _source_link
+
+    source = str(tmp_path / 'report.pdf')
+    def fail(*args, **kwargs):
+        raise error
+    monkeypatch.setattr(Path, 'resolve', fail)
+    assert _source_link(source, tmp_path) == f'`{source}`'
+
+
+def test_nul_source_does_not_abort_memory_page(tmp_path):
+    from chronicle.vault.render import render_memory
+
+    item = memory(source='a\x00b.pdf')
+    page = render_memory(item, {}, tmp_path)
+    assert item['content'] in page
+    assert 'Project: [[Chronicle/p/p|p]]' in page
+    assert 'Source: `a b.pdf`\n' in page
+    assert frontmatter(page)['source'] == item['source']
+
+
+def test_symlink_to_control_character_filename_is_inert(tmp_path):
+    from chronicle.vault.render import _source_link
+
+    target = tmp_path / 'report\n\n# H.pdf'
+    target.write_text('document')
+    source = tmp_path / 'alias.pdf'
+    source.symlink_to(target)
+    rendered = _source_link(str(source), tmp_path / 'vault')
+    assert rendered.startswith('`') and rendered.endswith('`')
+    assert '\n' not in rendered
+
+
+def test_expanded_home_source_remains_a_document_link(tmp_path, monkeypatch):
+    from chronicle.vault.render import _source_link
+
+    monkeypatch.setenv('HOME', str(tmp_path))
+    source = tmp_path / 'report.pdf'
+    source.write_text('document')
+    assert _source_link('~/report.pdf', tmp_path / 'vault') == f'[report.pdf]({source.as_uri()})'
