@@ -34,6 +34,9 @@
   `site-packages` and `__pycache__`.
 
 ### Fixed
+- A project's core document saved under a slug other than the project name
+  (e.g. `core`) is now found by core lookups and the session-start hook, which
+  fall back to the project's newest visible `overview` document.
 - Add project no longer registers a folder and silently skips its import when
   another job (e.g. the startup refresh) is running; it now refuses with
   "another refresh is already running".

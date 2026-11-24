@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Select, String, Text, column, select, table, text, update
+from sqlalchemy import Select, String, Text, column, func, select, table, text, update
 
 from chronicle.storage.database import Database
 from chronicle.storage.models import Episode, Memory, Scope, Source, utc_now
@@ -198,6 +198,23 @@ class MemoryRepository:
         project = _require_project(project)
         with self.session_factory() as session:
             return session.scalar(select(Memory).where(Memory.project == project, Memory.slug == slug))
+
+    def latest_overview_document(self, project: str) -> Memory | None:
+        """Newest visible overview document of a project, whatever its slug."""
+        project = _require_project(project)
+        statement = (
+            select(Memory)
+            .where(
+                Memory.project == project,
+                Memory.slug.isnot(None),
+                Memory.type == "overview",
+                Memory.status.not_in(HIDDEN_STATUSES),
+            )
+            .order_by(func.coalesce(Memory.updated_at, Memory.created_at).desc())
+            .limit(1)
+        )
+        with self.session_factory() as session:
+            return session.scalar(statement)
 
     def memory_projects(self, ids: Iterable[str]) -> dict[str, str]:
         """Resolve ownership without loading any memory content."""

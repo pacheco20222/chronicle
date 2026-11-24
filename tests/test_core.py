@@ -593,3 +593,28 @@ def test_lexical_query_cannot_inject_fts_operators(service, query):
 def test_lexical_search_stays_inside_the_project(service):
     service.add_memory([1.0], "shared secret keyword", "other", "note")
     assert _lexical_ids(service, "p", "shared secret keyword") == []
+
+
+def test_core_lookup_falls_back_to_overview_saved_under_another_slug(service):
+    service.set_document([0.0], "# P core", "p", "core", "overview")
+    service.set_document([0.0], "a note doc", "p", "notes", "note")
+
+    found = service.get_document("p", "p")
+
+    assert found is not None and found["content"] == "# P core"
+
+
+def test_core_lookup_prefers_exact_slug_and_skips_hidden_overviews(service):
+    old_id = service.set_document([0.0], "old core", "p", "core", "overview")
+    service.set_status(old_id, "superseded")
+    assert service.get_document("p", "p") is None
+
+    service.set_document([0.0], "other core", "p", "core-v2", "overview")
+    service.set_document([0.0], "exact core", "p", "p", "overview")
+    assert service.get_document("p", "p")["content"] == "exact core"
+
+
+def test_non_core_document_lookup_has_no_fallback(service):
+    service.set_document([0.0], "# P core", "p", "core", "overview")
+
+    assert service.get_document("p", "other") is None
