@@ -82,3 +82,47 @@ def test_partial_closing_delimiter_at_read_boundary_is_not_a_marker(tmp_path):
     padding = 'x' * (8192 - len(prefix) - 4)
     page.write_text(prefix + padding + '\n---not-a-delimiter\n')
     assert writer.is_generated(page) is False
+
+
+def test_wikilink_removes_newlines_without_markdown_injection():
+    assert paths.wikilink('a\nb', 'x\n\n# h') == '[[ab|x# h]]'
+
+
+@pytest.mark.parametrize('control', [chr(value) for value in range(32)] + ['\x7f', '\u2028', '\u2029'])
+def test_wikilink_and_markdown_label_remove_controls(control):
+    from chronicle.vault.render import _markdown_label
+
+    assert paths.wikilink(f'a{control}b', f'x{control}y') == '[[ab|xy]]'
+    assert _markdown_label(f'<x{control}y>`') == '\\<xy\\>\\`'
+
+
+@pytest.mark.parametrize('alias', ['', '\n\x00\u2028\u2029', '|[\t]'])
+def test_empty_sanitized_wikilink_alias_falls_back_to_target_segment(alias):
+    assert paths.wikilink('Chronicle/p/no\nte', alias) == '[[Chronicle/p/note|note]]'
+
+
+def test_project_and_log_titles_remove_controls(tmp_path):
+    from chronicle.vault.render import LinkTarget, render_log, render_project
+
+    project = 'p\n\n# injected\u2028\t'
+    title = 'Title\n\n# injected\u2029\x7f'
+    item = dict(id='id', project=project, type='note', content='Body', status='active',
+                created_at='2026-11-23T00:00:00+00:00')
+    links = {'id': LinkTarget(project, 'note', title)}
+    project_page = render_project(project, None, [item], tmp_path, links)
+    log_page = render_log(project, [item], links)
+    assert '# p# injected\n' in project_page
+    assert '# p# injected log\n' in log_page
+    assert 'created | Title# injected\n' in log_page
+    for page in (project_page, log_page):
+        assert '\n# injected' not in page
+        assert '\u2028' not in page and '\u2029' not in page and '\x7f' not in page
+        assert '|Title# injected]]' in page
+
+
+def test_unmirrored_project_label_removes_controls_without_leaking_title():
+    from chronicle.vault.render import LinkTarget, _target_link
+
+    assert _target_link(LinkTarget('p\n\n# injected', None, 'Secret')) == (
+        '(in project p# injected, not mirrored)'
+    )

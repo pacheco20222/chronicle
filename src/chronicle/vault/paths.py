@@ -4,6 +4,7 @@ import unicodedata
 from pathlib import Path
 
 MARKER = "chronicle"
+CONTROL_CHARACTERS = frozenset(map(chr, range(32))) | {"\x7f", "\u2028", "\u2029"}
 _RESERVED = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$", re.IGNORECASE)
 
 
@@ -54,10 +55,14 @@ def memory_file(vault: Path, project: str, stem: str) -> Path:
     return inside_root(vault, project_dir(vault, project) / "memories" / f"{safe_name(stem, 80)}.md")
 
 
+def strip_controls(text: str) -> str:
+    return "".join(char for char in text if char not in CONTROL_CHARACTERS)
+
+
 def wikilink(vault_relative_target: str, alias: str) -> str:
     delimiters = str.maketrans("", "", "|[]")
-    target = vault_relative_target.translate(delimiters)
-    title = alias.translate(delimiters)
+    target = strip_controls(vault_relative_target).translate(delimiters)
+    title = strip_controls(alias).translate(delimiters) or target.rstrip("/").rsplit("/", 1)[-1]
     return f"[[{target}|{title}]]"
 
 

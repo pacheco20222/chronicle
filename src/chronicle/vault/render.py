@@ -8,10 +8,11 @@ import os
 from pathlib import Path, PureWindowsPath
 from urllib.parse import quote, urlsplit
 
-from chronicle.vault.paths import MARKER, project_folder_name, wikilink
+from chronicle.vault.paths import (
+    CONTROL_CHARACTERS, MARKER, project_folder_name, strip_controls, wikilink,
+)
 
 _RECENT_PER_TYPE = 5
-_SOURCE_CONTROLS = frozenset(map(chr, range(32))) | {"\x7f", "\u2028", "\u2029"}
 _DOCUMENT_EXTENSIONS = frozenset(
     "pdf doc docx xls xlsx ppt pptx odt ods odp rtf txt md csv json "
     "png jpg jpeg gif webp svg mp3 mp4 mov wav".split()
@@ -39,22 +40,22 @@ def _project_link(project: str, section: str | None = None) -> str:
 
 def _target_link(target: LinkTarget) -> str:
     if target.stem is None:
-        return f"(in project {target.project}, not mirrored)"
+        return f"(in project {strip_controls(target.project)}, not mirrored)"
     folder = project_folder_name(target.project)
     return wikilink(f"Chronicle/{folder}/memories/{target.stem}", target.title)
 
 
 def _markdown_label(text: str) -> str:
-    return text.translate({ord(char): "\\" + char for char in "\\[]<>`"})
+    return strip_controls(text).translate({ord(char): "\\" + char for char in "\\[]<>`"})
 
 
 def _inert_source(source: str) -> str:
-    text = "".join(" " if char in _SOURCE_CONTROLS else char for char in source if char != "`")
+    text = "".join(" " if char in CONTROL_CHARACTERS else char for char in source if char != "`")
     return f"`{text}`"
 
 
 def _source_link(source: str, vault: Path) -> str:
-    if any(char in _SOURCE_CONTROLS for char in source):
+    if any(char in CONTROL_CHARACTERS for char in source):
         return _inert_source(source)
     try:
         windows = PureWindowsPath(source)
@@ -78,7 +79,7 @@ def _file_source_link(source: str, vault: Path) -> str:
     if not foreign_windows and not native.is_absolute():
         return _inert_source(source)
     path = windows if foreign_windows else native.resolve()
-    if any(char in _SOURCE_CONTROLS for char in str(path)):
+    if any(char in CONTROL_CHARACTERS for char in str(path)):
         return _inert_source(str(path))
     exists = False if foreign_windows else path.exists()
     directory = source.endswith(("/", "\\")) if foreign_windows else path.is_dir()
@@ -153,11 +154,11 @@ def render_log(project: str, memories: list[dict], links: dict[str, LinkTarget])
                 event = {"superseded": "superseded", "wrong": "marked wrong", "deleted": "retracted"}[status]
                 events.append((at, event, memory))
     events.sort(key=lambda event: (_timestamp(event[0]), event[2]["id"], event[1]), reverse=True)
-    lines = [f"# {project} log\n"]
+    lines = [f"# {strip_controls(project)} log\n"]
     for at, event, memory in events:
         target = links[memory['id']]
         date = _timestamp(at).date().isoformat()
-        lines.append(f"## [{date}] {event} | {target.title}\n\n{_target_link(target)}\n")
+        lines.append(f"## [{date}] {event} | {strip_controls(target.title)}\n\n{_target_link(target)}\n")
     return _frontmatter(project=project) + "\n".join(lines) + "\n"
 
 
@@ -165,7 +166,7 @@ def render_project(
     project: str, overview: str | None, memories: list[dict], vault: Path,
     links: dict[str, LinkTarget],
 ) -> str:
-    lines = [f"# {project}\n"]
+    lines = [f"# {strip_controls(project)}\n"]
     if overview:
         lines.append(overview + "\n")
     lines.append(f"{_project_link(project, 'log')} · {_project_link(project, 'files')}\n")
@@ -175,7 +176,7 @@ def render_project(
         lines.append("")
     lines.append("## Recent memories\n")
     for type_ in sorted({m["type"] for m in memories}):
-        lines.append(f"### {type_}\n")
+        lines.append(f"### {strip_controls(type_)}\n")
         recent = sorted((m for m in memories if m["type"] == type_),
                         key=lambda m: (_timestamp(m["created_at"]), m["id"]), reverse=True)
         lines.extend(f"- {_target_link(links[m['id']])}" for m in recent[:_RECENT_PER_TYPE])
