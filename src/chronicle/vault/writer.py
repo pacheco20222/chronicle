@@ -1,5 +1,5 @@
 import os
-import tempfile
+import uuid
 from pathlib import Path
 
 from chronicle.vault.paths import MARKER, inside_root
@@ -7,14 +7,18 @@ from chronicle.vault.paths import MARKER, inside_root
 
 def is_generated(path: Path) -> bool:
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except (FileNotFoundError, UnicodeDecodeError):
+        with path.open("rb") as stream:
+            header = stream.read(8192)
+        lines = header.split(b"\n")
+        if len(header) == 8192:
+            lines = lines[:-1]  # A truncated line cannot close frontmatter.
+    except OSError:
         return False
-    if not lines or lines[0] != "---":
+    if not lines or lines[0].rstrip(b"\r") != b"---":
         return False
     for end, line in enumerate(lines[1:], start=1):
-        if line == "---":
-            return f'generated_by: "{MARKER}"' in lines[1:end]
+        if line.rstrip(b"\r") == b"---":
+            return f'generated_by: "{MARKER}"'.encode() in [line.rstrip(b"\r") for line in lines[1:end]]
     return False
 
 
@@ -28,10 +32,10 @@ def write_page(vault: Path, path: Path, text: str) -> bool:
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=target.parent, delete=False,
-        ) as stream:
-            temporary = Path(stream.name)
+        candidate = target.parent / f".{uuid.uuid4().hex}.tmp"
+        descriptor = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        temporary = candidate
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             stream.write(text)
         os.replace(temporary, target)
     finally:

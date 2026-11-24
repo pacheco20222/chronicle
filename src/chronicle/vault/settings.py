@@ -21,7 +21,8 @@ def set_vault_path(path: Path) -> Path:
 
 
 def vault_projects() -> list[str]:
-    return config.read_config().get("vault_projects", [])
+    projects = config.read_config().get("vault_projects", [])
+    return projects if isinstance(projects, list) and all(isinstance(p, str) for p in projects) else []
 
 
 def add_project(name: str) -> None:

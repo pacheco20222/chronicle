@@ -1,0 +1,151 @@
+"""Deterministic Markdown projections of serialized Chronicle memories."""
+
+from collections import Counter
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
+from pathlib import Path, PureWindowsPath
+
+from chronicle.vault.paths import MARKER, memory_stem, memory_title, project_folder_name, wikilink
+
+_RECENT_PER_TYPE = 5
+
+
+@dataclass(frozen=True)
+class LinkTarget:
+    project: str
+    stem: str | None
+    title: str
+
+
+def _frontmatter(**values) -> str:
+    # JSON strings are also YAML double-quoted strings, including escaped controls.
+    values["generated_by"] = MARKER
+    lines = [f"{key}: {json.dumps(value, ensure_ascii=True)}" for key, value in values.items()]
+    return "---\n" + "\n".join(lines) + "\n---\n\n"
+
+
+def _project_link(project: str, section: str | None = None) -> str:
+    folder = project_folder_name(project)
+    return wikilink(f"Chronicle/{folder}/{section or folder}", section or project)
+
+
+def _target_link(target: LinkTarget) -> str:
+    if target.stem is None:
+        return f"(in project {target.project}, not mirrored)"
+    folder = project_folder_name(target.project)
+    return wikilink(f"Chronicle/{folder}/memories/{target.stem}", target.title)
+
+
+def _memory_link(memory: dict) -> str:
+    return _target_link(LinkTarget(
+        memory["project"], memory_stem(memory["type"], memory["content"], memory["id"]),
+        memory_title(memory["content"]),
+    ))
+
+
+def _markdown_label(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
+def _source_link(source: str, vault: Path) -> str:
+    if source.startswith(("https://", "http://")):
+        return f"[{_markdown_label(source)}]({source.replace(' ', '%20').replace('(', '%28').replace(')', '%29')})"
+    path = Path(source)
+    if path.is_relative_to(vault):
+        relative = path.relative_to(vault)
+        target = relative.with_suffix("") if relative.suffix == ".md" else relative
+        link = wikilink(target.as_posix(), path.name)
+    else:
+        external = PureWindowsPath(source) if PureWindowsPath(source).is_absolute() else path
+        link = f"[{_markdown_label(external.name)}]({external.as_uri()})"
+    return link + (" (file not found)" if not path.exists() else "")
+
+
+def _memory_links(memory: dict, links: dict[str, LinkTarget]) -> list[tuple[str, str]]:
+    result = [("Project", _project_link(memory["project"]))]
+    predecessor = memory.get("supersedes")
+    if predecessor:
+        result.append(("Replaces", _target_link(links[predecessor])))
+    for relation in memory.get("relations") or []:
+        label = "Replaces" if relation["type"] == "supersedes" else relation["type"]
+        entry = (label, _target_link(links[relation["target"]]))
+        if entry not in result:
+            result.append(entry)
+    for relation in memory.get("_inbound") or []:
+        label = "Replaced by" if relation["type"] == "supersedes" else f'{relation["type"]} (from)'
+        entry = (label, _target_link(links[relation["source"]]))
+        if entry not in result:
+            result.append(entry)
+    return result
+
+
+def render_memory(memory: dict, links: dict[str, LinkTarget], vault: Path) -> str:
+    properties = dict(chronicle_id=memory["id"], project=memory["project"],
+                      type=memory["type"], status=memory["status"],
+                      created=memory["created_at"], updated=memory["updated_at"])
+    for key in ("confidence", "source"):
+        if memory.get(key) is not None:
+            properties[key] = memory[key]
+    entries = _memory_links(memory, links)
+    banner = {"wrong": "Marked wrong", "deleted": "Retracted"}.get(memory["status"])
+    if memory["status"] == "superseded":
+        successors = [value for label, value in entries if label == "Replaced by"]
+        if successors:
+            banner = "Replaced by " + ", ".join(successors)
+    if memory.get("source"):
+        entries.append(("Source", _source_link(memory["source"], vault)))
+    body = (f"> {banner}\n\n" if banner else "") + memory["content"]
+    return _frontmatter(**properties) + body + "\n\n## Links\n\n" + "\n".join(
+        f"{label}: {value}" for label, value in entries
+    ) + "\n"
+
+
+def _timestamp(value: str | None) -> datetime:
+    if not value:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    parsed = datetime.fromisoformat(value)
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+
+
+def render_log(project: str, memories: list[dict]) -> str:
+    events = []
+    for memory in memories:
+        events.append((memory["created_at"], "created", memory))
+        status = memory["status"]
+        if status in {"superseded", "wrong", "deleted"}:
+            at = memory.get("invalid_at") if status != "deleted" else memory.get("updated_at")
+            if at:
+                event = {"superseded": "superseded", "wrong": "marked wrong", "deleted": "retracted"}[status]
+                events.append((at, event, memory))
+    events.sort(key=lambda event: (_timestamp(event[0]), event[2]["id"], event[1]), reverse=True)
+    lines = [f"# {project} log\n"]
+    for at, event, memory in events:
+        lines.append(f"## [{at[:10]}] {event} | {memory_title(memory['content'])}\n\n{_memory_link(memory)}\n")
+    return _frontmatter(project=project) + "\n".join(lines) + "\n"
+
+
+def render_project(project: str, overview: str | None, memories: list[dict], vault: Path) -> str:
+    lines = [f"# {project}\n"]
+    if overview:
+        lines.append(overview + "\n")
+    lines.append(f"{_project_link(project, 'log')} · {_project_link(project, 'files')}\n")
+    for field, heading in (("type", "By type"), ("status", "By status")):
+        lines.append(f"## {heading}\n")
+        lines.extend(f"- {name}: {count}" for name, count in sorted(Counter(m[field] for m in memories).items()))
+        lines.append("")
+    lines.append("## Recent memories\n")
+    for type_ in sorted({m["type"] for m in memories}):
+        lines.append(f"### {type_}\n")
+        recent = sorted((m for m in memories if m["type"] == type_),
+                        key=lambda m: (_timestamp(m["created_at"]), m["id"]), reverse=True)
+        lines.extend(f"- {_memory_link(m)}" for m in recent[:_RECENT_PER_TYPE])
+        lines.append("")
+    return _frontmatter(project=project) + "\n".join(lines) + "\n"
+
+
+def render_index(projects: list[tuple[str, str]]) -> str:
+    lines = ["# Chronicle\n"]
+    for project, summary in sorted(projects):
+        lines.append(f"- {_project_link(project)} — {' '.join(summary.splitlines())}")
+    return _frontmatter() + "\n".join(lines) + "\n"
