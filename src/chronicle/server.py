@@ -163,9 +163,13 @@ def memory_add(
     confidence: float | None = None,
     extraction_method: str | None = None,
     scope_path: str | None = None,
+    source: str | None = None,
 ) -> dict:
     project = scope_path if scope_path is not None else config.get_project()
     config.validate_type(type)
+    source = source if source and source.strip() else None
+    if source is not None and not source.startswith(("http://", "https://")):
+        source = str(Path(source).expanduser().resolve())
     vector = embeddings.embed_or_empty(content)
     memory_id = _get_service().add_memory(
         vector,
@@ -175,6 +179,8 @@ def memory_add(
         supersedes=supersedes,
         confidence=confidence,
         extraction_method=extraction_method,
+        source=source,
+        source_kind="reference",
     )
     return {
         "id": memory_id,
@@ -184,6 +190,8 @@ def memory_add(
         "supersedes": supersedes,
         "confidence": confidence,
         "extraction_method": extraction_method,
+        "source": source,
+        "source_kind": "reference" if source is not None else None,
     }
 
 

@@ -37,6 +37,7 @@ class MemoryService:
             "updated_at": _iso(row.updated_at),
             "source_id": row.source_id,
             "source": row.source_record.locator if row.source_record else None,
+            "source_kind": row.source_record.kind if row.source_record else None,
             "episode_id": row.episode_id,
             "episode_title": row.episode_record.title if row.episode_record else None,
             "supersedes": row.supersedes,
@@ -65,6 +66,7 @@ class MemoryService:
         extraction_method: str | None = None,
         episode_id: str | None = None,
         chunk_index: int | None = None,
+        source_kind: str = "external",
     ) -> str:
         project = _require_project(project)
         self.repository.get_or_create_scope(project)
@@ -75,6 +77,7 @@ class MemoryService:
             type_=type_,
             content=content,
             source=source,
+            source_kind=source_kind,
             status=status,
             supersedes=supersedes,
             confidence=confidence,

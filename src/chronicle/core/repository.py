@@ -64,16 +64,19 @@ class MemoryRepository:
         extraction_method: str | None = None,
         episode_id: str | None = None,
         chunk_index: int | None = None,
+        source_kind: str = "external",
     ) -> Memory:
         project = _require_project(project)
         with self.session_factory() as session:
             source_id = None
             if source is not None:
                 source_row = session.scalar(
-                    select(Source).where(Source.project == project, Source.locator == source)
+                    select(Source).where(
+                        Source.project == project, Source.locator == source, Source.kind == source_kind
+                    )
                 )
                 if source_row is None:
-                    source_row = Source(id=str(uuid.uuid4()), project=project, locator=source)
+                    source_row = Source(id=str(uuid.uuid4()), project=project, locator=source, kind=source_kind)
                     session.add(source_row)
                 source_id = source_row.id
             created_at = utc_now()
@@ -109,7 +112,9 @@ class MemoryRepository:
         project = _require_project(project)
         with self.session_factory() as session:
             source_row = session.scalar(
-                select(Source).where(Source.project == project, Source.locator == locator)
+                select(Source).where(
+                    Source.project == project, Source.locator == locator, Source.kind == "external"
+                )
             )
             if source_row is None:
                 source_row = Source(id=str(uuid.uuid4()), project=project, locator=locator)
@@ -203,6 +208,7 @@ class MemoryRepository:
                 Memory.project == project,
                 Source.project == project,
                 Source.locator == locator,
+                Source.kind != "reference",
                 Memory.status.not_in(HIDDEN_STATUSES),
             )
             .order_by(Memory.created_at.desc())
@@ -227,6 +233,7 @@ class MemoryRepository:
                 Memory.project == project,
                 Source.project == project,
                 Source.locator == locator,
+                Source.kind != "reference",
                 Memory.status.not_in(HIDDEN_STATUSES),
             )
         )
