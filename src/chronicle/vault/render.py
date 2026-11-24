@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path, PureWindowsPath
 
-from chronicle.vault.paths import MARKER, memory_stem, memory_title, project_folder_name, wikilink
+from chronicle.vault.paths import MARKER, project_folder_name, wikilink
 
 _RECENT_PER_TYPE = 5
 
@@ -37,13 +37,6 @@ def _target_link(target: LinkTarget) -> str:
     return wikilink(f"Chronicle/{folder}/memories/{target.stem}", target.title)
 
 
-def _memory_link(memory: dict) -> str:
-    return _target_link(LinkTarget(
-        memory["project"], memory_stem(memory["type"], memory["content"], memory["id"]),
-        memory_title(memory["content"]),
-    ))
-
-
 def _markdown_label(text: str) -> str:
     return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
@@ -58,7 +51,8 @@ def _source_link(source: str, vault: Path) -> str:
         link = wikilink(target.as_posix(), path.name)
     else:
         external = PureWindowsPath(source) if PureWindowsPath(source).is_absolute() else path
-        link = f"[{_markdown_label(external.name)}]({external.as_uri()})"
+        uri = external.as_uri().replace("(", "%28").replace(")", "%29")
+        link = f"[{_markdown_label(external.name)}]({uri})"
     return link + (" (file not found)" if not path.exists() else "")
 
 
@@ -108,7 +102,7 @@ def _timestamp(value: str | None) -> datetime:
     return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
 
 
-def render_log(project: str, memories: list[dict]) -> str:
+def render_log(project: str, memories: list[dict], links: dict[str, LinkTarget]) -> str:
     events = []
     for memory in memories:
         events.append((memory["created_at"], "created", memory))
@@ -121,11 +115,16 @@ def render_log(project: str, memories: list[dict]) -> str:
     events.sort(key=lambda event: (_timestamp(event[0]), event[2]["id"], event[1]), reverse=True)
     lines = [f"# {project} log\n"]
     for at, event, memory in events:
-        lines.append(f"## [{at[:10]}] {event} | {memory_title(memory['content'])}\n\n{_memory_link(memory)}\n")
+        target = links[memory['id']]
+        date = _timestamp(at).date().isoformat()
+        lines.append(f"## [{date}] {event} | {target.title}\n\n{_target_link(target)}\n")
     return _frontmatter(project=project) + "\n".join(lines) + "\n"
 
 
-def render_project(project: str, overview: str | None, memories: list[dict], vault: Path) -> str:
+def render_project(
+    project: str, overview: str | None, memories: list[dict], vault: Path,
+    links: dict[str, LinkTarget],
+) -> str:
     lines = [f"# {project}\n"]
     if overview:
         lines.append(overview + "\n")
@@ -139,7 +138,7 @@ def render_project(project: str, overview: str | None, memories: list[dict], vau
         lines.append(f"### {type_}\n")
         recent = sorted((m for m in memories if m["type"] == type_),
                         key=lambda m: (_timestamp(m["created_at"]), m["id"]), reverse=True)
-        lines.extend(f"- {_memory_link(m)}" for m in recent[:_RECENT_PER_TYPE])
+        lines.extend(f"- {_target_link(links[m['id']])}" for m in recent[:_RECENT_PER_TYPE])
         lines.append("")
     return _frontmatter(project=project) + "\n".join(lines) + "\n"
 

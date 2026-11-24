@@ -15,6 +15,14 @@ def memory(**changes):
     return item | changes
 
 
+def link_targets(items):
+    from chronicle.vault.render import LinkTarget
+
+    return {item['id']: LinkTarget(item['project'],
+                                  paths.memory_stem(item['type'], item['content'], item['id']),
+                                  paths.memory_title(item['content'])) for item in items}
+
+
 def frontmatter(page):
     block = page.split('---\n', 2)[1]
     result = {}
@@ -104,7 +112,7 @@ def test_log_is_newest_first_and_grep_friendly():
     items = [memory(status='superseded', invalid_at='2026-11-21T00:00:00+00:00'),
              memory(id='bbbbbbbb', status='wrong', invalid_at='2026-11-23T00:00:00+00:00'),
              memory(id='cccccccc', status='deleted')]
-    page = render_log('p', items)
+    page = render_log('p', items, link_targets(items))
     headings = [line for line in page.splitlines() if line.startswith('## [')]
     assert headings[:3] == ['## [2026-11-23] marked wrong | Title',
                             '## [2026-11-22] retracted | Title',
@@ -117,7 +125,8 @@ def test_log_is_newest_first_and_grep_friendly():
 def test_project_page_links_log_files_and_recent_memories(tmp_path):
     from chronicle.vault.render import render_project
 
-    page = render_project('a/b', 'Overview **verbatim**', [memory(project='a/b')], tmp_path)
+    page = render_project('a/b', 'Overview **verbatim**', [memory(project='a/b')], tmp_path,
+                          link_targets([memory(project='a/b')]))
     folder = paths.project_folder_name('a/b')
     assert f'[[Chronicle/{folder}/log|log]]' in page
     assert f'[[Chronicle/{folder}/files|files]]' in page
@@ -134,8 +143,8 @@ def test_renderers_are_deterministic_and_do_not_mutate_inputs(tmp_path):
     item = memory()
     before = deepcopy(item)
     for render in [lambda: render_memory(item, {}, tmp_path),
-                   lambda: render_project('p', None, [item], tmp_path),
-                   lambda: render_log('p', [item]),
+                   lambda: render_project('p', None, [item], tmp_path, link_targets([item])),
+                   lambda: render_log('p', [item], link_targets([item])),
                    lambda: render_index([('a/b', 'Summary')])]:
         assert render() == render()
         assert frontmatter(render())['generated_by'] == 'chronicle'
@@ -152,12 +161,12 @@ def test_recent_memories_are_bounded_per_type_and_newest_first(tmp_path):
     items = [memory(id=f'{number:08d}', content=f'Title {number}',
                     created_at=f'2026-11-{number + 1:02d}T00:00:00+00:00') for number in range(7)]
     items.append(memory(id='decision', type='decision', content='Decision'))
-    page = render_project('p', None, items, tmp_path)
+    page = render_project('p', None, items, tmp_path, link_targets(items))
     assert 'Title 0' not in page and 'Title 1' not in page
     assert page.index('|Title 6]]') < page.index('|Title 2]]')
     assert '|Decision]]' in page
     assert 'note: 7' in page
-    assert page == render_project('p', None, list(reversed(items)), tmp_path)
+    assert page == render_project('p', None, list(reversed(items)), tmp_path, link_targets(items))
 
 
 def test_log_compares_actual_instants_and_has_stable_ties():
@@ -165,9 +174,9 @@ def test_log_compares_actual_instants_and_has_stable_ties():
 
     early = memory(id='aaaaaaaa', content='Early', created_at='2026-11-21T01:00:00+02:00')
     late = memory(id='bbbbbbbb', content='Late', created_at='2026-11-20T23:30:00+00:00')
-    page = render_log('p', [early, late])
+    page = render_log('p', [early, late], link_targets([early, late]))
     assert page.index('| Late') < page.index('| Early')
-    assert page == render_log('p', [late, early])
+    assert page == render_log('p', [late, early], link_targets([early, late]))
 
 
 def test_supersedes_relation_is_not_duplicated(tmp_path):
@@ -184,14 +193,14 @@ def test_aliases_and_log_titles_use_shared_trimmed_eighty_character_title(tmp_pa
 
     item = memory(content=' \n  ' + 'x' * 100 + '  \nbody')
     title = 'x' * 80
-    assert f'created | {title}\n' in render_log('p', [item])
-    assert f'|{title}]]' in render_project('p', None, [item], tmp_path)
+    assert f'created | {title}\n' in render_log('p', [item], link_targets([item]))
+    assert f'|{title}]]' in render_project('p', None, [item], tmp_path, link_targets([item]))
 
 
 def test_empty_project_log_and_index_have_generated_marker(tmp_path):
     from chronicle.vault.render import render_index, render_log, render_project
 
-    for page in [render_project('p', None, [], tmp_path), render_log('p', []), render_index([])]:
+    for page in [render_project('p', None, [], tmp_path, {}), render_log('p', [], {}), render_index([])]:
         assert frontmatter(page)['generated_by'] == 'chronicle'
 
 
@@ -203,3 +212,53 @@ def test_index_sorts_projects_and_keeps_summaries_on_one_line():
     assert page.index('Chronicle/a/a') < page.index('Chronicle/z/z')
     assert 'first second' in page
     assert page == render_index(list(reversed(projects)))
+
+
+def test_project_and_log_keep_supplied_target_after_content_edit(tmp_path):
+    from chronicle.vault.render import LinkTarget, render_log, render_project
+
+    item = memory(content='Changed first line\nEdited body')
+    links = {item['id']: LinkTarget('p', 'note-original-12345678', 'Original title')}
+    for page in [render_project('p', None, [item], tmp_path, links),
+                 render_log('p', [item], links)]:
+        assert '[[Chronicle/p/memories/note-original-12345678|Original title]]' in page
+        assert 'Changed' not in page
+    assert 'created | Original title\n' in render_log('p', [item], links)
+
+
+@pytest.mark.parametrize('page_type', ['project', 'log'])
+def test_project_and_log_fail_visibly_for_missing_target(tmp_path, page_type):
+    from chronicle.vault.render import render_log, render_project
+
+    item = memory()
+    with pytest.raises(KeyError) as caught:
+        if page_type == 'project':
+            render_project('p', None, [item], tmp_path, {})
+        else:
+            render_log('p', [item], {})
+    assert caught.value.args == (item['id'],)
+
+
+def test_external_source_parentheses_are_encoded(tmp_path, monkeypatch):
+    from chronicle.vault.render import render_memory
+
+    source = tmp_path / 'report (1).pdf'
+    source.write_text('source')
+    uri = source.as_uri().replace('(', '%28').replace(')', '%29')
+    # Emulate pathlib versions that leave parentheses unescaped in file URIs.
+    monkeypatch.setattr(type(source), 'as_uri',
+                        lambda self: uri.replace('%28', '(').replace('%29', ')'))
+    page = render_memory(memory(source=str(source)), {}, tmp_path / 'vault')
+    assert f'Source: [report (1).pdf]({uri})' in page
+
+
+@pytest.mark.parametrize('status', ['active', 'wrong', 'deleted'])
+def test_log_heading_dates_use_utc_for_created_and_status_events(status):
+    from chronicle.vault.render import render_log
+
+    at = '2026-11-21T01:00:00+02:00'
+    item = memory(status=status, created_at=at, invalid_at=at, updated_at=at)
+    page = render_log('p', [item], link_targets([item]))
+    headings = [line for line in page.splitlines() if line.startswith('## [')]
+    assert len(headings) == (1 if status == 'active' else 2)
+    assert all(line.startswith('## [2026-11-20]') for line in headings)
