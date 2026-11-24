@@ -8,6 +8,7 @@ from mcp.types import TextContent
 from chronicle import config, dashboard, embeddings, graph_cli, refresh, registry, services
 from chronicle.core.runtime import get_runtime
 from chronicle.project_resolution import take_registration_notice
+from chronicle.vault import tools as vault_tools
 
 mcp = FastMCP(
     "chronicle",
@@ -93,7 +94,8 @@ mcp = FastMCP(
         "were never true, memory_merge to combine sources, and memory_split "
         "to replace one source with fragments; use memory_add with "
         "supersedes for a genuinely new replacement fact and memory_link "
-        "for relationships without replacement."
+        "for relationships without replacement. "
+        "When the user asks to note a file or vault note in Chronicle, read it and call memory_add with source=<path>; use memory_list_files to find documents in the project folder; only call memory_vault_add_project/remove_project when the user asks."
     ),
 )
 
@@ -153,6 +155,9 @@ def _get_service():
     if _service is None:
         _service = get_runtime()
     return _service
+
+
+vault_tools.register(mcp, _get_service)
 
 
 @mcp.tool
